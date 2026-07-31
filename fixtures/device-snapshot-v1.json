@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "messageId": 42,
+  "generatedAtEpoch": 1785508800,
+  "staleAfterSeconds": 180,
+  "providers": [
+    {
+      "id": "codex",
+      "name": "Codex",
+      "status": "ok",
+      "windows": [
+        {
+          "kind": "session",
+          "label": "Session",
+          "usedPercent": 28,
+          "resetAtEpoch": 1785527700
+        },
+        {
+          "kind": "weekly",
+          "label": "Weekly",
+          "usedPercent": 59,
+          "resetAtEpoch": 1785603600
+        }
+      ]
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "status": "ok",
+      "windows": [
+        {
+          "kind": "session",
+          "label": "Session",
+          "usedPercent": 73,
+          "resetAtEpoch": 1785519600
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "status": "unavailable",
+      "windows": []
+    }
+  ],
+  "display": {
+    "brightnessPercent": 55,
+    "alertThresholds": [75, 90],
+    "soundEnabled": false
+  },
+  "event": null
+}
+

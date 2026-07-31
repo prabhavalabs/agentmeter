@@ -1,0 +1,17 @@
+# Copy this file to the location printed by `agentmeter doctor`.
+
+[general]
+poll_interval_seconds = 60
+providers = ["codex", "claude", "gemini"]
+
+[display]
+brightness_percent = 55
+dim_after_seconds = 300
+screen_off_after_seconds = 1800
+alert_thresholds = [75, 90]
+sound_enabled = false
+
+[transport]
+preferred = "ble"
+device_name = "AgentMeter"
+

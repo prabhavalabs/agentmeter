@@ -1,0 +1,30 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# PlatformIO
+.pio/
+firmware/.pio/
+
+# Local configuration and operating-system files
+.DS_Store
+config.toml
+*.local.toml
+
+# Local development assistant configuration
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.windsurf/
+docs/superpowers/
+

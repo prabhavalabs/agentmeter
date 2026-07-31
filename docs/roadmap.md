@@ -1,0 +1,59 @@
+# Roadmap
+
+AgentMeter is in early development. Milestones are ordered to produce a reliable, understandable hobby project before adding optional features.
+
+## 0. Repository foundation — complete
+
+- Public project structure and MIT license
+- Host and firmware toolchain scaffolds
+- Architecture, hardware, setup, configuration, protocol, and contribution guides
+- Safe device schema and fixture
+- Automated host and firmware checks
+
+## 1. Hardware bring-up — next
+
+- Confirm the exact board revision and USB upload process
+- Initialize the AMOLED and render a test pattern
+- Verify touch, buttons, audio, IMU, RTC, and power management
+- Record verified pins and board notes
+- Run a 30-minute stability test
+
+## 2. Host data source
+
+- Launch CodexBar securely on loopback
+- Validate dashboard schema version 1
+- Normalize Codex, Claude, and Gemini snapshots
+- Prove that identity and credentials never enter device fixtures
+
+## 3. Communication
+
+- Implement Bluetooth discovery, framing, acknowledgement, retry, and reconnect
+- Implement USB serial fallback
+- Add a `doctor` command for permissions and connection problems
+- Complete repeated-send and forced-disconnect tests
+
+## 4. Display interface
+
+- Create overview and provider-detail screens
+- Add reset countdowns and progress indicators
+- Add waiting, stale, disconnected, and error states
+- Add touch navigation and physical-button fallback
+- Add dimming, screen-off, and pixel-shift protection
+
+## 5. Alerts and packaging
+
+- Add deduplicated 75% and 90% alerts
+- Add optional short device sounds
+- Package the host for straightforward macOS installation
+- Publish firmware binaries and a photographed assembly guide
+- Complete an independent setup test from the documentation
+
+## Later ideas
+
+- Linux and Windows host packages
+- Additional display boards and enclosure files
+- Historical sparklines and local trend storage
+- Desktop notifications
+- Multiple paired displays
+- Secure over-the-air firmware updates
+

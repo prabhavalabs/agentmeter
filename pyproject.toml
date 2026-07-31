@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentmeter-host"
+version = "0.1.0"
+description = "Desktop bridge for the AgentMeter coding-agent usage display"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Nipun Theekshana" },
+]
+keywords = ["esp32", "bluetooth", "usage-monitor", "coding-agents"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: System :: Monitoring",
+]
+dependencies = [
+  "bleak>=3.0.2,<4",
+  "httpx>=0.28.1,<1",
+  "platformdirs>=4,<5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jsonschema>=4,<5",
+  "pytest>=9,<10",
+  "pytest-asyncio>=1,<2",
+  "ruff>=0.15,<1",
+]
+firmware = [
+  "platformio>=6.1,<7",
+]
+
+[project.scripts]
+agentmeter = "agentmeter_host.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/prabhavalabs/agentmeter"
+Documentation = "https://github.com/prabhavalabs/agentmeter/tree/main/docs"
+Issues = "https://github.com/prabhavalabs/agentmeter/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["host/src/agentmeter_host"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["host/tests"]
+pythonpath = ["host/src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
