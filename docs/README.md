@@ -10,5 +10,5 @@ Use these guides in order when building or contributing to AgentMeter:
 6. [Development](development.md) — repository workflow and validation
 7. [Roadmap](roadmap.md) — current phase and planned milestones
 
-Screenshots, enclosure files, and a step-by-step physical assembly guide will be added after the first hardware bring-up.
-
+Screenshots and a step-by-step physical assembly guide will be added after the
+hardware diagnostic and stability test are complete.

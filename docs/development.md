@@ -28,7 +28,9 @@ make firmware
 .venv/bin/pio device monitor -d firmware
 ```
 
-Board-specific pin definitions and display initialization should remain under a dedicated board-support directory once hardware bring-up begins.
+Board-specific pin definitions and display initialization live under
+`firmware/src/boards/`. Keep new board support isolated there and expose it
+through the small interface in the board header.
 
 ## Contract changes
 

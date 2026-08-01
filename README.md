@@ -8,7 +8,9 @@
 
 It pairs an attractive 480×480 AMOLED touchscreen with a lightweight desktop application. Provider authentication stays on the computer; the display receives only the small, normalized snapshot needed to draw the interface.
 
-> Project status: repository scaffold complete; hardware bring-up begins when the first board arrives.
+> Project status: hardware bring-up is in progress. The AMOLED, touch controller,
+> power manager, user button, and external PSRAM are supported by the first
+> on-device diagnostic.
 
 ## What it will show
 
