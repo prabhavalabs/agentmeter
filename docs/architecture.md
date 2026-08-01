@@ -20,14 +20,15 @@ flowchart LR
 
 ### Desktop host
 
-The Python host application will:
+The Python host application:
 
-1. Start or connect to CodexBar on the loopback interface.
-2. Poll the versioned dashboard endpoint approximately once per minute.
-3. Select configured providers and convert their data into the device schema.
-4. Remove account identity, raw responses, credentials, costs, and unrelated fields.
-5. Deliver the snapshot over Bluetooth LE, with USB serial available for setup and recovery.
-6. Retry temporary failures and expose a concise `doctor` command for troubleshooting.
+1. Supervises `codexbar serve` on `127.0.0.1` and a temporary local port.
+2. Fetches `GET /dashboard/v1/snapshot` with a process-scoped bearer token.
+3. Selects configured providers and converts their data into the device schema.
+4. Removes account identity, raw responses, credentials, costs, and unrelated fields.
+5. Currently prints a one-shot snapshot for verification; Bluetooth delivery is the
+   next milestone, with USB serial retained for setup and recovery.
+6. Exposes a concise `doctor` command for installation and configuration problems.
 
 Provider collection stays behind an adapter boundary so another local source can be added without changing the firmware protocol.
 
@@ -69,7 +70,15 @@ The display must never receive:
 - Raw provider responses or local coding-session logs
 - Prompt text, generated code, file paths, or repository names
 
-CodexBar remains bound to `127.0.0.1`. A random dashboard token is passed only to its child process and is never written to device storage.
+CodexBar remains bound to `127.0.0.1`. A fresh 256-bit dashboard token is passed
+through `CODEXBAR_DASHBOARD_TOKEN`, never through command arguments. The host
+stops the supervised process after collection, and the token is never written to
+configuration or device storage.
+
+The CodexBar dashboard contract is already redacted, but AgentMeter applies a
+stricter allowlist. It removes the complete identity object, plan, source, credits,
+cost, upstream display hints, and raw error details before encoding the device
+document.
 
 ## Reliability rules
 
@@ -88,4 +97,3 @@ CodexBar remains bound to `127.0.0.1`. A random dashboard token is passed only t
 - Recovery transport: USB serial
 
 Linux is the next host target. Windows and additional display boards follow after the first hardware release is stable.
-

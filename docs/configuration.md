@@ -10,8 +10,10 @@ poll_interval_seconds = 60
 providers = ["codex", "claude", "gemini"]
 ```
 
-- `poll_interval_seconds` controls how often the local source is checked. The minimum supported value will be 30 seconds.
-- `providers` controls display order and is limited to four entries.
+- `poll_interval_seconds` controls the CodexBar cache interval and later the host
+  polling interval. The minimum value is 30 seconds.
+- `providers` controls display order and accepts one to four unique lowercase IDs.
+  The first tested IDs are `codex`, `claude`, and `gemini`.
 
 ## Display settings
 
@@ -34,9 +36,10 @@ preferred = "ble"
 device_name = "AgentMeter"
 ```
 
-Bluetooth LE is the normal connection. USB serial will remain available as a diagnostic and recovery transport.
+Bluetooth LE is the planned normal connection. USB serial will remain available
+as a diagnostic and recovery transport. Transport settings are present for the
+next milestone and do not change `agentmeter snapshot` yet.
 
 ## Secrets
 
 AgentMeter configuration must not contain provider API keys, session cookies, or OAuth tokens. Provider authentication belongs to the local data source. Local configuration files are excluded from version control.
-
