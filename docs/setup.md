@@ -47,7 +47,11 @@ When the board is connected, upload and open the serial monitor:
 .venv/bin/pio device monitor -d firmware
 ```
 
-The initial scaffold prints its name and version over USB serial. Display initialization will be added during hardware bring-up.
+After flashing, the screen shows the AgentMeter hardware diagnostic. Confirm
+the moving display test, tap coordinates, and button-controlled brightness.
+The serial monitor reports peripheral detection, PSRAM capacity, display timing,
+and a five-second heartbeat. See [Hardware](hardware.md#board-bring-up-reference)
+for the expected results.
 
 ## Configuration
 

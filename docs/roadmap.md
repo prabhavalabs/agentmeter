@@ -10,13 +10,14 @@ AgentMeter is in early development. Milestones are ordered to produce a reliable
 - Safe device schema and fixture
 - Automated host and firmware checks
 
-## 1. Hardware bring-up — next
+## 1. Hardware bring-up — in progress
 
-- Confirm the exact board revision and USB upload process
-- Initialize the AMOLED and render a test pattern
-- Verify touch, buttons, audio, IMU, RTC, and power management
-- Record verified pins and board notes
-- Run a 30-minute stability test
+- Confirm the exact board revision and USB upload process — complete
+- Initialize the AMOLED and render a test pattern — complete
+- Verify touch, the user button, and power management — in progress
+- Verify audio, IMU, and RTC — planned as separate drivers
+- Record verified pins and board notes — complete
+- Run a 30-minute stability test — complete
 
 ## 2. Host data source
 
@@ -56,4 +57,3 @@ AgentMeter is in early development. Milestones are ordered to produce a reliable
 - Desktop notifications
 - Multiple paired displays
 - Secure over-the-air firmware updates
-

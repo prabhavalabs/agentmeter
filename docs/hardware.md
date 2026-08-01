@@ -71,3 +71,66 @@ When the board arrives:
 6. Run a 30-minute gradient/display test and watch for resets or visual corruption.
 
 Do not install a battery during initial bring-up.
+
+## Board bring-up reference
+
+The firmware board layer follows the manufacturer's published pin map for the
+ESP32-S3-Touch-AMOLED-2.16:
+
+| Function | GPIO |
+| --- | --- |
+| CO5300 QSPI data 0–3 | 4, 5, 6, 7 |
+| CO5300 chip select | 12 |
+| CO5300 QSPI clock | 38 |
+| CO5300 reset | 39 |
+| Shared I2C SDA / SCL | 15 / 14 |
+| CST9220 interrupt / reset | 11 / 40 |
+| User button | 18, active low |
+
+Primary sources:
+
+- [Waveshare hardware documentation](https://docs.waveshare.com/ESP32-S3-Touch-AMOLED-2.16)
+- [Waveshare schematic](https://files.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-2.16/ESP32-S3-Touch-AMOLED-2.16-Schematic.pdf)
+- [Waveshare Arduino examples](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-2.16/tree/main/examples/arduino), reviewed at commit `713f8bdcc0fc2356ac22335ed4f381096e45ceea` (Apache-2.0)
+
+The initial diagnostic uses two 38,400-byte LVGL partial buffers in external
+PSRAM. It tests display updates, touch coordinates, GPIO18, and three AMOLED
+brightness levels. The speaker is connected through the ES8311 I2S codec, so
+audio is intentionally reserved for a separate driver milestone rather than
+treated as a direct GPIO buzzer.
+
+PlatformIO uses the `esp32-s3-devkitc1-n16r8` board profile. This exact profile
+is important: it enables the unit's 16 MB quad flash and 8 MB octal PSRAM.
+Using the generic no-PSRAM ESP32-S3 DevKit profile prevents the LVGL buffers
+from being allocated even though the physical chip contains PSRAM.
+
+### Flash and monitor
+
+With the board connected over USB, find its serial port and run:
+
+```bash
+.venv/bin/pio device list
+.venv/bin/pio run -d firmware --target upload --upload-port /dev/cu.usbmodemXXXX
+.venv/bin/pio device monitor --port /dev/cu.usbmodemXXXX --baud 115200
+```
+
+Expected checks:
+
+1. A dark blue-purple diagnostic screen appears with a moving square.
+2. Tapping the screen shows a cyan marker and coordinates.
+3. Pressing the GPIO18 user button cycles through three brightness levels.
+4. Serial output reports the AXP2101, CO5300, CST9220, PSRAM capacity, render
+   timing, and a five-second heartbeat.
+5. Leave the diagnostic running for 30 minutes and check that no resets,
+   corruption, stuck pixels, or excessive heat occurs.
+
+### Initial validation
+
+The first development unit completed a 30-minute animated-display soak on
+August 1, 2026. Serial telemetry reported 46,800 display flushes at an average
+of 527 microseconds, with free heap steady at 188,520 bytes and minimum free
+heap steady at 183,244 bytes. No resets, watchdogs, or firmware errors occurred.
+
+AMOLED color and visual integrity, touch-marker movement, button-controlled
+brightness, and enclosure temperature remain manual checks because they require
+observation of the physical unit.
