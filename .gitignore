@@ -16,6 +16,7 @@ firmware/.pio/
 .DS_Store
 config.toml
 *.local.toml
+.worktrees/
 
 # Local development assistant configuration
 AGENTS.md
@@ -27,4 +28,3 @@ GEMINI.md
 .cursor/
 .windsurf/
 docs/superpowers/
-
