@@ -42,6 +42,8 @@ display preferences. Run `doctor` again; all five checks should report `OK`.
 The command starts a temporary CodexBar server, waits until it is ready, fetches
 one snapshot, stops the server, and prints device protocol version 1. Omit
 `--pretty` to see the exact compact form that will be sent to the ESP32.
+An uncached multi-provider collection can take up to 60 seconds; the host keeps a
+five-second margin so CodexBar can return its own bounded error response.
 
 Expected top-level fields are `schemaVersion`, `messageId`, `generatedAtEpoch`,
 `staleAfterSeconds`, `providers`, `display`, and `event`. A configured provider
