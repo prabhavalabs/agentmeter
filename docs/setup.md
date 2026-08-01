@@ -6,6 +6,7 @@ The first development target is macOS 14 or later. Linux instructions will be ad
 
 - Git
 - Python 3.11 or later
+- A recent CodexBar CLI with `codexbar serve`
 - A data-capable USB-C cable
 - Waveshare ESP32-S3-Touch-AMOLED-2.16 for firmware testing
 
@@ -32,7 +33,14 @@ make lint
 make test
 ```
 
-The `doctor` command reports optional components that have not yet been installed. A missing CodexBar installation is expected until the data-source phase is implemented.
+The `doctor` command requires the Python libraries, CodexBar command, and a valid
+AgentMeter configuration. Install the CodexBar CLI from **Preferences → Advanced →
+Install CLI** in the macOS app, then verify it with:
+
+```bash
+codexbar --version
+codexbar serve --help
+```
 
 ## Build the firmware
 
@@ -61,4 +69,13 @@ Copy `config.example.toml` to the location shown by:
 .venv/bin/agentmeter doctor
 ```
 
-The example documents the planned settings. Data collection and device connection are intentionally not enabled in the initial scaffold.
+After copying the file, verify the secure local data path:
+
+```bash
+.venv/bin/agentmeter doctor
+.venv/bin/agentmeter snapshot --pretty
+```
+
+Snapshot collection is implemented. Bluetooth device delivery remains disabled
+until the communication milestone. See [Host data source](host.md) for behavior,
+privacy rules, and troubleshooting.

@@ -19,6 +19,9 @@ make test
 ```
 
 Ruff provides formatting and static checks. Pytest runs from `host/tests/`.
+The CodexBar tests use a local fake server process, so the complete automated test
+suite does not require provider accounts or a CodexBar installation. A manual live
+acceptance run uses `agentmeter snapshot --pretty`.
 
 ## Firmware workflow
 
@@ -43,6 +46,10 @@ Any device-message change must update:
 5. `docs/protocol.md`
 
 Breaking changes require a new `schemaVersion`; do not silently change the meaning of an existing field.
+
+Never add raw CodexBar dashboard responses as fixtures. Tests must use synthetic
+identity, billing, status, and error values and assert that these fields do not
+reach the device document.
 
 ## Pull requests
 

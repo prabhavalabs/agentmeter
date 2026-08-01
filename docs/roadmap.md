@@ -14,17 +14,18 @@ AgentMeter is in early development. Milestones are ordered to produce a reliable
 
 - Confirm the exact board revision and USB upload process — complete
 - Initialize the AMOLED and render a test pattern — complete
-- Verify touch, the user button, and power management — in progress
+- Verify touch, the user button, and power management — complete
 - Verify audio, IMU, and RTC — planned as separate drivers
 - Record verified pins and board notes — complete
 - Run a 30-minute stability test — complete
 
-## 2. Host data source
+## 2. Host data source — implementation complete
 
-- Launch CodexBar securely on loopback
-- Validate dashboard schema version 1
-- Normalize Codex, Claude, and Gemini snapshots
-- Prove that identity and credentials never enter device fixtures
+- Launch CodexBar securely on loopback — complete
+- Validate dashboard schema version 1 — complete
+- Normalize Codex, Claude, and Gemini snapshots — complete
+- Prove that identity and credentials never enter device payloads — complete
+- Complete a live-provider acceptance run — pending local CodexBar CLI installation
 
 ## 3. Communication
 

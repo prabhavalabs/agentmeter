@@ -8,9 +8,9 @@
 
 It pairs an attractive 480×480 AMOLED touchscreen with a lightweight desktop application. Provider authentication stays on the computer; the display receives only the small, normalized snapshot needed to draw the interface.
 
-> Project status: hardware bring-up is in progress. The AMOLED, touch controller,
-> power manager, user button, and external PSRAM are supported by the first
-> on-device diagnostic.
+> Project status: the board diagnostic and secure CodexBar data source are
+> implemented. Bluetooth delivery and the final dashboard interface are the next
+> milestones.
 
 ## What it will show
 
@@ -71,13 +71,22 @@ make lint
 make test
 ```
 
+After installing the CodexBar CLI and copying `config.example.toml` to the path
+reported by `agentmeter doctor`, collect one privacy-filtered device snapshot:
+
+```bash
+.venv/bin/agentmeter doctor
+.venv/bin/agentmeter snapshot --pretty
+```
+
 Firmware builds use [PlatformIO](https://platformio.org/):
 
 ```bash
 make firmware
 ```
 
-Detailed instructions are in [Setup](docs/setup.md) and [Development](docs/development.md).
+Detailed instructions are in [Setup](docs/setup.md), [Host data source](docs/host.md),
+and [Development](docs/development.md).
 
 ## Project principles
 
