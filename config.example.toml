@@ -2,7 +2,7 @@
 
 [general]
 poll_interval_seconds = 60
-providers = ["codex", "claude", "gemini"]
+providers = ["codex", "claude", "gemini", "cursor"]
 
 [display]
 brightness_percent = 55
@@ -14,4 +14,3 @@ sound_enabled = false
 [transport]
 preferred = "ble"
 device_name = "AgentMeter"
-

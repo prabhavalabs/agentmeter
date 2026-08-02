@@ -7,7 +7,7 @@ AgentMeter reads `~/.config/AgentMeter/config.toml` by default. Run `agentmeter 
 ```toml
 [general]
 poll_interval_seconds = 60
-providers = ["codex", "claude", "gemini"]
+providers = ["codex", "claude", "gemini", "cursor"]
 ```
 
 - `poll_interval_seconds` is the delay between completed bridge sends and also the CodexBar refresh interval. It must be at least 30 seconds. Provider collection itself can add time between visible updates.
@@ -15,6 +15,17 @@ providers = ["codex", "claude", "gemini"]
 - A configured provider missing from CodexBar appears as unavailable instead of being silently removed.
 
 Use the display's gear menu to hide an available provider from Home without editing this file or restarting the bridge. This separation keeps the host responsible for collection and the display responsible for presentation.
+
+### Cursor
+
+Cursor usage is collected by CodexBar's [Cursor provider](https://github.com/steipete/CodexBar/blob/main/docs/cursor.md) from the signed-in Cursor browser or desktop-app session. Enable and verify the provider before starting AgentMeter:
+
+```bash
+codexbar config enable --provider cursor
+codexbar --provider cursor --format json --pretty
+```
+
+The resulting AgentMeter card shows Cursor's available plan-usage windows and billing-cycle reset. Account identity, plan details, billing amounts, and raw dashboard responses remain on the Mac.
 
 ## Display settings
 

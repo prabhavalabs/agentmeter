@@ -11,7 +11,7 @@ def test_load_config_reads_host_data_source_settings() -> None:
     config = load_config(ROOT / "config.example.toml")
 
     assert config.poll_interval_seconds == 60
-    assert config.provider_ids == ("codex", "claude", "gemini")
+    assert config.provider_ids == ("codex", "claude", "gemini", "cursor")
     assert config.display.brightness_percent == 55
     assert config.display.dim_after_seconds == 300
     assert config.display.screen_off_after_seconds == 1800

@@ -20,7 +20,7 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 - Persistent supervised CodexBar loopback server with a fresh bearer token per process
 - Per-provider last-good caching for transient Claude and other provider failures
 - Dashboard schema validation and allowlist normalization
-- Live Codex, Claude, and Gemini acceptance
+- Live Codex, Claude, Gemini, and Cursor acceptance
 - Confirmed that identity, credentials, costs, and raw responses do not enter device messages
 
 ## Communication — complete
@@ -35,7 +35,7 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 - Responsive, scrollable one-to-eight-provider overview and provider-detail screens
 - Reset countdowns and threshold-aware progress indicators
 - Waiting, reconnecting, stale, unavailable, and provider-error states
-- Recognizable Codex, Claude, and Gemini marks
+- Recognizable Codex, Claude, Gemini, and Cursor marks
 - Persistent agent visibility, always-on, and full-view rotation settings
 - Touch navigation and context-aware physical-button fallback
 - Configurable dimming, screen-off, always-on override, and pixel shifting
