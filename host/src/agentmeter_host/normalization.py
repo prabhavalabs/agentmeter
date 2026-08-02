@@ -8,6 +8,7 @@ from typing import Any
 _PROVIDER_NAMES = {
     "claude": "Claude",
     "codex": "Codex",
+    "cursor": "Cursor",
     "gemini": "Gemini",
 }
 

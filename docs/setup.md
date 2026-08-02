@@ -17,7 +17,7 @@ codexbar --version
 codexbar serve --help
 ```
 
-Configure and verify Codex, Claude, Gemini, or any other supported account inside CodexBar first. AgentMeter does not store those credentials.
+Configure and verify Codex, Claude, Gemini, Cursor, or any other supported account inside CodexBar first. AgentMeter does not store those credentials. Cursor can be verified independently with `codexbar --provider cursor --format json --pretty`.
 
 ## Prepare AgentMeter
 

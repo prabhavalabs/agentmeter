@@ -5,6 +5,7 @@
 #include <unity.h>
 
 #include "dashboard_model.h"
+#include "provider_visuals.h"
 #include "protocol.h"
 #include "settings_model.h"
 #include "ui_layout.h"
@@ -141,6 +142,15 @@ void test_ui_formats_unknown_usage_and_bounded_reset_countdowns() {
   TEST_ASSERT_EQUAL_STRING("1h 1m", text.data());
   agentmeter::format_countdown(8 * 86400, text.data(), text.size());
   TEST_ASSERT_EQUAL_STRING("8d", text.data());
+}
+
+void test_cursor_visuals_use_warm_neutral_cube_mark() {
+  const agentmeter::ProviderVisuals visuals =
+      agentmeter::provider_visuals("cursor");
+
+  TEST_ASSERT_EQUAL_HEX32(0xD6D5CC, visuals.accent_rgb);
+  TEST_ASSERT_EQUAL(static_cast<int>(agentmeter::ProviderMark::CursorCube),
+                    static_cast<int>(visuals.mark));
 }
 
 void test_dashboard_preferences_filter_providers_by_stable_id() {
@@ -280,6 +290,7 @@ int main(int, char**) {
       test_reassembler_applies_snapshot_only_after_final_in_order_fragment);
   RUN_TEST(test_ack_encodes_protocol_version_message_id_and_status);
   RUN_TEST(test_ui_formats_unknown_usage_and_bounded_reset_countdowns);
+  RUN_TEST(test_cursor_visuals_use_warm_neutral_cube_mark);
   RUN_TEST(test_dashboard_preferences_filter_providers_by_stable_id);
   RUN_TEST(test_dashboard_preferences_round_trip_hidden_provider_ids);
   RUN_TEST(test_full_view_rotation_skips_hidden_providers_and_wraps);

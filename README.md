@@ -8,7 +8,7 @@
 
 It pairs a 480×480 AMOLED touchscreen with a lightweight macOS bridge. Provider authentication stays on the computer; the display receives only the bounded, privacy-filtered values required by its interface.
 
-The first hardware version is working end to end with Codex, Claude, and Gemini data supplied by CodexBar. Bluetooth delivery, acknowledgement, reconnection, USB fallback, the dashboard UI, alerts, and launch-at-login installation are implemented.
+The first hardware version is working end to end with Codex, Claude, Gemini, and Cursor data supplied by CodexBar. Bluetooth delivery, acknowledgement, reconnection, USB fallback, the dashboard UI, alerts, and launch-at-login installation are implemented.
 
 ## What it shows
 

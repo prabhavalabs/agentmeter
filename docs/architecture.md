@@ -71,7 +71,7 @@ CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXB
 
 - Host: macOS 14 or later
 - Board: Waveshare ESP32-S3-Touch-AMOLED-2.16
-- Acceptance providers: Codex, Claude, and Gemini
+- Acceptance providers: Codex, Claude, Gemini, and Cursor
 - Primary transport: Bluetooth LE
 - Recovery transport: USB serial
 
