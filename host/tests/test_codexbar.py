@@ -164,6 +164,23 @@ def test_serve_process_allows_slow_multi_provider_collection() -> None:
     assert arguments[-2:] == ("--request-timeout", "60")
 
 
+def test_serve_process_isolates_claude_cli_from_plugins() -> None:
+    from agentmeter_host.codexbar import build_serve_process
+
+    _arguments, environment = build_serve_process(
+        command="codexbar",
+        port=46_213,
+        refresh_interval_seconds=60,
+        token="test-secret",
+        base_environment={"PATH": "/opt/homebrew/bin:/usr/bin"},
+        claude_command="/opt/homebrew/bin/claude",
+        claude_shim_command="/app/venv/bin/agentmeter-claude-probe",
+    )
+
+    assert environment["CLAUDE_CLI_PATH"] == "/app/venv/bin/agentmeter-claude-probe"
+    assert environment["AGENTMETER_CLAUDE_CLI_PATH"] == "/opt/homebrew/bin/claude"
+
+
 @pytest.mark.asyncio
 async def test_server_supervises_loopback_process_and_fetches_snapshot(
     tmp_path, monkeypatch

@@ -9,7 +9,7 @@ from agentmeter_host.normalization import normalize_dashboard_snapshot
 
 
 class DeviceSnapshotCollector:
-    """Keep one CodexBar server alive for the lifetime of a bridge run."""
+    """Own the CodexBar server used for one device snapshot."""
 
     def __init__(
         self,

@@ -20,6 +20,8 @@ make host-test
 
 Ruff checks formatting and static rules. Pytest uses fake CodexBar processes and transport backends, so automated tests need no provider accounts, Bluetooth adapter, or attached hardware.
 
+Claude CLI integration is tested through a fake executable at the process boundary. Keep `agentmeter-claude-probe` limited to direct execution without a shell, persistent state, or user customizations. Live verification should confirm that repeated AgentMeter snapshots do not increase the number of Claude plugin or MCP processes.
+
 Useful manual commands are:
 
 ```bash

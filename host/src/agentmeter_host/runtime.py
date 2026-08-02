@@ -123,7 +123,13 @@ async def run_bridge(
         if collector is not None:
             await execute(collector)
         else:
-            async with collector_session_factory(config) as session:
-                await execute(session.collect)
+
+            async def collect_on_demand(
+                active_config: HostConfig, *, message_id: int
+            ) -> dict[str, Any]:
+                async with collector_session_factory(active_config) as session:
+                    return await session.collect(active_config, message_id=message_id)
+
+            await execute(collect_on_demand)
     finally:
         await transport.close()
