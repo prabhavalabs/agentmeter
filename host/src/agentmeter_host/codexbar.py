@@ -5,7 +5,9 @@ import os
 import secrets
 import shutil
 import socket
+import sys
 from collections.abc import Mapping
+from pathlib import Path
 
 import httpx
 
@@ -24,6 +26,8 @@ def build_serve_process(
     refresh_interval_seconds: int,
     token: str,
     base_environment: Mapping[str, str],
+    claude_command: str | None = None,
+    claude_shim_command: str | None = None,
 ) -> tuple[tuple[str, ...], dict[str, str]]:
     arguments = (
         command,
@@ -39,7 +43,20 @@ def build_serve_process(
     )
     environment = dict(base_environment)
     environment["CODEXBAR_DASHBOARD_TOKEN"] = token
+    if claude_command is not None and claude_shim_command is not None:
+        environment["AGENTMETER_CLAUDE_CLI_PATH"] = claude_command
+        environment["CLAUDE_CLI_PATH"] = claude_shim_command
     return arguments, environment
+
+
+def _installed_claude_shim() -> str | None:
+    command = shutil.which("agentmeter-claude-probe")
+    if command is not None:
+        return command
+    sibling = Path(sys.executable).with_name("agentmeter-claude-probe")
+    if sibling.is_file() and os.access(sibling, os.X_OK):
+        return str(sibling)
+    return None
 
 
 class CodexBarClient:
@@ -103,10 +120,14 @@ class CodexBarServer:
         self,
         *,
         command: str | None = None,
+        claude_command: str | None = None,
+        claude_shim_command: str | None = None,
         refresh_interval_seconds: int = 60,
         startup_timeout_seconds: float = 10,
     ) -> None:
         self._command = command
+        self._claude_command = claude_command
+        self._claude_shim_command = claude_shim_command
         self._refresh_interval_seconds = refresh_interval_seconds
         self._startup_timeout_seconds = startup_timeout_seconds
         self._process: asyncio.subprocess.Process | None = None
@@ -126,6 +147,10 @@ class CodexBarServer:
             refresh_interval_seconds=self._refresh_interval_seconds,
             token=token,
             base_environment=os.environ,
+            claude_command=(
+                self._claude_command or os.environ.get("CLAUDE_CLI_PATH") or shutil.which("claude")
+            ),
+            claude_shim_command=self._claude_shim_command or _installed_claude_shim(),
         )
         client = CodexBarClient(port=port, token=token)
         try:

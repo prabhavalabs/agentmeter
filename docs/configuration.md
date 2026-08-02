@@ -6,11 +6,11 @@ AgentMeter reads `~/.config/AgentMeter/config.toml` by default. Run `agentmeter 
 
 ```toml
 [general]
-poll_interval_seconds = 60
+poll_interval_seconds = 300
 providers = ["codex", "claude", "gemini", "cursor"]
 ```
 
-- `poll_interval_seconds` is the delay between completed bridge sends and also the CodexBar refresh interval. It must be at least 30 seconds. Provider collection itself can add time between visible updates.
+- `poll_interval_seconds` is the delay between completed bridge sends. It must be at least 30 seconds. The recommended five-minute default keeps CPU and network activity low; use 60 seconds only when fresher quota values matter more than efficiency. Provider collection itself can add time between visible updates, while countdowns and full-view rotation continue locally on the display.
 - `providers` sets the available provider set and order and accepts one to eight unique IDs using lowercase letters, numbers, `_`, or `-`.
 - A configured provider missing from CodexBar appears as unavailable instead of being silently removed.
 

@@ -171,7 +171,7 @@ async def test_run_bridge_continuously_polls_until_stop_event() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_bridge_reuses_one_collection_session_across_polls() -> None:
+async def test_run_bridge_releases_collection_session_between_polls() -> None:
     from agentmeter_host.config import HostConfig
     from agentmeter_host.normalization import DisplayPreferences
     from agentmeter_host.runtime import run_bridge
@@ -204,7 +204,13 @@ async def test_run_bridge_reuses_one_collection_session_across_polls() -> None:
             snapshot["providers"][0]["name"] = "Claude"
             return snapshot
 
-    session = RecordingCollectionSession()
+    sessions: list[RecordingCollectionSession] = []
+
+    def make_session(_config) -> RecordingCollectionSession:
+        session = RecordingCollectionSession()
+        sessions.append(session)
+        return session
+
     wait_count = 0
 
     async def wait(_seconds: float) -> None:
@@ -217,14 +223,15 @@ async def test_run_bridge_reuses_one_collection_session_across_polls() -> None:
         config,
         once=False,
         transport_factory=lambda _config: transport,
-        collector_session_factory=lambda _config: session,
+        collector_session_factory=make_session,
         stop_event=stop_event,
         wait=wait,
     )
 
-    assert session.enter_count == 1
-    assert session.exit_count == 1
-    assert session.collected_ids == [0, 1]
+    assert len(sessions) == 2
+    assert [session.enter_count for session in sessions] == [1, 1]
+    assert [session.exit_count for session in sessions] == [1, 1]
+    assert [session.collected_ids for session in sessions] == [[0], [1]]
     assert [sent_id for _snapshot, sent_id in transport.sent] == [0, 1]
 
 

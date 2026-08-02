@@ -23,13 +23,14 @@ The Python bridge:
 1. Starts `codexbar serve` on `127.0.0.1` and a temporary port.
 2. Uses a newly generated 256-bit bearer token for that child process.
 3. Fetches and validates dashboard schema version 1.
-4. Reuses one supervised server so its per-provider cache survives refreshes.
-5. Selects up to eight configured providers and three quota windows per provider.
-6. Removes identity, credentials, raw errors, costs, credits, and unrelated fields.
-7. Retains recent valid provider windows for up to one hour when a refresh returns an empty error row, marking the result stale.
-8. Creates deduplicated threshold events in memory.
-9. Fragments, sends, retries, and waits for a firmware acknowledgement.
-10. Runs interactively or as a macOS LaunchAgent installed into an isolated virtual environment.
+4. Stops the supervised server after each snapshot so provider helpers consume no memory between refreshes.
+5. Isolates Claude CLI fallback in safe mode so passive collection cannot load user hooks, plugins, MCP servers, or project instructions.
+6. Selects up to eight configured providers and three quota windows per provider.
+7. Removes identity, credentials, raw errors, costs, credits, and unrelated fields.
+8. Retains recent valid provider windows for up to one hour when a refresh returns an empty error row, marking the result stale.
+9. Creates deduplicated threshold events in memory.
+10. Fragments, sends, retries, and waits for a firmware acknowledgement.
+11. Runs interactively or as a macOS LaunchAgent installed into an isolated virtual environment.
 
 Provider collection is behind an adapter boundary, so another local source can be added without changing the firmware contract.
 
@@ -52,7 +53,7 @@ The same parser accepts newline-delimited USB serial snapshots for diagnosis and
 
 The display may receive provider IDs and names, short status values, quota labels, usage percentages, reset timestamps, display preferences, and short-lived event IDs. It must never receive API keys, OAuth tokens, cookies, email addresses, account IDs, prompts, code, file paths, repository names, raw responses, or local coding-session logs.
 
-CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXBAR_DASHBOARD_TOKEN`, not command arguments or files. The supervised server remains alive only for the bridge process lifetime and stops with it.
+CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXBAR_DASHBOARD_TOKEN`, not command arguments or files. The supervised server remains alive only while collecting one snapshot and is stopped before the bridge waits for its next interval.
 
 ## Reliability rules
 

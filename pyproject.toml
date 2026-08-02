@@ -41,6 +41,7 @@ firmware = [
 
 [project.scripts]
 agentmeter = "agentmeter_host.cli:main"
+agentmeter-claude-probe = "agentmeter_host.claude_probe:main"
 
 [project.urls]
 Homepage = "https://github.com/prabhavalabs/agentmeter"
