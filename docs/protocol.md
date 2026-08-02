@@ -39,7 +39,7 @@ Protocol version 1 sends compact UTF-8 JSON from the desktop bridge to the displ
 ## Limits
 
 - Document: at most 4096 bytes
-- Providers: at most 4
+- Providers: at most 8
 - Windows per provider: at most 3
 - Provider and window IDs: 1–23 lowercase ASCII letters, digits, `_`, or `-`
 - Display labels: 1–23 characters

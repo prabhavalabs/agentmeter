@@ -11,8 +11,10 @@ providers = ["codex", "claude", "gemini"]
 ```
 
 - `poll_interval_seconds` is the delay between completed bridge sends and also the CodexBar refresh interval. It must be at least 30 seconds. Provider collection itself can add time between visible updates.
-- `providers` sets display order and accepts one to four unique IDs using lowercase letters, numbers, `_`, or `-`.
+- `providers` sets the available provider set and order and accepts one to eight unique IDs using lowercase letters, numbers, `_`, or `-`.
 - A configured provider missing from CodexBar appears as unavailable instead of being silently removed.
+
+Use the display's gear menu to hide an available provider from Home without editing this file or restarting the bridge. This separation keeps the host responsible for collection and the display responsible for presentation.
 
 ## Display settings
 
@@ -31,7 +33,7 @@ sound_enabled = false
 - `alert_thresholds` contains one to three strictly increasing, unique percentages. A window generates an alert only when it crosses upward; it can alert again after falling below the threshold, normally after reset.
 - `sound_enabled` requests a short device sound for events. The first board version keeps this off because its ES8311 audio path is not yet enabled; visual alerts work now.
 
-Touch, button input, and a new snapshot wake a dimmed or blank screen. The UI also shifts its content by one pixel each minute while lit.
+Touch, button input, and alerts wake a dimmed or blank screen. The UI also shifts its content by one pixel each minute while lit. The gear menu provides an always-on override that is stored on the ESP32 and bypasses both host-provided idle timers.
 
 ## Bluetooth transport
 

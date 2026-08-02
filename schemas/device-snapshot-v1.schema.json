@@ -19,7 +19,7 @@
     "staleAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
     "providers": {
       "type": "array",
-      "maxItems": 4,
+      "maxItems": 8,
       "items": { "$ref": "#/$defs/provider" }
     },
     "display": { "$ref": "#/$defs/display" },

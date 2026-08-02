@@ -22,6 +22,21 @@ def test_load_config_reads_host_data_source_settings() -> None:
     assert config.transport.serial_port is None
 
 
+def test_host_config_accepts_up_to_eight_provider_ids() -> None:
+    from agentmeter_host.config import HostConfig
+    from agentmeter_host.normalization import DisplayPreferences
+
+    provider_ids = tuple(f"provider-{index}" for index in range(8))
+
+    config = HostConfig(
+        poll_interval_seconds=60,
+        provider_ids=provider_ids,
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+
+    assert config.provider_ids == provider_ids
+
+
 def test_load_config_reports_invalid_provider_list(tmp_path) -> None:
     from agentmeter_host.config import ConfigError, load_config
 
@@ -39,7 +54,7 @@ sound_enabled = false
 """
     )
 
-    with pytest.raises(ConfigError, match="providers must contain between 1 and 4 unique IDs"):
+    with pytest.raises(ConfigError, match="providers must contain between 1 and 8 unique IDs"):
         load_config(config_path)
 
 

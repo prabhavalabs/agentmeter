@@ -167,20 +167,35 @@ def test_normalizer_marks_disabled_provider_unavailable() -> None:
     assert snapshot["providers"][0]["status"] == "unavailable"
 
 
-def test_normalizer_rejects_more_providers_than_device_contract_allows() -> None:
+def test_normalizer_rejects_more_than_eight_providers() -> None:
     from agentmeter_host.normalization import (
         DisplayPreferences,
         NormalizationError,
         normalize_dashboard_snapshot,
     )
 
-    with pytest.raises(NormalizationError, match="between 1 and 4 providers"):
+    with pytest.raises(NormalizationError, match="between 1 and 8 providers"):
         normalize_dashboard_snapshot(
             dashboard_snapshot(),
-            provider_ids=("codex", "claude", "gemini", "four", "five"),
+            provider_ids=tuple(f"provider-{index}" for index in range(9)),
             message_id=12,
             display=DisplayPreferences(55, (75, 90), False),
         )
+
+
+def test_normalizer_builds_a_snapshot_with_five_providers() -> None:
+    from agentmeter_host.normalization import DisplayPreferences, normalize_dashboard_snapshot
+
+    provider_ids = ("codex", "claude", "gemini", "future-one", "future-two")
+
+    snapshot = normalize_dashboard_snapshot(
+        dashboard_snapshot(),
+        provider_ids=provider_ids,
+        message_id=20,
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+
+    assert [provider["id"] for provider in snapshot["providers"]] == list(provider_ids)
 
 
 @pytest.mark.parametrize(
