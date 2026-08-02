@@ -62,3 +62,85 @@ def test_doctor_reports_missing_configuration(monkeypatch, tmp_path, capsys) -> 
     output = capsys.readouterr().out
     assert "[MISSING] Configuration file" in output
     assert f"Copy config.example.toml to {config_path}." in output
+
+
+def test_send_command_runs_one_live_bridge_tick(monkeypatch) -> None:
+    import agentmeter_host.cli as cli
+
+    calls = []
+
+    async def fake_run_bridge(config, *, once, on_error):
+        calls.append((config.provider_ids, once, on_error is not None))
+
+    monkeypatch.setattr(cli, "run_bridge", fake_run_bridge, raising=False)
+
+    assert main(["send", "--config", str(ROOT / "config.example.toml")]) == 0
+    assert calls == [(("codex", "claude", "gemini"), True, True)]
+
+
+def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
+    import agentmeter_host.cli as cli
+
+    calls = []
+
+    async def fake_run_bridge(config, *, once, on_error):
+        calls.append((config.provider_ids, once, on_error is not None))
+
+    monkeypatch.setattr(cli, "run_bridge", fake_run_bridge, raising=False)
+
+    assert main(["run", "--config", str(ROOT / "config.example.toml")]) == 0
+    assert calls == [(("codex", "claude", "gemini"), False, True)]
+
+
+def test_service_install_uses_requested_source(monkeypatch, tmp_path, capsys) -> None:
+    import agentmeter_host.cli as cli
+
+    calls = []
+    paths = type(
+        "Paths",
+        (),
+        {
+            "launch_agent": tmp_path / "agentmeter.plist",
+            "config": tmp_path / "config.toml",
+            "stderr_log": tmp_path / "error.log",
+        },
+    )()
+    monkeypatch.setattr(
+        cli,
+        "install_service",
+        lambda source: calls.append(source) or paths,
+        raising=False,
+    )
+
+    assert main(["service", "install", "--source", str(tmp_path)]) == 0
+    assert calls == [tmp_path]
+    output = capsys.readouterr().out
+    assert "Background bridge installed and started" in output
+    assert str(paths.launch_agent) in output
+
+
+def test_service_status_reports_loaded_launch_agent(monkeypatch, tmp_path, capsys) -> None:
+    import agentmeter_host.cli as cli
+
+    monkeypatch.setattr(cli, "service_is_loaded", lambda: True, raising=False)
+    monkeypatch.setattr(
+        cli,
+        "ServicePaths",
+        type(
+            "ServicePaths",
+            (),
+            {
+                "for_home": staticmethod(
+                    lambda _home: type(
+                        "Paths",
+                        (),
+                        {"stderr_log": tmp_path / "bridge-error.log"},
+                    )()
+                )
+            },
+        ),
+        raising=False,
+    )
+
+    assert main(["service", "status"]) == 0
+    assert "AgentMeter background bridge: running" in capsys.readouterr().out

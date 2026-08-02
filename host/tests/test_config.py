@@ -13,8 +13,13 @@ def test_load_config_reads_host_data_source_settings() -> None:
     assert config.poll_interval_seconds == 60
     assert config.provider_ids == ("codex", "claude", "gemini")
     assert config.display.brightness_percent == 55
+    assert config.display.dim_after_seconds == 300
+    assert config.display.screen_off_after_seconds == 1800
     assert config.display.alert_thresholds == (75, 90)
     assert config.display.sound_enabled is False
+    assert config.transport.preferred == "ble"
+    assert config.transport.device_name_prefix == "AgentMeter"
+    assert config.transport.serial_port is None
 
 
 def test_load_config_reports_invalid_provider_list(tmp_path) -> None:

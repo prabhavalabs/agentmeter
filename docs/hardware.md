@@ -67,7 +67,7 @@ When the board arrives:
 2. Check for shipping damage before connecting power.
 3. Connect it with a known data-capable USB cable.
 4. Record the serial port and confirm a basic firmware upload.
-5. Test the display, touch, buttons, audio, and power management individually.
+5. Test the display, touch, user button, and power management individually.
 6. Run a 30-minute gradient/display test and watch for resets or visual corruption.
 
 Do not install a battery during initial bring-up.
@@ -93,11 +93,11 @@ Primary sources:
 - [Waveshare schematic](https://files.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-2.16/ESP32-S3-Touch-AMOLED-2.16-Schematic.pdf)
 - [Waveshare Arduino examples](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-2.16/tree/main/examples/arduino), reviewed at commit `713f8bdcc0fc2356ac22335ed4f381096e45ceea` (Apache-2.0)
 
-The initial diagnostic uses two 38,400-byte LVGL partial buffers in external
-PSRAM. It tests display updates, touch coordinates, GPIO18, and three AMOLED
-brightness levels. The speaker is connected through the ES8311 I2S codec, so
-audio is intentionally reserved for a separate driver milestone rather than
-treated as a direct GPIO buzzer.
+The board layer uses two 38,400-byte LVGL partial buffers in external PSRAM.
+The application uses the CST9220 touch controller, GPIO18 user button, AXP2101
+power management, CO5300 display, and the ESP32-S3 BLE radio. The speaker is
+connected through the ES8311 I2S codec, so audio is reserved for a separate
+driver milestone rather than treated as a direct GPIO buzzer.
 
 PlatformIO uses the `esp32-s3-devkitc1-n16r8` board profile. This exact profile
 is important: it enables the unit's 16 MB quad flash and 8 MB octal PSRAM.
@@ -116,13 +116,15 @@ With the board connected over USB, find its serial port and run:
 
 Expected checks:
 
-1. A dark blue-purple diagnostic screen appears with a moving square.
-2. Tapping the screen shows a cyan marker and coordinates.
-3. Pressing the GPIO18 user button cycles through three brightness levels.
-4. Serial output reports the AXP2101, CO5300, CST9220, PSRAM capacity, render
-   timing, and a five-second heartbeat.
-5. Leave the diagnostic running for 30 minutes and check that no resets,
-   corruption, stuck pixels, or excessive heat occurs.
+1. A dark AgentMeter waiting screen appears and includes the BLE name.
+2. Serial output reports the AXP2101, CO5300, CST9220, PSRAM, BLE advertising,
+   and a periodic heartbeat.
+3. `agentmeter send` changes the waiting screen to the provider overview.
+4. Tapping a provider opens its detail view; the back control returns.
+5. A short GPIO18 press toggles overview/detail. A five-second hold clears BLE
+   bonds and shows a confirmation banner.
+6. Leave the dashboard running for 30 minutes and check that no resets,
+   corruption, stuck pixels, excessive heat, or unexpected brightness occurs.
 
 ### Initial validation
 
@@ -131,6 +133,6 @@ August 1, 2026. Serial telemetry reported 46,800 display flushes at an average
 of 527 microseconds, with free heap steady at 188,520 bytes and minimum free
 heap steady at 183,244 bytes. No resets, watchdogs, or firmware errors occurred.
 
-AMOLED color and visual integrity, touch-marker movement, button-controlled
-brightness, and enclosure temperature remain manual checks because they require
+AMOLED color and visual integrity, touch navigation, button behavior, alert
+banners, and enclosure temperature remain manual checks because they require
 observation of the physical unit.

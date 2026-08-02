@@ -1,15 +1,15 @@
 # AgentMeter documentation
 
-Use these guides in order when building or contributing to AgentMeter:
+Use these guides in order when building or contributing:
 
-1. [Hardware](hardware.md) — supported board and bill of materials
-2. [Setup](setup.md) — prepare the host and firmware toolchains
-3. [Host data source](host.md) — install CodexBar and collect a safe snapshot
-4. [Architecture](architecture.md) — components, data flow, and privacy boundaries
-5. [Configuration](configuration.md) — providers, display, alerts, and transport
-6. [Protocol](protocol.md) — host-to-device data contract
-7. [Development](development.md) — repository workflow and validation
-8. [Roadmap](roadmap.md) — current phase and planned milestones
+1. [Hardware](hardware.md) — supported board and complete bill of materials
+2. [Setup](setup.md) — flash, pair, test, and install the background bridge
+3. [Host bridge](host.md) — collection, delivery, alerts, privacy, and troubleshooting
+4. [Display interface](ui.md) — layouts, controls, states, and AMOLED protection
+5. [Configuration](configuration.md) — providers, display, alerts, and transports
+6. [Architecture](architecture.md) — components, data flow, and privacy boundaries
+7. [Protocol](protocol.md) — JSON contract, BLE framing, ACKs, and serial fallback
+8. [Development](development.md) — repository workflow and validation
+9. [Roadmap](roadmap.md) — completed milestones and future work
 
-Screenshots and a step-by-step physical assembly guide will be added with the
-dashboard interface milestone.
+A photographed build and enclosure guide will be added when the first reproducible mechanical design is ready.

@@ -1,6 +1,6 @@
 # Device protocol
 
-Protocol version 1 sends a compact UTF-8 JSON snapshot from the desktop host to the display. The canonical machine-readable definition is `schemas/device-snapshot-v1.schema.json`.
+Protocol version 1 sends compact UTF-8 JSON from the desktop bridge to the display. The canonical contract is [`schemas/device-snapshot-v1.schema.json`](../schemas/device-snapshot-v1.schema.json).
 
 ## Snapshot example
 
@@ -27,6 +27,8 @@ Protocol version 1 sends a compact UTF-8 JSON snapshot from the desktop host to 
   ],
   "display": {
     "brightnessPercent": 55,
+    "dimAfterSeconds": 300,
+    "screenOffAfterSeconds": 1800,
     "alertThresholds": [75, 90],
     "soundEnabled": false
   },
@@ -36,24 +38,36 @@ Protocol version 1 sends a compact UTF-8 JSON snapshot from the desktop host to 
 
 ## Limits
 
-- Maximum document size: 4096 bytes
-- Maximum providers: 4
-- Maximum windows per provider: 3
-- Provider and window IDs: 1–23 lowercase ASCII characters, digits, `_`, or `-`
+- Document: at most 4096 bytes
+- Providers: at most 4
+- Windows per provider: at most 3
+- Provider and window IDs: 1–23 lowercase ASCII letters, digits, `_`, or `-`
 - Display labels: 1–23 characters
-- Usage: integer from 0 to 100, or `null` when unknown
+- Event ID: at most 96 characters
+- Usage: integer 0–100, or `null` when unknown
+- Stale interval: 30–3600 seconds
 
-Unknown fields are ignored. An unknown `schemaVersion` is rejected.
+Unknown fields are ignored. An unknown schema version or invalid required value rejects the complete candidate model.
 
-## Staleness and countdowns
+## Time and events
 
-`generatedAtEpoch` is the host time when the snapshot was built. A device marks it stale when its age exceeds `staleAfterSeconds`. `resetAtEpoch` is optional; when available, the device updates the countdown locally between host messages.
+`generatedAtEpoch` anchors the device's monotonic clock when a snapshot arrives. The firmware advances reset countdowns locally and marks the model stale once its age exceeds `staleAfterSeconds`.
 
-Missing values are never converted to zero. When a reset time changes, the new timestamp immediately replaces the old countdown.
+A threshold event uses an ID such as `threshold:claude:weekly:90`, a `warning` or `critical` level, and an expiry epoch. Only the short event is sent; the device derives a human-readable message from the already allowlisted provider model. The host queues simultaneous crossings and suppresses repeats until the window falls below the relevant threshold.
 
-## Bluetooth framing
+## Bluetooth service
 
-Bluetooth messages will use a private service with a data characteristic and a status characteristic. Because the available write size varies by operating system and connection, a snapshot is divided into fragments. Each fragment starts with an eight-byte little-endian header:
+| Purpose | UUID | Properties |
+| --- | --- | --- |
+| AgentMeter service | `a77e0001-8f7b-4f63-9a53-65f93f0d6d01` | Primary service |
+| Snapshot data | `a77e0002-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted write / write without response |
+| Delivery status | `a77e0003-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted read / notify |
+
+The ESP32 requests secure-connections bonding with no input/output capability. A long physical-button press clears its saved bonds.
+
+## Fragment framing
+
+The negotiated BLE write size varies, so a snapshot is divided into frames. Each frame begins with an eight-byte little-endian header:
 
 ```text
 byte 0      frame version = 1
@@ -64,9 +78,30 @@ bytes 6..7  fragment offset
 bytes 8..N  JSON bytes
 ```
 
-The firmware acknowledges only after a complete document has been reassembled, parsed, and validated. Detailed status codes and service UUIDs will be frozen with the BLE implementation.
+Fragments must be ordered and contiguous. A different message ID may replace an incomplete message only when its first fragment has offset zero. Reassembly expires after two seconds.
 
-## USB fallback
+## Acknowledgement
 
-USB serial carries one minified JSON document followed by a newline. It enters the same validation path as Bluetooth and is intended for setup, diagnostics, and recovery.
+The status characteristic notifies exactly five bytes:
 
+```text
+byte 0      frame version = 1
+byte 1      message type = 0x81 (ACK)
+bytes 2..3  message ID
+byte 4      status
+```
+
+| Status | Meaning |
+| ---: | --- |
+| `0` | Accepted and applied |
+| `1` | Malformed frame |
+| `2` | Payload too large |
+| `3` | Invalid JSON |
+| `4` | Unsupported schema version |
+| `5` | Invalid snapshot model |
+
+The host waits up to two seconds for the matching ACK and retries the complete message up to three times. A nonzero validation status is not retried because resending identical invalid data cannot fix it.
+
+## USB serial fallback
+
+USB serial runs at 115,200 baud. The host writes one minified JSON document followed by `\n`. The firmware sends `ACK <message-id> <status>\n` after the same model validation used by BLE. Oversized input is discarded through the next newline.

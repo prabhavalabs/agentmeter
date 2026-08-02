@@ -11,6 +11,7 @@ from agentmeter_host.normalization import normalize_dashboard_snapshot
 async def collect_device_snapshot(
     config: HostConfig,
     *,
+    message_id: int = 0,
     server_factory: Callable[..., Any] = CodexBarServer,
 ) -> dict[str, Any]:
     server = server_factory(refresh_interval_seconds=config.poll_interval_seconds)
@@ -19,6 +20,6 @@ async def collect_device_snapshot(
     return normalize_dashboard_snapshot(
         dashboard,
         provider_ids=config.provider_ids,
-        message_id=0,
+        message_id=message_id,
         display=config.display,
     )

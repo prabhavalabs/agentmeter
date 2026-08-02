@@ -1,6 +1,6 @@
 # Configuration
 
-AgentMeter uses a small TOML configuration file on the host. Run `agentmeter doctor` to print the platform-specific path, then copy `config.example.toml` there.
+AgentMeter reads `~/.config/AgentMeter/config.toml` by default. Run `agentmeter doctor` to print the exact path. Local configuration files are excluded from version control.
 
 ## General settings
 
@@ -10,10 +10,9 @@ poll_interval_seconds = 60
 providers = ["codex", "claude", "gemini"]
 ```
 
-- `poll_interval_seconds` controls the CodexBar cache interval and later the host
-  polling interval. The minimum value is 30 seconds.
-- `providers` controls display order and accepts one to four unique lowercase IDs.
-  The first tested IDs are `codex`, `claude`, and `gemini`.
+- `poll_interval_seconds` is the delay between completed bridge sends and also the CodexBar refresh interval. It must be at least 30 seconds. Provider collection itself can add time between visible updates.
+- `providers` sets display order and accepts one to four unique IDs using lowercase letters, numbers, `_`, or `-`.
+- A configured provider missing from CodexBar appears as unavailable instead of being silently removed.
 
 ## Display settings
 
@@ -26,9 +25,15 @@ alert_thresholds = [75, 90]
 sound_enabled = false
 ```
 
-Brightness is deliberately moderate to reduce AMOLED wear. Alerts pair color with text and an icon; sound is off by default.
+- `brightness_percent` accepts 1–100. Moderate brightness reduces AMOLED wear.
+- `dim_after_seconds` must be at least 30.
+- `screen_off_after_seconds` must be greater than or equal to the dim delay and no more than 86,400.
+- `alert_thresholds` contains one to three strictly increasing, unique percentages. A window generates an alert only when it crosses upward; it can alert again after falling below the threshold, normally after reset.
+- `sound_enabled` requests a short device sound for events. The first board version keeps this off because its ES8311 audio path is not yet enabled; visual alerts work now.
 
-## Transport settings
+Touch, button input, and a new snapshot wake a dimmed or blank screen. The UI also shifts its content by one pixel each minute while lit.
+
+## Bluetooth transport
 
 ```toml
 [transport]
@@ -36,10 +41,21 @@ preferred = "ble"
 device_name = "AgentMeter"
 ```
 
-Bluetooth LE is the planned normal connection. USB serial will remain available
-as a diagnostic and recovery transport. Transport settings are present for the
-next milestone and do not change `agentmeter snapshot` yet.
+`device_name` is a discovery prefix. The firmware appends four address characters, producing a name such as `AgentMeter-7404`. The bridge scans only for this name and the private AgentMeter service.
 
-## Secrets
+Bluetooth is bonded and encrypted. Hold the device's top button for five seconds to remove its saved bonds when moving it to another computer. Remove the corresponding AgentMeter entry from macOS Bluetooth settings if a completely clean pairing is required.
 
-AgentMeter configuration must not contain provider API keys, session cookies, or OAuth tokens. Provider authentication belongs to the local data source. Local configuration files are excluded from version control.
+## USB serial transport
+
+```toml
+[transport]
+preferred = "serial"
+device_name = "AgentMeter"
+serial_port = "/dev/cu.usbmodem21201"
+```
+
+An explicit `serial_port` is required for serial mode so AgentMeter never guesses and writes to an unrelated device. Use `pio device list` to identify the ESP32 `USB JTAG/serial debug unit`.
+
+## Secrets and privacy
+
+Do not put provider API keys, session cookies, OAuth tokens, or account identifiers in this file. Authentication remains inside the local coding-agent tools and CodexBar. AgentMeter generates a temporary bearer token only for its loopback CodexBar child process and never stores it.
