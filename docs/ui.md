@@ -13,6 +13,8 @@ The overview displays only the agents selected on the device and automatically a
 
 Each card includes a recognizable provider mark and shows the provider name and health, its most-used quota window, the current percentage, a local reset countdown, and a progress bar. Normal usage uses the provider accent, the first configured threshold turns amber, and the highest threshold turns red.
 
+Codex uses green interlocking arcs, Claude an orange starburst, Gemini a blue sparkle, and Cursor a warm-neutral wireframe cube. Unknown providers receive the shared purple treatment and a generated initial, so future additions remain usable before they gain a dedicated mark.
+
 The header pairs a pulsing status dot with `LIVE` while the bridge is connected. Tap the gear beside it to open Settings.
 
 ## Provider detail

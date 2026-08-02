@@ -12,6 +12,7 @@
 #include <cstring>
 
 #include "boards/waveshare_amoled_216/board.h"
+#include "provider_visuals.h"
 #include "settings_model.h"
 #include "settings_store.h"
 #include "ui_format.h"
@@ -31,7 +32,6 @@ constexpr uint32_t kAmber = 0xF5C451;
 constexpr uint32_t kRed = 0xFF6B7A;
 constexpr uint32_t kPurple = 0x8B7CFF;
 constexpr uint32_t kBlue = 0x5EC8FF;
-constexpr uint32_t kOrange = 0xF2A36B;
 
 enum class ViewMode : uint8_t { Overview, Detail, Settings };
 
@@ -75,16 +75,7 @@ bool screen_off = false;
 lv_color_t color(uint32_t value) { return lv_color_hex(value); }
 
 uint32_t provider_accent(const ProviderSnapshot& provider) {
-  if (std::strcmp(provider.id.data(), "codex") == 0) {
-    return kGreen;
-  }
-  if (std::strcmp(provider.id.data(), "claude") == 0) {
-    return kOrange;
-  }
-  if (std::strcmp(provider.id.data(), "gemini") == 0) {
-    return kBlue;
-  }
-  return kPurple;
+  return provider_visuals(provider.id.data()).accent_rgb;
 }
 
 const char* provider_status_text(ProviderStatus status) {
@@ -153,7 +144,8 @@ lv_obj_t* add_icon_line(lv_obj_t* parent, const lv_point_precise_t* points,
 
 lv_obj_t* add_provider_icon(lv_obj_t* parent, const ProviderSnapshot& provider,
                             int16_t x, int16_t y, int16_t size) {
-  const uint32_t accent = provider_accent(provider);
+  const ProviderVisuals visuals = provider_visuals(provider.id.data());
+  const uint32_t accent = visuals.accent_rgb;
   lv_obj_t* icon = lv_obj_create(parent);
   lv_obj_set_pos(icon, x, y);
   lv_obj_set_size(icon, size, size);
@@ -164,7 +156,7 @@ lv_obj_t* add_provider_icon(lv_obj_t* parent, const ProviderSnapshot& provider,
   lv_obj_set_style_pad_all(icon, 0, 0);
   lv_obj_remove_flag(icon, LV_OBJ_FLAG_SCROLLABLE);
 
-  if (std::strcmp(provider.id.data(), "codex") == 0) {
+  if (visuals.mark == ProviderMark::Codex) {
     for (int rotation : {0, 120, 240}) {
       lv_obj_t* arc = lv_arc_create(icon);
       lv_obj_set_size(arc, size - 11, size - 11);
@@ -177,7 +169,7 @@ lv_obj_t* add_provider_icon(lv_obj_t* parent, const ProviderSnapshot& provider,
       lv_obj_set_style_arc_width(arc, 0, LV_PART_INDICATOR);
       lv_obj_remove_flag(arc, LV_OBJ_FLAG_CLICKABLE);
     }
-  } else if (std::strcmp(provider.id.data(), "claude") == 0) {
+  } else if (visuals.mark == ProviderMark::Claude) {
     static const lv_point_precise_t horizontal[] = {{5, 17}, {29, 17}};
     static const lv_point_precise_t vertical[] = {{17, 5}, {17, 29}};
     static const lv_point_precise_t diagonal_one[] = {{8, 8}, {26, 26}};
@@ -186,11 +178,21 @@ lv_obj_t* add_provider_icon(lv_obj_t* parent, const ProviderSnapshot& provider,
     add_icon_line(icon, vertical, 2, accent, 3);
     add_icon_line(icon, diagonal_one, 2, accent, 3);
     add_icon_line(icon, diagonal_two, 2, accent, 3);
-  } else if (std::strcmp(provider.id.data(), "gemini") == 0) {
+  } else if (visuals.mark == ProviderMark::Gemini) {
     static const lv_point_precise_t sparkle[] = {
         {17, 4}, {21, 13}, {30, 17}, {21, 21}, {17, 30},
         {13, 21}, {4, 17}, {13, 13}, {17, 4}};
     add_icon_line(icon, sparkle, 9, accent, 2);
+  } else if (visuals.mark == ProviderMark::CursorCube) {
+    static const lv_point_precise_t cube_top[] = {
+        {17, 5}, {28, 11}, {17, 17}, {6, 11}, {17, 5}};
+    static const lv_point_precise_t cube_left[] = {
+        {6, 11}, {17, 17}, {17, 29}, {6, 23}, {6, 11}};
+    static const lv_point_precise_t cube_right[] = {
+        {17, 17}, {28, 11}, {28, 23}, {17, 29}, {17, 17}};
+    add_icon_line(icon, cube_top, 5, accent, 2);
+    add_icon_line(icon, cube_left, 5, accent, 2);
+    add_icon_line(icon, cube_right, 5, accent, 2);
   } else {
     char initial[2] = {static_cast<char>(std::toupper(
                            static_cast<unsigned char>(provider.name[0]))),

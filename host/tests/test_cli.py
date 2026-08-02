@@ -35,7 +35,7 @@ def test_snapshot_command_prints_device_json(monkeypatch, capsys) -> None:
 
     assert main(["snapshot", "--config", str(ROOT / "config.example.toml")]) == 0
     assert json.loads(capsys.readouterr().out) == device_snapshot()
-    assert observed_providers == ["codex", "claude", "gemini"]
+    assert observed_providers == ["codex", "claude", "gemini", "cursor"]
 
 
 def test_doctor_requires_codexbar_for_snapshot_collection(monkeypatch, capsys) -> None:
@@ -75,7 +75,7 @@ def test_send_command_runs_one_live_bridge_tick(monkeypatch) -> None:
     monkeypatch.setattr(cli, "run_bridge", fake_run_bridge, raising=False)
 
     assert main(["send", "--config", str(ROOT / "config.example.toml")]) == 0
-    assert calls == [(("codex", "claude", "gemini"), True, True)]
+    assert calls == [(("codex", "claude", "gemini", "cursor"), True, True)]
 
 
 def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
@@ -89,7 +89,7 @@ def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
     monkeypatch.setattr(cli, "run_bridge", fake_run_bridge, raising=False)
 
     assert main(["run", "--config", str(ROOT / "config.example.toml")]) == 0
-    assert calls == [(("codex", "claude", "gemini"), False, True)]
+    assert calls == [(("codex", "claude", "gemini", "cursor"), False, True)]
 
 
 def test_service_install_uses_requested_source(monkeypatch, tmp_path, capsys) -> None:
