@@ -4,19 +4,33 @@ The interface is designed for a 480×480 AMOLED viewed at arm's length. It uses 
 
 ## Overview
 
-The overview automatically lays out one to four providers:
+The overview displays only the agents selected on the device and automatically adapts its layout:
 
 - One provider uses a large full-width card.
 - Two providers use stacked full-width cards.
 - Three or four providers use a two-column grid.
+- Five to eight providers continue in the same two-column grid with vertical scrolling.
 
-Each card shows the provider name and health, its most-used quota window, the current percentage, a local reset countdown, and a progress bar. Normal usage uses the provider accent, the first configured threshold turns amber, and the highest threshold turns red.
+Each card includes a recognizable provider mark and shows the provider name and health, its most-used quota window, the current percentage, a local reset countdown, and a progress bar. Normal usage uses the provider accent, the first configured threshold turns amber, and the highest threshold turns red.
+
+The header pairs a pulsing status dot with `LIVE` while the bridge is connected. Tap the gear beside it to open Settings.
 
 ## Provider detail
 
 Tap a provider to see up to three quota windows at once. Every row keeps its own percentage, progress bar, and reset countdown. Tap the back control to return to the overview.
 
 The top physical button provides the same overview/detail toggle when touch is inconvenient. Detail opens on the first configured provider when entered with the button.
+
+## Settings
+
+Settings are stored in the ESP32's nonvolatile storage and survive ordinary firmware updates and power cycles.
+
+- **Agent visibility:** choose which received providers appear on Home. At least one agent remains selected. Changing this setting does not alter CodexBar or the host configuration.
+- **Always on:** bypass the normal dim and screen-off timers. One-pixel shifting remains active for AMOLED protection.
+- **Full-view rotation:** replace Home with the polished single-agent detail view and rotate through visible agents only.
+- **Rotation interval:** choose 3–60 seconds per agent with the minus and plus controls.
+
+With full-view rotation enabled, a compact loop badge shows the active interval. A short physical-button press advances immediately to the next visible agent. The gear remains available from every dashboard view.
 
 ## Connection and data states
 
@@ -41,9 +55,10 @@ Alerts are deduplicated by the host. Multiple simultaneous crossings are queued 
 - The display dims after five idle minutes by default.
 - It turns off after 30 idle minutes by default.
 - Lit content shifts through a one-pixel square once per minute.
-- Touch, a button press, or a new model wakes the screen.
+- Touch, a button press, or an alert wakes the screen.
+- Always-on mode bypasses dimming and sleep but retains pixel shifting.
 
-These values are configurable on the host and arrive with every accepted snapshot.
+Brightness and default idle timers are configured on the host and arrive with every accepted snapshot. The always-on override is configured and stored on the display.
 
 ## Pairing reset
 

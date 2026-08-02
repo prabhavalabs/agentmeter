@@ -7,7 +7,7 @@
 namespace agentmeter {
 
 inline constexpr size_t kMaximumSnapshotBytes = 4096;
-inline constexpr size_t kMaximumProviders = 4;
+inline constexpr size_t kMaximumProviders = 8;
 inline constexpr size_t kMaximumWindows = 3;
 inline constexpr size_t kDeviceTextBytes = 24;
 inline constexpr size_t kEventIdBytes = 97;

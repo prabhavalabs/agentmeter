@@ -12,12 +12,13 @@ The first hardware version is working end to end with Codex, Claude, and Gemini 
 
 ## What it shows
 
-- Up to four coding-agent providers in one overview
+- Up to eight coding-agent providers in a responsive, scrollable overview
 - Session, weekly, and other provider-defined quota windows
 - Live reset countdowns maintained locally between updates
 - Color progress indicators and deduplicated configurable threshold alerts
 - Waiting, live, reconnecting, stale, unavailable, and provider-error states
-- Touch-driven provider details and a physical-button fallback
+- Touch-driven provider details, recognizable agent marks, and a physical-button fallback
+- On-device agent visibility, always-on, full-view rotation, and rotation interval settings
 - Configurable brightness, dimming, screen-off, and AMOLED pixel shifting
 
 ## Architecture
@@ -31,7 +32,7 @@ flowchart LR
     D --> E["AMOLED dashboard"]
 ```
 
-The host starts CodexBar on loopback with a temporary bearer token, normalizes the selected providers, removes identity and billing fields, and transmits a document capped at 4096 bytes. The firmware acknowledges a message only after complete reassembly and validation. Invalid data never replaces the last good screen.
+The host keeps CodexBar running on loopback with a temporary bearer token, normalizes the selected providers, removes identity and billing fields, and transmits a document capped at 4096 bytes. Keeping one collector process alive preserves CodexBar's per-provider cache, while AgentMeter retains recent valid windows as visibly delayed data through transient provider failures. The firmware acknowledges a message only after complete reassembly and validation.
 
 See [Architecture](docs/architecture.md) and [Device protocol](docs/protocol.md) for the complete design.
 

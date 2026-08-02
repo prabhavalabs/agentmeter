@@ -13,7 +13,9 @@ codexbar serve --help
 
 The upstream [CLI guide](https://github.com/steipete/CodexBar/blob/main/docs/cli.md) documents installation options. Configure each provider inside CodexBar. AgentMeter never asks for provider keys, cookies, or OAuth tokens.
 
-For each refresh, AgentMeter starts `codexbar serve` on `127.0.0.1` with a temporary 256-bit bearer token, fetches one schema-versioned snapshot, and stops the child. It applies a stricter allowlist before encoding the device message.
+AgentMeter starts one `codexbar serve` process on `127.0.0.1` with a temporary 256-bit bearer token and keeps it for the lifetime of the bridge. Each refresh reuses that private process and its provider cache. AgentMeter applies a stricter allowlist before encoding the device message and stops the child when the bridge exits.
+
+This lifecycle matters for providers such as Claude. A background process may be unable to read browser cookies under macOS privacy controls, causing CodexBar to fall back to the Claude CLI. Reusing the server avoids restarting that slower session every minute and allows CodexBar to substitute its last valid provider row when a refresh fails. AgentMeter adds a second one-hour last-good window cache; a substituted row is explicitly marked `stale`/`Data delayed`, never live.
 
 ## Commands
 
@@ -33,7 +35,7 @@ agentmeter service uninstall
 - `run` repeats collection and delivery until interrupted.
 - `service` installs or manages the isolated macOS launch-at-login bridge.
 
-The first uncached multi-provider snapshot can take about a minute. The configured poll interval begins after each completed attempt, so the interval between device updates also includes collection time.
+The first uncached multi-provider snapshot can take about a minute. Later refreshes reuse the server and its cache. The configured poll interval begins after each completed attempt, so provider refresh time can still add to the interval between device updates.
 
 ## Bluetooth behavior
 
@@ -68,7 +70,7 @@ AgentMeter suppresses CodexBar child output because provider tools can include p
 
 - **CodexBar command missing:** install it from CodexBar preferences and ensure `/opt/homebrew/bin` or `/usr/local/bin` is on `PATH`.
 - **Unsupported dashboard schema:** update AgentMeter and CodexBar to compatible releases.
-- **Provider unavailable:** enable and verify it in CodexBar, then keep its lowercase ID in the AgentMeter configuration.
+- **Provider unavailable:** enable and verify it in CodexBar, then keep its lowercase ID in the AgentMeter configuration. For Claude, also run `codexbar usage --provider claude --format json` to verify that either browser access or the Claude CLI fallback succeeds.
 - **No display discovered:** confirm Bluetooth is enabled and the screen shows its `AgentMeter-XXXX` waiting state. Hold the top button for five seconds if an old bond must be cleared.
 - **First send times out:** approve the macOS Bluetooth prompt, wait for pairing to finish, and retry once.
 - **Background bridge appears idle:** run `agentmeter service status`, then inspect `bridge-error.log`. An uncached collection can take about a minute before BLE activity begins.

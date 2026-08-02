@@ -1,4 +1,5 @@
 import asyncio
+import copy
 import json
 
 import pytest
@@ -167,3 +168,153 @@ async def test_run_bridge_continuously_polls_until_stop_event() -> None:
 
     assert [sent_id for _snapshot, sent_id in transport.sent] == [0]
     assert transport.closed is True
+
+
+@pytest.mark.asyncio
+async def test_run_bridge_reuses_one_collection_session_across_polls() -> None:
+    from agentmeter_host.config import HostConfig
+    from agentmeter_host.normalization import DisplayPreferences
+    from agentmeter_host.runtime import run_bridge
+
+    config = HostConfig(
+        poll_interval_seconds=60,
+        provider_ids=("claude",),
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+    transport = RecordingTransport()
+    stop_event = asyncio.Event()
+
+    class RecordingCollectionSession:
+        def __init__(self) -> None:
+            self.enter_count = 0
+            self.exit_count = 0
+            self.collected_ids: list[int] = []
+
+        async def __aenter__(self):
+            self.enter_count += 1
+            return self
+
+        async def __aexit__(self, *_args) -> None:
+            self.exit_count += 1
+
+        async def collect(self, _config, *, message_id: int):
+            self.collected_ids.append(message_id)
+            snapshot = device_snapshot(message_id=message_id)
+            snapshot["providers"][0]["id"] = "claude"
+            snapshot["providers"][0]["name"] = "Claude"
+            return snapshot
+
+    session = RecordingCollectionSession()
+    wait_count = 0
+
+    async def wait(_seconds: float) -> None:
+        nonlocal wait_count
+        wait_count += 1
+        if wait_count == 2:
+            stop_event.set()
+
+    await run_bridge(
+        config,
+        once=False,
+        transport_factory=lambda _config: transport,
+        collector_session_factory=lambda _config: session,
+        stop_event=stop_event,
+        wait=wait,
+    )
+
+    assert session.enter_count == 1
+    assert session.exit_count == 1
+    assert session.collected_ids == [0, 1]
+    assert [sent_id for _snapshot, sent_id in transport.sent] == [0, 1]
+
+
+@pytest.mark.asyncio
+async def test_runtime_keeps_last_good_provider_windows_during_transient_error() -> None:
+    from agentmeter_host.config import HostConfig
+    from agentmeter_host.normalization import DisplayPreferences
+    from agentmeter_host.runtime import BridgeRuntime
+
+    config = HostConfig(
+        poll_interval_seconds=60,
+        provider_ids=("claude",),
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+    good = device_snapshot(message_id=0)
+    good["providers"][0].update(
+        {
+            "id": "claude",
+            "name": "Claude",
+            "windows": [
+                {
+                    "kind": "weekly",
+                    "label": "Weekly",
+                    "usedPercent": 84,
+                    "resetAtEpoch": 1_785_614_400,
+                }
+            ],
+        }
+    )
+    failed = copy.deepcopy(good)
+    failed["messageId"] = 1
+    failed["generatedAtEpoch"] += 60
+    failed["providers"][0]["status"] = "error"
+    failed["providers"][0]["windows"] = []
+    snapshots = iter((good, failed))
+
+    async def collect(_config, *, message_id):
+        return next(snapshots)
+
+    transport = RecordingTransport()
+    runtime = BridgeRuntime(config, transport, collector=collect)
+
+    await runtime.tick()
+    await runtime.tick()
+
+    recovered = transport.sent[1][0]["providers"][0]
+    assert recovered == {
+        "id": "claude",
+        "name": "Claude",
+        "status": "stale",
+        "windows": [
+            {
+                "kind": "weekly",
+                "label": "Weekly",
+                "usedPercent": 84,
+                "resetAtEpoch": 1_785_614_400,
+            }
+        ],
+    }
+
+
+@pytest.mark.asyncio
+async def test_runtime_expires_last_good_provider_windows_after_one_hour() -> None:
+    from agentmeter_host.config import HostConfig
+    from agentmeter_host.normalization import DisplayPreferences
+    from agentmeter_host.runtime import BridgeRuntime
+
+    config = HostConfig(
+        poll_interval_seconds=60,
+        provider_ids=("claude",),
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+    good = device_snapshot(message_id=0)
+    good["providers"][0].update({"id": "claude", "name": "Claude"})
+    failed = copy.deepcopy(good)
+    failed["messageId"] = 1
+    failed["generatedAtEpoch"] += 3_601
+    failed["providers"][0]["status"] = "error"
+    failed["providers"][0]["windows"] = []
+    snapshots = iter((good, failed))
+
+    async def collect(_config, *, message_id):
+        return next(snapshots)
+
+    transport = RecordingTransport()
+    runtime = BridgeRuntime(config, transport, collector=collect)
+
+    await runtime.tick()
+    await runtime.tick()
+
+    expired = transport.sent[1][0]["providers"][0]
+    assert expired["status"] == "error"
+    assert expired["windows"] == []

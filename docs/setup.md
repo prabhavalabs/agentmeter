@@ -111,7 +111,10 @@ Stop the background bridge before using the same serial port manually, then run 
 
 - Tap a provider card to open all of its quota windows.
 - Tap the back button to return to the overview.
-- Short-press the top physical button to toggle overview/detail.
+- Tap the gear beside the pulsing live indicator to choose visible agents, always-on behavior, full-view rotation, and a 3–60 second interval.
+- Short-press the top physical button to toggle overview/detail, or advance to the next agent while full-view rotation is enabled.
 - Hold the physical button for five seconds to delete saved Bluetooth bonds and advertise for a fresh pairing.
+
+Dashboard settings are stored on the ESP32. A normal firmware upload preserves them; erasing the full flash resets them to all agents visible, normal sleep behavior, full-view off, and a three-second rotation interval.
 
 See [Configuration](configuration.md), [Display interface](ui.md), and [Host bridge](host.md) for details.

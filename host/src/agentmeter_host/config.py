@@ -37,10 +37,10 @@ class HostConfig:
     def __post_init__(self) -> None:
         if not isinstance(self.poll_interval_seconds, int) or self.poll_interval_seconds < 30:
             raise ConfigError("poll_interval_seconds must be at least 30")
-        if not 1 <= len(self.provider_ids) <= 4 or len(set(self.provider_ids)) != len(
+        if not 1 <= len(self.provider_ids) <= 8 or len(set(self.provider_ids)) != len(
             self.provider_ids
         ):
-            raise ConfigError("providers must contain between 1 and 4 unique IDs")
+            raise ConfigError("providers must contain between 1 and 8 unique IDs")
         if any(
             re.fullmatch(r"[a-z0-9_-]{1,23}", provider_id) is None
             for provider_id in self.provider_ids

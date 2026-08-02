@@ -1,10 +1,13 @@
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include <unity.h>
 
 #include "dashboard_model.h"
 #include "protocol.h"
+#include "settings_model.h"
+#include "ui_layout.h"
 #include "ui_format.h"
 
 namespace {
@@ -140,6 +143,133 @@ void test_ui_formats_unknown_usage_and_bounded_reset_countdowns() {
   TEST_ASSERT_EQUAL_STRING("8d", text.data());
 }
 
+void test_dashboard_preferences_filter_providers_by_stable_id() {
+  agentmeter::DashboardSnapshot snapshot{};
+  snapshot.provider_count = 3;
+  std::strcpy(snapshot.providers[0].id.data(), "codex");
+  std::strcpy(snapshot.providers[1].id.data(), "claude");
+  std::strcpy(snapshot.providers[2].id.data(), "gemini");
+  agentmeter::DashboardPreferences preferences{};
+
+  TEST_ASSERT_TRUE(
+      agentmeter::set_provider_visible(preferences, "gemini", false));
+  std::array<uint8_t, agentmeter::kMaximumProviders> visible{};
+  const uint8_t count = agentmeter::visible_provider_indices(
+      snapshot, preferences, visible);
+
+  TEST_ASSERT_EQUAL_UINT8(2, count);
+  TEST_ASSERT_EQUAL_UINT8(0, visible[0]);
+  TEST_ASSERT_EQUAL_UINT8(1, visible[1]);
+  TEST_ASSERT_FALSE(
+      agentmeter::is_provider_visible(preferences, "gemini"));
+  TEST_ASSERT_TRUE(agentmeter::is_provider_visible(preferences, "codex"));
+}
+
+void test_dashboard_preferences_round_trip_hidden_provider_ids() {
+  agentmeter::DashboardPreferences original{};
+  TEST_ASSERT_TRUE(
+      agentmeter::set_provider_visible(original, "gemini", false));
+  TEST_ASSERT_TRUE(
+      agentmeter::set_provider_visible(original, "future-agent", false));
+  std::array<char, 256> encoded{};
+
+  TEST_ASSERT_TRUE(agentmeter::encode_hidden_provider_ids(
+      original, encoded.data(), encoded.size()));
+  TEST_ASSERT_EQUAL_STRING("gemini,future-agent", encoded.data());
+
+  agentmeter::DashboardPreferences restored{};
+  TEST_ASSERT_TRUE(
+      agentmeter::decode_hidden_provider_ids(encoded.data(), restored));
+  TEST_ASSERT_FALSE(
+      agentmeter::is_provider_visible(restored, "gemini"));
+  TEST_ASSERT_FALSE(
+      agentmeter::is_provider_visible(restored, "future-agent"));
+  TEST_ASSERT_TRUE(agentmeter::is_provider_visible(restored, "claude"));
+}
+
+void test_full_view_rotation_skips_hidden_providers_and_wraps() {
+  agentmeter::DashboardSnapshot snapshot{};
+  snapshot.provider_count = 3;
+  std::strcpy(snapshot.providers[0].id.data(), "codex");
+  std::strcpy(snapshot.providers[1].id.data(), "claude");
+  std::strcpy(snapshot.providers[2].id.data(), "gemini");
+  agentmeter::DashboardPreferences preferences{};
+  agentmeter::set_provider_visible(preferences, "claude", false);
+
+  TEST_ASSERT_EQUAL_UINT8(
+      2, agentmeter::next_visible_provider(snapshot, preferences, 0));
+  TEST_ASSERT_EQUAL_UINT8(
+      0, agentmeter::next_visible_provider(snapshot, preferences, 2));
+}
+
+void test_rotation_interval_accepts_three_to_sixty_seconds() {
+  agentmeter::DashboardPreferences preferences{};
+
+  TEST_ASSERT_EQUAL_UINT8(3, preferences.rotation_seconds);
+  TEST_ASSERT_FALSE(agentmeter::set_rotation_seconds(preferences, 2));
+  TEST_ASSERT_EQUAL_UINT8(3, preferences.rotation_seconds);
+  TEST_ASSERT_TRUE(agentmeter::set_rotation_seconds(preferences, 15));
+  TEST_ASSERT_EQUAL_UINT8(15, preferences.rotation_seconds);
+  TEST_ASSERT_FALSE(agentmeter::set_rotation_seconds(preferences, 61));
+  TEST_ASSERT_EQUAL_UINT8(15, preferences.rotation_seconds);
+}
+
+void test_overview_layout_uses_two_columns_and_scrolls_after_four_cards() {
+  const agentmeter::CardFrame first = agentmeter::overview_card_frame(5, 0);
+  const agentmeter::CardFrame second = agentmeter::overview_card_frame(5, 1);
+  const agentmeter::CardFrame fifth = agentmeter::overview_card_frame(5, 4);
+
+  TEST_ASSERT_EQUAL_INT16(14, first.x);
+  TEST_ASSERT_EQUAL_INT16(247, second.x);
+  TEST_ASSERT_EQUAL_INT16(first.y + 190 * 2, fifth.y);
+  TEST_ASSERT_EQUAL_INT16(219, fifth.width);
+  TEST_ASSERT_GREATER_THAN_INT16(398, agentmeter::overview_content_height(5));
+}
+
+void test_two_provider_layout_uses_full_width_rows() {
+  const agentmeter::CardFrame first = agentmeter::overview_card_frame(2, 0);
+  const agentmeter::CardFrame second = agentmeter::overview_card_frame(2, 1);
+
+  TEST_ASSERT_EQUAL_INT16(20, first.x);
+  TEST_ASSERT_EQUAL_INT16(440, first.width);
+  TEST_ASSERT_EQUAL_INT16(10, first.y);
+  TEST_ASSERT_EQUAL_INT16(196, second.y);
+  TEST_ASSERT_EQUAL_INT16(398, agentmeter::overview_content_height(2));
+}
+
+void test_snapshot_parser_accepts_five_providers_for_scrollable_dashboard() {
+  const std::string payload = R"json({
+    "schemaVersion": 1,
+    "messageId": 43,
+    "generatedAtEpoch": 1785508800,
+    "staleAfterSeconds": 180,
+    "providers": [
+      {"id":"one","name":"One","status":"ok","windows":[]},
+      {"id":"two","name":"Two","status":"ok","windows":[]},
+      {"id":"three","name":"Three","status":"ok","windows":[]},
+      {"id":"four","name":"Four","status":"ok","windows":[]},
+      {"id":"five","name":"Five","status":"ok","windows":[]}
+    ],
+    "display": {
+      "brightnessPercent": 55,
+      "dimAfterSeconds": 300,
+      "screenOffAfterSeconds": 1800,
+      "alertThresholds": [75, 90],
+      "soundEnabled": false
+    },
+    "event": null
+  })json";
+  agentmeter::DashboardSnapshot snapshot{};
+
+  const auto status = agentmeter::parse_snapshot(
+      reinterpret_cast<const uint8_t*>(payload.data()), payload.size(),
+      snapshot);
+
+  TEST_ASSERT_EQUAL(static_cast<int>(agentmeter::ParseStatus::Ok),
+                    static_cast<int>(status));
+  TEST_ASSERT_EQUAL_UINT8(5, snapshot.provider_count);
+}
+
 }  // namespace
 
 int main(int, char**) {
@@ -150,5 +280,14 @@ int main(int, char**) {
       test_reassembler_applies_snapshot_only_after_final_in_order_fragment);
   RUN_TEST(test_ack_encodes_protocol_version_message_id_and_status);
   RUN_TEST(test_ui_formats_unknown_usage_and_bounded_reset_countdowns);
+  RUN_TEST(test_dashboard_preferences_filter_providers_by_stable_id);
+  RUN_TEST(test_dashboard_preferences_round_trip_hidden_provider_ids);
+  RUN_TEST(test_full_view_rotation_skips_hidden_providers_and_wraps);
+  RUN_TEST(test_rotation_interval_accepts_three_to_sixty_seconds);
+  RUN_TEST(
+      test_overview_layout_uses_two_columns_and_scrolls_after_four_cards);
+  RUN_TEST(test_two_provider_layout_uses_full_width_rows);
+  RUN_TEST(
+      test_snapshot_parser_accepts_five_providers_for_scrollable_dashboard);
   return UNITY_END();
 }

@@ -8,6 +8,7 @@
 #define LV_MEM_SIZE (96U * 1024U)
 
 // Built-in fonts used by the 480x480 dashboard hierarchy.
+#define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_18 1

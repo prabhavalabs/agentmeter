@@ -111,8 +111,8 @@ def _normalize_dashboard_snapshot(
     message_id: int,
     display: DisplayPreferences,
 ) -> dict[str, Any]:
-    if not 1 <= len(provider_ids) <= 4:
-        raise NormalizationError("device snapshots require between 1 and 4 providers")
+    if not 1 <= len(provider_ids) <= 8:
+        raise NormalizationError("device snapshots require between 1 and 8 providers")
     if not isinstance(message_id, int) or not 0 <= message_id <= 65_535:
         raise NormalizationError("message_id must be an integer from 0 to 65535")
 

@@ -3,9 +3,17 @@
 #include <ArduinoJson.h>
 
 #include <cstring>
+#include <type_traits>
 
 namespace agentmeter {
 namespace {
+
+static_assert(std::is_trivially_copyable_v<DashboardSnapshot>);
+
+// BLE and USB frames are applied from the Arduino loop task. Keeping the
+// atomic parse candidate in static storage avoids placing the bounded provider
+// model on that task's small stack while still publishing only valid snapshots.
+DashboardSnapshot parse_candidate{};
 
 bool copy_text(JsonVariantConst value,
                std::array<char, kDeviceTextBytes>& destination) {
@@ -204,7 +212,9 @@ ParseStatus parse_snapshot(const uint8_t* payload, size_t length,
     return ParseStatus::InvalidModel;
   }
 
-  DashboardSnapshot candidate{};
+  std::memset(&parse_candidate, 0, sizeof(parse_candidate));
+  parse_candidate.schema_version = 1;
+  DashboardSnapshot& candidate = parse_candidate;
   candidate.message_id = static_cast<uint16_t>(message_id);
   candidate.generated_at_epoch = generated_at;
   candidate.stale_after_seconds = static_cast<uint32_t>(stale_after);
