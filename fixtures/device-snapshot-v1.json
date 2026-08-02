@@ -45,9 +45,10 @@
   ],
   "display": {
     "brightnessPercent": 55,
+    "dimAfterSeconds": 300,
+    "screenOffAfterSeconds": 1800,
     "alertThresholds": [75, 90],
     "soundEnabled": false
   },
   "event": null
 }
-

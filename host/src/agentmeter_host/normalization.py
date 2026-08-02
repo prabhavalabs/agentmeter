@@ -21,18 +21,43 @@ class DisplayPreferences:
     brightness_percent: int
     alert_thresholds: tuple[int, ...]
     sound_enabled: bool
+    dim_after_seconds: int = 300
+    screen_off_after_seconds: int = 1_800
 
     def __post_init__(self) -> None:
         if not isinstance(self.brightness_percent, int) or not 1 <= self.brightness_percent <= 100:
             raise NormalizationError("brightness_percent must be an integer from 1 to 100")
-        if not 1 <= len(self.alert_thresholds) <= 3 or any(
-            not isinstance(value, int) or not 1 <= value <= 100 for value in self.alert_thresholds
+        if (
+            not 1 <= len(self.alert_thresholds) <= 3
+            or any(
+                not isinstance(value, int) or not 1 <= value <= 100
+                for value in self.alert_thresholds
+            )
+            or any(
+                current <= previous
+                for previous, current in zip(
+                    self.alert_thresholds, self.alert_thresholds[1:], strict=False
+                )
+            )
         ):
             raise NormalizationError(
-                "alert_thresholds must contain between 1 and 3 integers from 1 to 100"
+                "alert_thresholds must contain 1-3 increasing unique integers from 1 to 100"
             )
         if not isinstance(self.sound_enabled, bool):
             raise NormalizationError("sound_enabled must be a boolean")
+        if (
+            not isinstance(self.dim_after_seconds, int)
+            or not 30 <= self.dim_after_seconds <= 86_400
+        ):
+            raise NormalizationError("dim_after_seconds must be between 30 and 86400")
+        if (
+            not isinstance(self.screen_off_after_seconds, int)
+            or self.screen_off_after_seconds < self.dim_after_seconds
+            or self.screen_off_after_seconds > 86_400
+        ):
+            raise NormalizationError(
+                "screen_off_after_seconds must be between dim_after_seconds and 86400"
+            )
 
 
 def _epoch(timestamp: str | None) -> int | None:
@@ -146,6 +171,8 @@ def _normalize_dashboard_snapshot(
         "providers": providers,
         "display": {
             "brightnessPercent": display.brightness_percent,
+            "dimAfterSeconds": display.dim_after_seconds,
+            "screenOffAfterSeconds": display.screen_off_after_seconds,
             "alertThresholds": list(display.alert_thresholds),
             "soundEnabled": display.sound_enabled,
         },

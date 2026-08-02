@@ -1,99 +1,74 @@
 # Architecture
 
-AgentMeter separates provider access from the physical display. The computer handles authentication and data collection; the ESP32 receives only the values required for presentation.
+AgentMeter separates provider access from the physical display. The computer handles authentication and collection; the ESP32 receives only the values required for presentation.
 
 ## Data flow
 
 ```mermaid
 flowchart LR
     A["Provider credentials and local sessions"] --> B["CodexBar"]
-    B -->|"Local dashboard API"| C["AgentMeter host"]
-    C --> D["Validate and normalize"]
-    D --> E["Remove identity and sensitive fields"]
-    E -->|"Bluetooth LE"| F["AgentMeter firmware"]
+    B -->|"Loopback dashboard API"| C["AgentMeter host"]
+    C --> D["Validate and allowlist fields"]
+    D --> E["Threshold event engine"]
+    E -->|"Encrypted BLE + ACK"| F["Firmware model"]
     E -.->|"USB serial fallback"| F
-    F --> G["Overview and provider detail"]
-    F --> H["Local reset countdown"]
+    F --> G["Overview and details"]
+    F --> H["Local countdowns and stale state"]
 ```
 
-## Components
+## Desktop host
 
-### Desktop host
+The Python bridge:
 
-The Python host application:
+1. Starts `codexbar serve` on `127.0.0.1` and a temporary port.
+2. Uses a newly generated 256-bit bearer token for that child process.
+3. Fetches and validates dashboard schema version 1.
+4. Selects up to four configured providers and three quota windows per provider.
+5. Removes identity, credentials, raw errors, costs, credits, and unrelated fields.
+6. Creates deduplicated threshold events in memory.
+7. Fragments, sends, retries, and waits for a firmware acknowledgement.
+8. Runs interactively or as a macOS LaunchAgent installed into an isolated virtual environment.
 
-1. Supervises `codexbar serve` on `127.0.0.1` and a temporary local port.
-2. Fetches `GET /dashboard/v1/snapshot` with a process-scoped bearer token.
-3. Selects configured providers and converts their data into the device schema.
-4. Removes account identity, raw responses, credentials, costs, and unrelated fields.
-5. Currently prints a one-shot snapshot for verification; Bluetooth delivery is the
-   next milestone, with USB serial retained for setup and recovery.
-6. Exposes a concise `doctor` command for installation and configuration problems.
+Provider collection is behind an adapter boundary, so another local source can be added without changing the firmware contract.
 
-Provider collection stays behind an adapter boundary so another local source can be added without changing the firmware protocol.
+## Firmware
 
-### Firmware
+The ESP32 application:
 
-The ESP32 firmware will:
+1. Advertises a private GATT service as `AgentMeter-XXXX`.
+2. Requires an encrypted bonded connection for data and status characteristics.
+3. Queues BLE writes outside the callback, reassembles ordered fragments, and rejects incomplete, oversized, or malformed messages.
+4. Parses into a fixed-size candidate model and swaps it in only after complete validation.
+5. Renders overview, provider detail, alert, waiting, reconnecting, stale, unavailable, and provider-error states.
+6. Updates countdowns locally without network time or continuous host traffic.
+7. Protects the AMOLED with moderate brightness, dimming, screen-off, and one-pixel shifting.
 
-1. Receive and validate a bounded snapshot.
-2. Keep at most four providers and three windows per provider in memory.
-3. Render overview, provider detail, alert, waiting, disconnected, and stale states.
-4. Update reset countdowns locally once per second.
-5. Dim and blank the AMOLED after configurable idle periods.
-6. Reject malformed, oversized, or unsupported messages without losing the last good snapshot.
-
-### Shared contract
-
-`schemas/device-snapshot-v1.schema.json` is the language-independent contract. Safe fixtures under `fixtures/` let host and firmware work proceed without live provider accounts or attached hardware.
-
-## Communication choice
-
-Bluetooth LE is the primary transport because it avoids network provisioning and keeps the project wireless at the data layer. USB serial carries the same logical snapshot as a dependable fallback.
-
-The first version does not expose an HTTP server on the local network and does not use a cloud relay. These alternatives create credential, discovery, and maintenance work that is unnecessary for a personal desk display.
+The same parser accepts newline-delimited USB serial snapshots for diagnosis and recovery.
 
 ## Privacy boundary
 
-The display may receive:
+The display may receive provider IDs and names, short status values, quota labels, usage percentages, reset timestamps, display preferences, and short-lived event IDs. It must never receive API keys, OAuth tokens, cookies, email addresses, account IDs, prompts, code, file paths, repository names, raw responses, or local coding-session logs.
 
-- Provider ID and display name
-- Usage percentages and provider-defined window labels
-- Reset timestamps
-- Short health states such as `ok`, `error`, or `unavailable`
-- Display preferences and short-lived alert events
-
-The display must never receive:
-
-- API keys, OAuth tokens, session cookies, or bearer tokens
-- Email addresses or account identifiers
-- Raw provider responses or local coding-session logs
-- Prompt text, generated code, file paths, or repository names
-
-CodexBar remains bound to `127.0.0.1`. A fresh 256-bit dashboard token is passed
-through `CODEXBAR_DASHBOARD_TOKEN`, never through command arguments. The host
-stops the supervised process after collection, and the token is never written to
-configuration or device storage.
-
-The CodexBar dashboard contract is already redacted, but AgentMeter applies a
-stricter allowlist. It removes the complete identity object, plan, source, credits,
-cost, upstream display hints, and raw error details before encoding the device
-document.
+CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXBAR_DASHBOARD_TOKEN`, not command arguments or files. The supervised server is stopped after each collection.
 
 ## Reliability rules
 
-- A snapshot is considered stale after 180 seconds unless configured otherwise.
-- Missing usage is represented as unknown, never as zero.
-- Unknown protocol versions are rejected explicitly.
-- Bluetooth messages are capped at 4096 bytes and acknowledged after validation.
-- The last valid values may remain visible while disconnected, but they are dimmed and labeled with their age.
+- Missing usage remains unknown and is never converted to zero.
+- Documents are capped at 4096 bytes.
+- Frame and schema versions are checked explicitly.
+- Fragments must arrive in order and complete within two seconds.
+- A five-byte ACK is sent only after the JSON has been reassembled and parsed.
+- The host retries a whole message up to three times and reconnects after link errors.
+- Invalid data never replaces the last valid model.
+- Old values may remain visible, but the UI marks them stale and reduces opacity.
+- Message IDs wrap safely from 65,535 to zero; countdown and stale calculations tolerate `millis()` rollover.
 
-## Initial platform scope
+## Supported scope
 
 - Host: macOS 14 or later
 - Board: Waveshare ESP32-S3-Touch-AMOLED-2.16
-- Providers used for acceptance: Codex, Claude, and Gemini
+- Acceptance providers: Codex, Claude, and Gemini
 - Primary transport: Bluetooth LE
 - Recovery transport: USB serial
 
-Linux is the next host target. Windows and additional display boards follow after the first hardware release is stable.
+Linux, Windows, more boards, and additional data adapters remain future work.

@@ -44,6 +44,8 @@ def test_normalizer_builds_whitelisted_device_snapshot() -> None:
         ],
         "display": {
             "brightnessPercent": 55,
+            "dimAfterSeconds": 300,
+            "screenOffAfterSeconds": 1800,
             "alertThresholds": [75, 90],
             "soundEnabled": False,
         },
@@ -187,6 +189,8 @@ def test_normalizer_rejects_more_providers_than_device_contract_allows() -> None
         ((0, (75, 90), False), "brightness_percent"),
         ((55, (), False), "alert_thresholds"),
         ((55, (75, 101), False), "alert_thresholds"),
+        ((55, (90, 75), False), "alert_thresholds"),
+        ((55, (75, 75), False), "alert_thresholds"),
     ],
 )
 def test_display_preferences_reject_values_outside_device_contract(
@@ -196,6 +200,30 @@ def test_display_preferences_reject_values_outside_device_contract(
 
     with pytest.raises(NormalizationError, match=message):
         DisplayPreferences(*display)
+
+
+@pytest.mark.parametrize(
+    ("dim_after", "screen_off_after", "message"),
+    [
+        (29, 1_800, "dim_after_seconds"),
+        (86_401, 86_401, "dim_after_seconds"),
+        (600, 599, "screen_off_after_seconds"),
+        (600, 86_401, "screen_off_after_seconds"),
+    ],
+)
+def test_display_preferences_reject_invalid_power_intervals(
+    dim_after: int, screen_off_after: int, message: str
+) -> None:
+    from agentmeter_host.normalization import DisplayPreferences, NormalizationError
+
+    with pytest.raises(NormalizationError, match=message):
+        DisplayPreferences(
+            55,
+            (75, 90),
+            False,
+            dim_after_seconds=dim_after,
+            screen_off_after_seconds=screen_off_after,
+        )
 
 
 @pytest.mark.parametrize("message_id", [-1, 65_536])

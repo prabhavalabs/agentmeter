@@ -51,3 +51,6 @@ jobs:
 
       - name: Build firmware
         run: pio run -d firmware
+
+      - name: Run native firmware tests
+        run: pio test -d firmware -e native

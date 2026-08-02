@@ -2,7 +2,7 @@ PYTHON ?= python3.11
 VENV ?= .venv
 PIO ?= $(VENV)/bin/pio
 
-.PHONY: setup lint test firmware clean
+.PHONY: setup lint test host-test firmware-test firmware clean
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -13,8 +13,13 @@ lint:
 	$(VENV)/bin/ruff check .
 	$(VENV)/bin/ruff format --check .
 
-test:
+test: host-test firmware-test
+
+host-test:
 	$(VENV)/bin/pytest
+
+firmware-test:
+	$(PIO) test -d firmware -e native
 
 firmware:
 	$(PIO) run -d firmware
