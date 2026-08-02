@@ -25,6 +25,29 @@ async def test_client_fetches_authenticated_dashboard_snapshot() -> None:
 
 
 @pytest.mark.asyncio
+async def test_client_timeout_outlasts_codexbar_request_deadline() -> None:
+    from agentmeter_host.codexbar import CodexBarClient
+
+    class DeadlineAwareTransport(httpx.AsyncBaseTransport):
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            read_timeout = request.extensions["timeout"]["read"]
+            if read_timeout <= 60:
+                raise httpx.ReadTimeout(
+                    "client stopped before CodexBar's request deadline",
+                    request=request,
+                )
+            return httpx.Response(200, json=dashboard_snapshot())
+
+    client = CodexBarClient(
+        port=46_213,
+        token="test-secret",
+        transport=DeadlineAwareTransport(),
+    )
+
+    assert await client.fetch_snapshot() == dashboard_snapshot()
+
+
+@pytest.mark.asyncio
 async def test_client_reports_http_failure_without_exposing_token() -> None:
     from agentmeter_host.codexbar import CodexBarClient, CodexBarError
 
@@ -117,12 +140,28 @@ def test_serve_process_binds_loopback_and_passes_token_only_in_environment() -> 
         "46213",
         "--refresh-interval",
         "60",
+        "--request-timeout",
+        "60",
     )
     assert "environment-only-secret" not in arguments
     assert environment == {
         "PATH": "/usr/bin",
         "CODEXBAR_DASHBOARD_TOKEN": "environment-only-secret",
     }
+
+
+def test_serve_process_allows_slow_multi_provider_collection() -> None:
+    from agentmeter_host.codexbar import build_serve_process
+
+    arguments, _environment = build_serve_process(
+        command="codexbar",
+        port=46_213,
+        refresh_interval_seconds=60,
+        token="test-secret",
+        base_environment={},
+    )
+
+    assert arguments[-2:] == ("--request-timeout", "60")
 
 
 @pytest.mark.asyncio
@@ -144,6 +183,7 @@ parser.add_argument("command")
 parser.add_argument("--host", required=True)
 parser.add_argument("--port", required=True, type=int)
 parser.add_argument("--refresh-interval", required=True, type=int)
+parser.add_argument("--request-timeout", required=True, type=int)
 args = parser.parse_args()
 snapshot = os.environ["FAKE_DASHBOARD"]
 token = os.environ["CODEXBAR_DASHBOARD_TOKEN"]

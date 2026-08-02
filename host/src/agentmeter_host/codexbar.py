@@ -9,6 +9,9 @@ from collections.abc import Mapping
 
 import httpx
 
+_CODEXBAR_REQUEST_TIMEOUT_SECONDS = 60
+_DASHBOARD_CLIENT_TIMEOUT_SECONDS = _CODEXBAR_REQUEST_TIMEOUT_SECONDS + 5
+
 
 class CodexBarError(RuntimeError):
     """CodexBar could not provide a usable dashboard snapshot."""
@@ -31,6 +34,8 @@ def build_serve_process(
         str(port),
         "--refresh-interval",
         str(refresh_interval_seconds),
+        "--request-timeout",
+        str(_CODEXBAR_REQUEST_TIMEOUT_SECONDS),
     )
     environment = dict(base_environment)
     environment["CODEXBAR_DASHBOARD_TOKEN"] = token
@@ -53,7 +58,7 @@ class CodexBarClient:
         async with httpx.AsyncClient(
             base_url=self._base_url,
             headers={"Authorization": f"Bearer {self._token}"},
-            timeout=10,
+            timeout=_DASHBOARD_CLIENT_TIMEOUT_SECONDS,
             transport=self._transport,
         ) as client:
             try:
