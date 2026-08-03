@@ -6,6 +6,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,31 @@ LABEL = "com.prabhavalabs.agentmeter"
 
 class ServiceError(RuntimeError):
     """The macOS background bridge could not be managed."""
+
+
+def bootstrap_launch_agent(
+    domain: str,
+    launch_agent: Path,
+    *,
+    attempts: int = 3,
+    retry_delay_seconds: float = 0.2,
+) -> None:
+    """Load a recently replaced LaunchAgent after launchd releases its old job."""
+    if attempts < 1 or retry_delay_seconds < 0:
+        raise ValueError("launch agent retry settings are invalid")
+    command = ["launchctl", "bootstrap", domain, str(launch_agent)]
+    for attempt in range(attempts):
+        result = subprocess.run(
+            command,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            return
+        if attempt < attempts - 1:
+            time.sleep(retry_delay_seconds)
+    raise subprocess.CalledProcessError(result.returncode, command)
 
 
 @dataclass(frozen=True)
@@ -117,10 +143,7 @@ def install_service(source_root: Path, *, home: Path | None = None) -> ServicePa
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        subprocess.run(
-            ["launchctl", "bootstrap", domain, str(paths.launch_agent)],
-            check=True,
-        )
+        bootstrap_launch_agent(domain, paths.launch_agent)
         subprocess.run(
             ["launchctl", "kickstart", f"{domain}/{LABEL}"],
             check=True,
