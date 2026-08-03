@@ -25,3 +25,18 @@ def test_example_management_messages_match_schema() -> None:
     ):
         document = json.loads((ROOT / "fixtures" / fixture_name).read_text())
         validator.validate(document)
+
+
+def test_example_desktop_ipc_messages_match_schema() -> None:
+    schema = json.loads((ROOT / "schemas/desktop-ipc-v1.schema.json").read_text())
+    validator = Draft202012Validator(schema)
+
+    Draft202012Validator.check_schema(schema)
+    for fixture_name in (
+        "desktop-ipc-status-v1.json",
+        "desktop-ipc-event-v1.json",
+        "desktop-ipc-settings-v1.json",
+        "desktop-ipc-error-v1.json",
+    ):
+        document = json.loads((ROOT / "fixtures" / fixture_name).read_text())
+        validator.validate(document)
