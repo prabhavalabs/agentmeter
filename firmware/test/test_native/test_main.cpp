@@ -11,6 +11,11 @@
 #include "ui_layout.h"
 #include "ui_format.h"
 
+void run_management_model_tests();
+void run_management_protocol_tests();
+void run_settings_codec_tests();
+void run_device_controller_tests();
+
 namespace {
 
 constexpr char kValidSnapshot[] = R"json({
@@ -284,6 +289,10 @@ void test_snapshot_parser_accepts_five_providers_for_scrollable_dashboard() {
 
 int main(int, char**) {
   UNITY_BEGIN();
+  run_device_controller_tests();
+  run_management_model_tests();
+  run_management_protocol_tests();
+  run_settings_codec_tests();
   RUN_TEST(test_parse_snapshot_populates_bounded_display_model);
   RUN_TEST(test_countdown_and_staleness_use_rollover_safe_monotonic_time);
   RUN_TEST(

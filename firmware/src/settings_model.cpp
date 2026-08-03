@@ -1,35 +1,16 @@
 #include "settings_model.h"
 
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 
 namespace agentmeter {
 namespace {
 
-bool valid_provider_id(const char* provider_id) {
-  if (provider_id == nullptr) {
-    return false;
-  }
-  const size_t length = std::strlen(provider_id);
-  if (length == 0 || length >= kDeviceTextBytes) {
-    return false;
-  }
-  for (size_t index = 0; index < length; ++index) {
-    const unsigned char value =
-        static_cast<unsigned char>(provider_id[index]);
-    if (!std::islower(value) && !std::isdigit(value) && value != '_' &&
-        value != '-') {
-      return false;
-    }
-  }
-  return true;
-}
-
 int hidden_provider_index(const DashboardPreferences& preferences,
                           const char* provider_id) {
-  for (uint8_t index = 0; index < preferences.hidden_provider_count; ++index) {
-    if (std::strcmp(preferences.hidden_provider_ids[index].data(),
+  for (uint8_t index = 0; index < preferences.hidden_provider_ids.count;
+       ++index) {
+    if (std::strcmp(preferences.hidden_provider_ids.values[index].data(),
                     provider_id) == 0) {
       return index;
     }
@@ -46,7 +27,7 @@ bool is_provider_visible(const DashboardPreferences& preferences,
 
 bool set_provider_visible(DashboardPreferences& preferences,
                           const char* provider_id, bool visible) {
-  if (!valid_provider_id(provider_id)) {
+  if (!is_valid_provider_id(provider_id)) {
     return false;
   }
   const int index = hidden_provider_index(preferences, provider_id);
@@ -55,25 +36,28 @@ bool set_provider_visible(DashboardPreferences& preferences,
       return true;
     }
     for (uint8_t current = static_cast<uint8_t>(index);
-         current + 1 < preferences.hidden_provider_count; ++current) {
-      preferences.hidden_provider_ids[current] =
-          preferences.hidden_provider_ids[current + 1];
+         current + 1 < preferences.hidden_provider_ids.count; ++current) {
+      preferences.hidden_provider_ids.values[current] =
+          preferences.hidden_provider_ids.values[current + 1];
     }
-    --preferences.hidden_provider_count;
-    preferences.hidden_provider_ids[preferences.hidden_provider_count].fill(0);
+    --preferences.hidden_provider_ids.count;
+    preferences.hidden_provider_ids.values[preferences.hidden_provider_ids.count]
+        .fill(0);
     return true;
   }
   if (index >= 0) {
     return true;
   }
-  if (preferences.hidden_provider_count >=
-      preferences.hidden_provider_ids.size()) {
+  if (preferences.hidden_provider_ids.count >=
+      preferences.hidden_provider_ids.values.size()) {
     return false;
   }
   std::snprintf(
-      preferences.hidden_provider_ids[preferences.hidden_provider_count].data(),
+      preferences.hidden_provider_ids
+          .values[preferences.hidden_provider_ids.count]
+          .data(),
       kDeviceTextBytes, "%s", provider_id);
-  ++preferences.hidden_provider_count;
+  ++preferences.hidden_provider_ids.count;
   return true;
 }
 
@@ -90,13 +74,7 @@ uint8_t visible_provider_indices(
     const DashboardSnapshot& snapshot,
     const DashboardPreferences& preferences,
     std::array<uint8_t, kMaximumProviders>& output) {
-  uint8_t count = 0;
-  for (uint8_t index = 0; index < snapshot.provider_count; ++index) {
-    if (is_provider_visible(preferences, snapshot.providers[index].id.data())) {
-      output[count++] = index;
-    }
-  }
-  return count;
+  return ordered_visible_provider_indices(snapshot, preferences, output);
 }
 
 uint8_t next_visible_provider(const DashboardSnapshot& snapshot,
@@ -105,15 +83,18 @@ uint8_t next_visible_provider(const DashboardSnapshot& snapshot,
   if (snapshot.provider_count == 0) {
     return kNoProviderIndex;
   }
-  for (uint8_t offset = 1; offset <= snapshot.provider_count; ++offset) {
-    const uint8_t candidate =
-        static_cast<uint8_t>((current_index + offset) % snapshot.provider_count);
-    if (is_provider_visible(preferences,
-                            snapshot.providers[candidate].id.data())) {
-      return candidate;
+  std::array<uint8_t, kMaximumProviders> visible{};
+  const uint8_t visible_count =
+      ordered_visible_provider_indices(snapshot, preferences, visible);
+  if (visible_count == 0) {
+    return kNoProviderIndex;
+  }
+  for (uint8_t index = 0; index < visible_count; ++index) {
+    if (visible[index] == current_index) {
+      return visible[static_cast<uint8_t>((index + 1) % visible_count)];
     }
   }
-  return kNoProviderIndex;
+  return visible[0];
 }
 
 bool encode_hidden_provider_ids(const DashboardPreferences& preferences,
@@ -123,8 +104,10 @@ bool encode_hidden_provider_ids(const DashboardPreferences& preferences,
   }
   output[0] = '\0';
   size_t used = 0;
-  for (uint8_t index = 0; index < preferences.hidden_provider_count; ++index) {
-    const char* provider_id = preferences.hidden_provider_ids[index].data();
+  for (uint8_t index = 0; index < preferences.hidden_provider_ids.count;
+       ++index) {
+    const char* provider_id =
+        preferences.hidden_provider_ids.values[index].data();
     const size_t length = std::strlen(provider_id);
     const size_t separator = index == 0 ? 0 : 1;
     if (used + separator + length + 1 > output_size) {
@@ -147,8 +130,8 @@ bool decode_hidden_provider_ids(const char* encoded,
     return false;
   }
   DashboardPreferences candidate = preferences;
-  candidate.hidden_provider_count = 0;
-  for (auto& provider_id : candidate.hidden_provider_ids) {
+  candidate.hidden_provider_ids.count = 0;
+  for (auto& provider_id : candidate.hidden_provider_ids.values) {
     provider_id.fill(0);
   }
   if (encoded[0] == '\0') {
@@ -162,13 +145,13 @@ bool decode_hidden_provider_ids(const char* encoded,
     const size_t length = end == nullptr ? std::strlen(start)
                                          : static_cast<size_t>(end - start);
     if (length == 0 || length >= kDeviceTextBytes ||
-        candidate.hidden_provider_count >=
-            candidate.hidden_provider_ids.size()) {
+        candidate.hidden_provider_ids.count >=
+            candidate.hidden_provider_ids.values.size()) {
       return false;
     }
     std::array<char, kDeviceTextBytes> provider_id{};
     std::memcpy(provider_id.data(), start, length);
-    if (!valid_provider_id(provider_id.data()) ||
+    if (!is_valid_provider_id(provider_id.data()) ||
         !set_provider_visible(candidate, provider_id.data(), false)) {
       return false;
     }

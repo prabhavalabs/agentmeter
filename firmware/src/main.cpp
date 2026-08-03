@@ -1,8 +1,12 @@
 #include <Arduino.h>
 #include <lvgl.h>
 
+#include <cstdio>
+
 #include "boards/waveshare_amoled_216/board.h"
 #include "dashboard_model.h"
+#include "device_controller.h"
+#include "settings_store.h"
 #include "transport.h"
 #include "ui.h"
 
@@ -23,15 +27,113 @@ uint32_t raw_button_changed_at_ms = 0;
 uint32_t button_pressed_at_ms = 0;
 uint32_t last_heartbeat_ms = 0;
 
+class NvsSettingsRepository final : public agentmeter::SettingsRepository {
+ public:
+  agentmeter::SettingsLoadResult load(
+      agentmeter::DeviceSettings& output) override {
+    return agentmeter::load_device_settings(output);
+  }
+
+  bool save(const agentmeter::DeviceSettings& settings) override {
+    return agentmeter::save_device_settings(settings);
+  }
+};
+
+class BleManagementEventSink final : public agentmeter::ManagementEventSink {
+ public:
+  bool publish(uint8_t message_type, uint16_t message_id,
+               const uint8_t* payload, size_t length) override {
+    return agentmeter::transport_publish_management(
+        message_type, message_id, payload, length);
+  }
+};
+
+class BoardDevicePlatform final : public agentmeter::DevicePlatform {
+ public:
+  agentmeter::DeviceInformation information() override {
+    agentmeter::DeviceInformation value{};
+    std::snprintf(value.model.data(), value.model.size(), "%s",
+                  "waveshare-amoled-216");
+    std::snprintf(value.name.data(), value.name.size(), "%s",
+                  agentmeter::transport_device_name());
+    std::snprintf(value.firmware_version.data(),
+                  value.firmware_version.size(), "%s", AGENTMETER_VERSION);
+    std::snprintf(value.hardware_revision.data(),
+                  value.hardware_revision.size(), "%s", "1");
+    value.supports_battery = true;
+    value.supports_vbus_voltage = true;
+    value.supports_input_current = false;
+    return value;
+  }
+
+  agentmeter::DeviceTelemetry telemetry(
+      const agentmeter::DeviceSettings& settings) override {
+    const agentmeter::BoardTelemetry board =
+        agentmeter::board_read_telemetry();
+    agentmeter::DeviceTelemetry value{};
+    value.uptime_seconds = millis() / 1000U;
+    value.free_heap_bytes = ESP.getFreeHeap();
+    value.minimum_free_heap_bytes = ESP.getMinFreeHeap();
+    value.display_on = agentmeter::ui_display_is_on();
+    value.display_dimmed = agentmeter::ui_display_is_dimmed();
+    value.brightness_percent = settings.brightness_percent;
+    value.usb_present = board.usb_present;
+    value.battery_present = board.battery_present;
+    value.power_source = board.usb_present
+                             ? agentmeter::PowerSource::Usb
+                             : (board.battery_present
+                                    ? agentmeter::PowerSource::Battery
+                                    : agentmeter::PowerSource::Unknown);
+    value.has_charging = board.charging_available;
+    value.charging = board.charging;
+    value.has_battery_voltage = board.battery_voltage_available;
+    value.battery_voltage_mv = board.battery_voltage_mv;
+    value.has_battery_percent = board.battery_percent_available;
+    value.battery_percent = board.battery_percent;
+    value.has_vbus_voltage = board.vbus_voltage_available;
+    value.vbus_voltage_mv = board.vbus_voltage_mv;
+    return value;
+  }
+
+  void apply_settings(const agentmeter::DeviceSettings& settings) override {
+    if (agentmeter::ui_display_is_on()) {
+      agentmeter::board_set_brightness_percent(settings.brightness_percent);
+    }
+  }
+
+  void identify() override { agentmeter::ui_identify(); }
+  void restart() override { ESP.restart(); }
+  void forget_bonds() override { agentmeter::transport_clear_bonds(); }
+};
+
+NvsSettingsRepository settings_repository;
+BleManagementEventSink management_event_sink;
+BoardDevicePlatform device_platform;
+agentmeter::DeviceController device_controller(
+    settings_repository, management_event_sink, device_platform);
+
 void snapshot_received(const agentmeter::DashboardSnapshot& snapshot,
                        uint32_t received_at_ms) {
   latest_snapshot = snapshot;
   snapshot_received_at_ms = received_at_ms;
   has_snapshot = true;
+  device_controller.set_snapshot(&latest_snapshot);
   agentmeter::ui_set_model(snapshot, received_at_ms);
   agentmeter::ui_set_connection(agentmeter::ConnectionState::Connected);
   Serial.printf("Snapshot: message=%u providers=%u\n", snapshot.message_id,
                 snapshot.provider_count);
+}
+
+void management_request_received(
+    const agentmeter::ManagementRequest& request, uint32_t received_at_ms) {
+  device_controller.handle(request, received_at_ms);
+  agentmeter::ui_apply_settings(device_controller.settings());
+}
+
+void settings_changed_from_ui(const agentmeter::DeviceSettings& settings,
+                              uint32_t changed_at_ms) {
+  device_controller.settings_changed_from_ui(settings, changed_at_ms);
+  agentmeter::ui_apply_settings(device_controller.settings());
 }
 
 void update_button(uint32_t now_ms) {
@@ -89,11 +191,18 @@ void setup() {
     Serial.println("Board: initialization failed; app stopped");
     return;
   }
-  if (!agentmeter::transport_begin(snapshot_received)) {
+  const agentmeter::SettingsLoadResult settings_result =
+      device_controller.begin();
+  if (settings_result == agentmeter::SettingsLoadResult::StorageError) {
+    Serial.println("Settings: storage unavailable; safe defaults active");
+  }
+  if (!agentmeter::transport_begin(snapshot_received,
+                                   management_request_received)) {
     Serial.println("Transport: Bluetooth unavailable; USB serial remains active");
   }
 
-  agentmeter::ui_begin(agentmeter::transport_device_name());
+  agentmeter::ui_begin(agentmeter::transport_device_name(),
+                       device_controller.settings(), settings_changed_from_ui);
   lv_timer_handler();
   app_ready = true;
   Serial.println("AgentMeter: ready");
@@ -107,6 +216,7 @@ void loop() {
 
   const uint32_t now_ms = millis();
   agentmeter::transport_loop();
+  device_controller.tick(now_ms);
   update_button(now_ms);
   update_connection_state(now_ms);
   agentmeter::ui_tick(now_ms);

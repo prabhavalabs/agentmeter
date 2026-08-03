@@ -1,6 +1,13 @@
 from pathlib import Path
+from subprocess import CompletedProcess
 
-from agentmeter_host.service import LABEL, ServicePaths, launch_agent_document
+from agentmeter_host.service import (
+    LABEL,
+    ServicePaths,
+    bootstrap_launch_agent,
+    launch_agent_document,
+    rotate_service_logs,
+)
 
 
 def test_service_paths_keep_runtime_and_logs_in_user_library(tmp_path: Path) -> None:
@@ -23,9 +30,41 @@ def test_launch_agent_runs_bridge_at_login_with_homebrew_on_path(tmp_path: Path)
         "run",
         "--config",
         str(paths.config),
+        "--ipc-path",
+        str(paths.ipc_socket),
     ]
     assert document["RunAtLoad"] is True
     assert document["KeepAlive"] is True
     assert document["EnvironmentVariables"]["PATH"].startswith("/opt/homebrew/bin:")
     assert document["StandardOutPath"] == str(paths.stdout_log)
     assert document["StandardErrorPath"] == str(paths.stderr_log)
+
+
+def test_log_rotation_is_fixed_and_bounded(tmp_path: Path) -> None:
+    paths = ServicePaths.for_home(tmp_path)
+    paths.stdout_log.parent.mkdir(parents=True)
+    paths.stdout_log.write_text("x" * 20)
+    paths.stdout_log.with_name("bridge.log.1").write_text("older")
+
+    rotate_service_logs(paths, maximum_bytes=10, backups=2)
+
+    assert paths.stdout_log.with_name("bridge.log.1").read_text() == "x" * 20
+    assert paths.stdout_log.with_name("bridge.log.2").read_text() == "older"
+    assert not paths.stdout_log.exists()
+
+
+def test_bootstrap_retries_while_launchd_releases_the_previous_job(
+    tmp_path: Path, monkeypatch
+) -> None:
+    attempts = iter([5, 0])
+    pauses: list[float] = []
+
+    def run(command, **kwargs):
+        return CompletedProcess(command, next(attempts))
+
+    monkeypatch.setattr("agentmeter_host.service.subprocess.run", run)
+    monkeypatch.setattr("agentmeter_host.service.time.sleep", pauses.append)
+
+    bootstrap_launch_agent("gui/501", tmp_path / "agentmeter.plist")
+
+    assert pauses == [0.2]

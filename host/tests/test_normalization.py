@@ -1,9 +1,10 @@
 import copy
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from helpers import dashboard_snapshot
+from helpers import dashboard_snapshot, provider_usage
 
 ROOT = Path(__file__).parents[2]
 
@@ -58,6 +59,113 @@ def test_normalizer_builds_whitelisted_device_snapshot() -> None:
     assert "oauth" not in encoded
     assert "112.4" not in encoded
     assert "18.22" not in encoded
+
+
+def test_usage_normalizer_keeps_successes_and_redacts_private_fields() -> None:
+    from agentmeter_host.normalization import (
+        DisplayPreferences,
+        normalize_provider_usages,
+    )
+
+    snapshot = normalize_provider_usages(
+        {
+            "codex": provider_usage("codex"),
+            "claude": None,
+        },
+        provider_ids=("codex", "claude"),
+        message_id=21,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+        stale_after_seconds=180,
+    )
+
+    assert snapshot["providers"] == [
+        {
+            "id": "codex",
+            "name": "Codex",
+            "status": "ok",
+            "windows": [
+                {
+                    "kind": "session",
+                    "label": "Session",
+                    "usedPercent": 28,
+                    "resetAtEpoch": 1_785_614_400,
+                },
+                {
+                    "kind": "weekly",
+                    "label": "Weekly",
+                    "usedPercent": 41,
+                    "resetAtEpoch": 1_786_212_000,
+                },
+            ],
+        },
+        {
+            "id": "claude",
+            "name": "Claude",
+            "status": "error",
+            "windows": [],
+        },
+    ]
+    encoded = json.dumps(snapshot)
+    assert "redacted@example.test" not in encoded
+    assert "also-private@example.test" not in encoded
+
+
+def test_usage_normalizer_treats_a_successful_collection_as_fresh() -> None:
+    from agentmeter_host.normalization import (
+        DisplayPreferences,
+        normalize_provider_usages,
+    )
+
+    usage = provider_usage("claude")
+    usage["usage"]["updatedAt"] = "2026-08-01T17:00:00Z"
+
+    snapshot = normalize_provider_usages(
+        {"claude": usage},
+        provider_ids=("claude",),
+        message_id=22,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+        stale_after_seconds=180,
+    )
+
+    assert snapshot["providers"][0]["status"] == "ok"
+
+
+def test_usage_normalizer_reads_nested_supplemental_rate_window() -> None:
+    """Catch reading model usage from the descriptor instead of its nested window."""
+    from agentmeter_host.normalization import (
+        DisplayPreferences,
+        normalize_provider_usages,
+    )
+
+    usage = provider_usage("claude")
+    usage["usage"]["extraRateWindows"] = [
+        {
+            "id": "claude-weekly-scoped-fable",
+            "title": "Fable only",
+            "window": {
+                "usedPercent": 93,
+                "resetsAt": "2026-08-03T16:00:00Z",
+                "windowMinutes": 10_080,
+            },
+        }
+    ]
+
+    snapshot = normalize_provider_usages(
+        {"claude": usage},
+        provider_ids=("claude",),
+        message_id=23,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 3, 14, 0, tzinfo=UTC),
+    )
+
+    assert snapshot["providers"][0]["windows"][2] == {
+        "kind": "claude-weekly-scoped-fa",
+        "label": "Fable only",
+        "usedPercent": 93,
+        "resetAtEpoch": 1_785_772_800,
+    }
 
 
 def test_normalizer_rejects_unsupported_dashboard_schema() -> None:

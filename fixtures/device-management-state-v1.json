@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "requestId": 0,
+  "type": "device.state",
+  "payload": {
+    "information": {
+      "model": "waveshare-amoled-216",
+      "name": "AgentMeter",
+      "firmwareVersion": "0.1.0",
+      "hardwareRevision": "1",
+      "snapshotSchemaVersion": 1,
+      "managementSchemaVersion": 1,
+      "capabilities": {
+        "settings": true,
+        "identify": true,
+        "restart": true,
+        "forget": true,
+        "brightness": true,
+        "battery": true,
+        "vbusVoltage": true,
+        "inputCurrent": false
+      }
+    },
+    "telemetry": {
+      "uptimeSeconds": 3600,
+      "freeHeapBytes": 183520,
+      "minimumFreeHeapBytes": 172408,
+      "displayOn": true,
+      "displayDimmed": false,
+      "brightnessPercent": 55,
+      "powerSource": "usb",
+      "usbPresent": true,
+      "batteryPresent": false,
+      "charging": null,
+      "batteryVoltageMv": null,
+      "batteryPercent": null,
+      "vbusVoltageMv": 5012,
+      "inputCurrentMa": null,
+      "boardTemperatureC": null
+    },
+    "settings": {
+      "revision": 8,
+      "alwaysOn": false,
+      "fullView": false,
+      "rotationSeconds": 3,
+      "brightnessPercent": 55,
+      "dimAfterSeconds": 300,
+      "screenOffAfterSeconds": 1800,
+      "alertThresholds": [75, 90],
+      "soundEnabled": false,
+      "hiddenProviderIds": ["gemini"],
+      "providerOrder": ["codex", "claude", "cursor"]
+    }
+  }
+}

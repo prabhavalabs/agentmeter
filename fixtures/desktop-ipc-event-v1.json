@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "event-13",
+  "type": "connection.changed",
+  "payload": {
+    "revision": 13,
+    "phase": "retrying",
+    "nextRetryEpoch": 1785607210,
+    "errorCode": "deviceDisconnected"
+  }
+}

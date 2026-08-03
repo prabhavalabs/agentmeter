@@ -45,6 +45,29 @@ def dashboard_snapshot() -> dict[str, object]:
     }
 
 
+def provider_usage(provider_id: str = "codex") -> dict[str, object]:
+    return {
+        "provider": provider_id,
+        "source": "oauth",
+        "usage": {
+            "primary": {
+                "usedPercent": 27.6,
+                "resetsAt": "2026-08-01T20:00:00Z",
+            },
+            "secondary": {
+                "usedPercent": 41.2,
+                "resetsAt": "2026-08-08T18:00:00Z",
+            },
+            "tertiary": None,
+            "extraRateWindows": [],
+            "updatedAt": "2026-08-01T17:59:45Z",
+            "identity": {"accountEmail": "redacted@example.test"},
+        },
+        "account": {"email": "also-private@example.test"},
+        "error": None,
+    }
+
+
 def device_snapshot(*, message_id: int = 15) -> dict[str, object]:
     return {
         "schemaVersion": 1,

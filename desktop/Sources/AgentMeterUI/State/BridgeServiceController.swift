@@ -1,0 +1,259 @@
+import AppKit
+import CryptoKit
+import Darwin
+import Foundation
+import Observation
+import OSLog
+import ServiceManagement
+
+public enum BridgeServiceState: Equatable, Sendable {
+    case idle
+    case preparing
+    case registering
+    case waitingForBridge
+    case ready
+    case external
+    case needsApproval
+    case unavailable
+    case failed(String)
+
+    public var title: String {
+        switch self {
+        case .idle: "Not started"
+        case .preparing: "Preparing"
+        case .registering: "Registering"
+        case .waitingForBridge: "Starting"
+        case .ready: "Running"
+        case .external: "Development bridge"
+        case .needsApproval: "Approval required"
+        case .unavailable: "Bundle required"
+        case .failed: "Needs attention"
+        }
+    }
+
+    public var isUsable: Bool {
+        switch self {
+        case .waitingForBridge, .ready, .external: true
+        default: false
+        }
+    }
+
+    public var detail: String? {
+        if case let .failed(message) = self { return message }
+        return nil
+    }
+}
+
+@MainActor
+@Observable
+public final class BridgeServiceController {
+    public static let plistName = "com.prabhavalabs.agentmeter.bridge.plist"
+    public static let legacyLabel = "com.prabhavalabs.agentmeter"
+
+    public private(set) var state: BridgeServiceState = .idle
+    public private(set) var isUpdating = false
+    public private(set) var hasBundledBridge: Bool
+
+    private let service: SMAppService
+    private let bundle: Bundle
+    private let fileManager: FileManager
+    private let externalMode: Bool
+    private let defaults: UserDefaults
+    private var hasStarted = false
+    private let logger = Logger(
+        subsystem: "com.prabhavalabs.agentmeter.desktop",
+        category: "BridgeService"
+    )
+
+    public init(
+        bundle: Bundle = .main,
+        fileManager: FileManager = .default,
+        defaults: UserDefaults = .standard,
+        externalMode: Bool = false
+    ) {
+        self.bundle = bundle
+        self.fileManager = fileManager
+        self.externalMode = externalMode
+        self.defaults = defaults
+        service = SMAppService.agent(plistName: Self.plistName)
+        hasBundledBridge = bundle.resourceURL?
+            .appendingPathComponent("AgentMeterBridge/AgentMeterBridge")
+            .isFileURL == true
+            && fileManager.isExecutableFile(
+                atPath: bundle.resourceURL?
+                    .appendingPathComponent("AgentMeterBridge/AgentMeterBridge").path ?? ""
+            )
+        if externalMode {
+            state = .external
+        } else if hasBundledBridge == false {
+            state = .unavailable
+        }
+    }
+
+    public func start() async {
+        guard hasStarted == false else { return }
+        hasStarted = true
+        if externalMode {
+            state = .external
+            return
+        }
+        guard hasBundledBridge else {
+            state = .unavailable
+            return
+        }
+
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            state = .preparing
+            try prepareConfiguration()
+            state = .registering
+            var shouldRegister = service.status == .notRegistered || service.status == .notFound
+            if service.status == .enabled,
+               let digest = currentHelperDigest,
+               defaults.string(forKey: "registeredBridgeDigest") != digest {
+                try await service.unregister()
+                shouldRegister = true
+            }
+            if shouldRegister {
+                try service.register()
+            }
+            let status = await settledStatus()
+            if status == .requiresApproval {
+                state = .needsApproval
+                hasStarted = false
+                return
+            }
+            guard status == .enabled else {
+                state = .failed("The background bridge is not enabled in Login Items.")
+                hasStarted = false
+                return
+            }
+            stopLegacyServiceIfPresent()
+            state = .waitingForBridge
+        } catch {
+            logger.error("Bridge service registration failed: \(error.localizedDescription, privacy: .public)")
+            state = .failed(error.localizedDescription)
+            hasStarted = false
+        }
+    }
+
+    public func retry() async {
+        hasStarted = false
+        await start()
+    }
+
+    public func confirmBridgeReady() {
+        guard state == .waitingForBridge || state == .external else { return }
+        state = externalMode ? .external : .ready
+        if let digest = currentHelperDigest {
+            defaults.set(digest, forKey: "registeredBridgeDigest")
+        }
+        archiveLegacyLaunchAgent()
+    }
+
+    public func stop() async {
+        guard externalMode == false, hasBundledBridge else { return }
+        isUpdating = true
+        defer { isUpdating = false }
+        do {
+            if service.status != .notRegistered {
+                try await service.unregister()
+            }
+            state = .idle
+            hasStarted = false
+        } catch {
+            logger.error("Bridge service removal failed: \(error.localizedDescription, privacy: .public)")
+            state = .failed(error.localizedDescription)
+        }
+    }
+
+    public func openLoginItemsSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"
+        ) else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func prepareConfiguration() throws {
+        let support = try fileManager.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        ).appendingPathComponent("AgentMeter", isDirectory: true)
+        try fileManager.createDirectory(
+            at: support,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o700]
+        )
+        let destination = support.appendingPathComponent("config.toml")
+        guard fileManager.fileExists(atPath: destination.path) == false else { return }
+
+        let legacy = fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent(".config/AgentMeter/config.toml")
+        if fileManager.fileExists(atPath: legacy.path) {
+            try fileManager.copyItem(at: legacy, to: destination)
+            return
+        }
+        guard let template = bundle.url(forResource: "config.example", withExtension: "toml") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try fileManager.copyItem(at: template, to: destination)
+    }
+
+    private func settledStatus() async -> SMAppService.Status {
+        for _ in 0 ..< 20 {
+            let status = service.status
+            if status != .notRegistered, status != .notFound { return status }
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        return service.status
+    }
+
+    private func stopLegacyServiceIfPresent() {
+        let legacyPlist = legacyLaunchAgentURL
+        guard fileManager.fileExists(atPath: legacyPlist.path) else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        task.arguments = ["bootout", "gui/\(getuid())/\(Self.legacyLabel)"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+        task.waitUntilExit()
+    }
+
+    private func archiveLegacyLaunchAgent() {
+        guard externalMode == false else { return }
+        let legacy = legacyLaunchAgentURL
+        guard fileManager.fileExists(atPath: legacy.path) else { return }
+        do {
+            let support = try fileManager.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            ).appendingPathComponent("AgentMeter/Migration", isDirectory: true)
+            try fileManager.createDirectory(at: support, withIntermediateDirectories: true)
+            let backup = support.appendingPathComponent("\(Self.legacyLabel).plist")
+            if fileManager.fileExists(atPath: backup.path) {
+                try fileManager.removeItem(at: backup)
+            }
+            try fileManager.moveItem(at: legacy, to: backup)
+        } catch {
+            // A retained legacy plist is harmless once its job is booted out.
+        }
+    }
+
+    private var legacyLaunchAgentURL: URL {
+        fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(Self.legacyLabel).plist")
+    }
+
+    private var currentHelperDigest: String? {
+        guard let url = bundle.resourceURL?
+            .appendingPathComponent("AgentMeterBridge/AgentMeterBridge"),
+            let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return nil }
+        return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+    }
+}

@@ -1,6 +1,7 @@
 # Copy this file to the location printed by `agentmeter doctor`.
 
 [general]
+# The desktop app stores later changes in a private Application Support overlay.
 poll_interval_seconds = 300
 providers = ["codex", "claude", "gemini", "cursor"]
 

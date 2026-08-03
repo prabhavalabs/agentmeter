@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 _PROVIDER_NAMES = {
@@ -10,6 +10,13 @@ _PROVIDER_NAMES = {
     "codex": "Codex",
     "cursor": "Cursor",
     "gemini": "Gemini",
+}
+
+_WINDOW_LABELS = {
+    "claude": ("Session", "Weekly", "Sonnet"),
+    "codex": ("Session", "Weekly", "Tertiary"),
+    "cursor": ("Total", "Auto", "API"),
+    "gemini": ("Pro", "Flash", "Flash Lite"),
 }
 
 
@@ -199,3 +206,118 @@ def normalize_dashboard_snapshot(
         raise
     except (AttributeError, KeyError, OverflowError, TypeError, ValueError) as error:
         raise NormalizationError("dashboard schema version 1 is invalid") from error
+
+
+def _usage_window(
+    window: object,
+    *,
+    kind: str,
+    label: str,
+) -> dict[str, object] | None:
+    if window is None:
+        return None
+    if not isinstance(window, dict):
+        raise ValueError("usage window is invalid")
+    used_percent = window.get("usedPercent")
+    resets_at = window.get("resetsAt")
+    _used_percent(used_percent)
+    _epoch(resets_at)
+    return {
+        "kind": kind,
+        "label": label,
+        "usedPercent": used_percent,
+        "resetAt": resets_at,
+    }
+
+
+def _dashboard_provider_from_usage(
+    provider_id: str,
+    payload: dict[str, object] | None,
+    *,
+    generated_at: str,
+) -> dict[str, object]:
+    fallback = {
+        "id": provider_id,
+        "name": _PROVIDER_NAMES.get(provider_id, provider_id.title()),
+        "enabled": True,
+        "windows": [],
+        "error": {"code": "providerUnavailable"},
+        "updatedAt": generated_at,
+    }
+    if (
+        payload is None
+        or payload.get("provider") != provider_id
+        or payload.get("error") is not None
+    ):
+        return fallback
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return fallback
+
+    try:
+        labels = _WINDOW_LABELS.get(provider_id, ("Primary", "Secondary", "Tertiary"))
+        windows = [
+            _usage_window(usage.get("primary"), kind="session", label=labels[0]),
+            _usage_window(usage.get("secondary"), kind="weekly", label=labels[1]),
+            _usage_window(usage.get("tertiary"), kind="tertiary", label=labels[2]),
+        ]
+        normalized_windows = [window for window in windows if window is not None]
+        for extra in usage.get("extraRateWindows") or []:
+            if len(normalized_windows) == 3:
+                break
+            if not isinstance(extra, dict):
+                raise ValueError("extra usage window is invalid")
+            normalized = _usage_window(
+                extra.get("window", extra),
+                kind=_identifier(extra.get("id")),
+                label=_label(extra.get("title"), fallback="Extra"),
+            )
+            if normalized is not None:
+                normalized_windows.append(normalized)
+        source_updated_at = usage.get("updatedAt") or generated_at
+        _epoch(source_updated_at)
+    except (AttributeError, TypeError, ValueError):
+        return fallback
+
+    return {
+        "id": provider_id,
+        "name": _PROVIDER_NAMES.get(provider_id, provider_id.title()),
+        "enabled": True,
+        "windows": normalized_windows,
+        "error": None,
+        # A successful local collection is fresh even when the provider's payload
+        # timestamp describes the last quota change rather than the probe time.
+        "updatedAt": generated_at,
+    }
+
+
+def normalize_provider_usages(
+    usages: dict[str, dict[str, object] | None],
+    *,
+    provider_ids: tuple[str, ...],
+    message_id: int,
+    display: DisplayPreferences,
+    generated_at: datetime | None = None,
+    stale_after_seconds: int = 180,
+) -> dict[str, Any]:
+    timestamp = generated_at or datetime.now(UTC)
+    generated_at_text = timestamp.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    dashboard = {
+        "schemaVersion": 1,
+        "generatedAt": generated_at_text,
+        "staleAfterSeconds": stale_after_seconds,
+        "providers": [
+            _dashboard_provider_from_usage(
+                provider_id,
+                usages.get(provider_id),
+                generated_at=generated_at_text,
+            )
+            for provider_id in provider_ids
+        ],
+    }
+    return normalize_dashboard_snapshot(
+        dashboard,
+        provider_ids=provider_ids,
+        message_id=message_id,
+        display=display,
+    )

@@ -236,7 +236,7 @@ async def test_run_bridge_releases_collection_session_between_polls() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runtime_keeps_last_good_provider_windows_during_transient_error() -> None:
+async def test_runtime_keeps_recent_provider_windows_live_during_transient_error() -> None:
     from agentmeter_host.config import HostConfig
     from agentmeter_host.normalization import DisplayPreferences
     from agentmeter_host.runtime import BridgeRuntime
@@ -281,7 +281,7 @@ async def test_runtime_keeps_last_good_provider_windows_during_transient_error()
     assert recovered == {
         "id": "claude",
         "name": "Claude",
-        "status": "stale",
+        "status": "ok",
         "windows": [
             {
                 "kind": "weekly",
@@ -291,6 +291,56 @@ async def test_runtime_keeps_last_good_provider_windows_during_transient_error()
             }
         ],
     }
+
+
+@pytest.mark.asyncio
+async def test_runtime_marks_cached_provider_stale_after_freshness_grace() -> None:
+    from agentmeter_host.config import HostConfig
+    from agentmeter_host.normalization import DisplayPreferences
+    from agentmeter_host.runtime import BridgeRuntime
+
+    config = HostConfig(
+        poll_interval_seconds=60,
+        provider_ids=("claude",),
+        display=DisplayPreferences(55, (75, 90), False),
+    )
+    good = device_snapshot(message_id=0)
+    good["providers"][0].update({"id": "claude", "name": "Claude"})
+    failed = copy.deepcopy(good)
+    failed["messageId"] = 1
+    failed["generatedAtEpoch"] += good["staleAfterSeconds"] + 1
+    failed["providers"][0]["status"] = "error"
+    failed["providers"][0]["windows"] = []
+    snapshots = iter((good, failed))
+
+    async def collect(_config, *, message_id):
+        return next(snapshots)
+
+    transport = RecordingTransport()
+    runtime = BridgeRuntime(config, transport, collector=collect)
+
+    await runtime.tick()
+    await runtime.tick()
+
+    recovered = transport.sent[1][0]["providers"][0]
+    assert recovered["status"] == "stale"
+    assert recovered["windows"] == good["providers"][0]["windows"]
+
+
+def test_provider_history_preserves_last_successful_update_time() -> None:
+    from agentmeter_host.runtime import ProviderHistory
+
+    history = ProviderHistory()
+    good = device_snapshot(message_id=0)
+    failed = copy.deepcopy(good)
+    failed["generatedAtEpoch"] += 60
+    failed["providers"][0]["status"] = "error"
+    failed["providers"][0]["windows"] = []
+
+    history.apply(good)
+    history.apply(failed)
+
+    assert history.updated_at_epoch("codex") == good["generatedAtEpoch"]
 
 
 @pytest.mark.asyncio

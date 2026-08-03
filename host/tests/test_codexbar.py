@@ -1,9 +1,10 @@
+import asyncio
 import json
 import os
 
 import httpx
 import pytest
-from helpers import dashboard_snapshot
+from helpers import dashboard_snapshot, provider_usage
 
 
 @pytest.mark.asyncio
@@ -22,6 +23,75 @@ async def test_client_fetches_authenticated_dashboard_snapshot() -> None:
     )
 
     assert await client.fetch_snapshot() == dashboard_snapshot()
+
+
+@pytest.mark.asyncio
+async def test_client_fetches_configured_provider_usage_concurrently() -> None:
+    from agentmeter_host.codexbar import CodexBarClient
+
+    requested: set[str] = set()
+    both_started = asyncio.Event()
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/usage"
+        assert request.headers["Authorization"] == "Bearer test-secret"
+        provider_id = request.url.params["provider"]
+        requested.add(provider_id)
+        if len(requested) == 2:
+            both_started.set()
+        await asyncio.wait_for(both_started.wait(), timeout=1)
+        return httpx.Response(200, json=[provider_usage(provider_id)])
+
+    client = CodexBarClient(
+        port=46_213,
+        token="test-secret",
+        transport=httpx.MockTransport(handle),
+    )
+
+    result = await client.fetch_provider_usages(("codex", "claude"))
+
+    assert result == {
+        "codex": provider_usage("codex"),
+        "claude": provider_usage("claude"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_client_preserves_successful_provider_when_another_request_fails() -> None:
+    from agentmeter_host.codexbar import CodexBarClient
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        provider_id = request.url.params["provider"]
+        if provider_id == "claude":
+            return httpx.Response(504, json={"error": "deadline exceeded"})
+        return httpx.Response(200, json=[provider_usage(provider_id)])
+
+    client = CodexBarClient(
+        port=46_213,
+        token="test-secret",
+        transport=httpx.MockTransport(handle),
+    )
+
+    assert await client.fetch_provider_usages(("codex", "claude")) == {
+        "codex": provider_usage("codex"),
+        "claude": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_client_rejects_refresh_when_every_provider_request_fails() -> None:
+    from agentmeter_host.codexbar import CodexBarClient, CodexBarError
+
+    client = CodexBarClient(
+        port=46_213,
+        token="test-secret",
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(504, json={"error": "deadline exceeded"})
+        ),
+    )
+
+    with pytest.raises(CodexBarError, match="any configured provider"):
+        await client.fetch_provider_usages(("codex", "claude"))
 
 
 @pytest.mark.asyncio
@@ -179,6 +249,22 @@ def test_serve_process_isolates_claude_cli_from_plugins() -> None:
 
     assert environment["CLAUDE_CLI_PATH"] == "/app/venv/bin/agentmeter-claude-probe"
     assert environment["AGENTMETER_CLAUDE_CLI_PATH"] == "/opt/homebrew/bin/claude"
+
+
+def test_claude_command_prefers_the_current_user_install(tmp_path, monkeypatch) -> None:
+    from agentmeter_host.codexbar import _installed_claude_command
+
+    user_command = tmp_path / ".local" / "bin" / "claude"
+    user_command.parent.mkdir(parents=True)
+    user_command.write_text("current user Claude")
+    user_command.chmod(0o755)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(
+        "agentmeter_host.codexbar.shutil.which",
+        lambda name: "/opt/homebrew/bin/claude" if name == "claude" else None,
+    )
+
+    assert _installed_claude_command() == str(user_command)
 
 
 @pytest.mark.asyncio

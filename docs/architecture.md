@@ -10,8 +10,9 @@ flowchart LR
     B -->|"Loopback dashboard API"| C["AgentMeter host"]
     C --> D["Validate and allowlist fields"]
     D --> E["Threshold event engine"]
-    E -->|"Encrypted BLE + ACK"| F["Firmware model"]
+    E -->|"Encrypted BLE snapshots, settings, and telemetry"| F["Firmware model"]
     E -.->|"USB serial fallback"| F
+    E <-->|"Private user-only Unix socket"| I["Native macOS app"]
     F --> G["Overview and details"]
     F --> H["Local countdowns and stale state"]
 ```
@@ -29,8 +30,10 @@ The Python bridge:
 7. Removes identity, credentials, raw errors, costs, credits, and unrelated fields.
 8. Retains recent valid provider windows for up to one hour when a refresh returns an empty error row, marking the result stale.
 9. Creates deduplicated threshold events in memory.
-10. Fragments, sends, retries, and waits for a firmware acknowledgement.
-11. Runs interactively or as a macOS LaunchAgent installed into an isolated virtual environment.
+10. Owns the only Bluetooth connection and serializes snapshot and management operations.
+11. Stores only downsampled percentages and capability-gated hardware health for 30 days.
+12. Publishes state changes to the native app through a private, user-only Unix socket.
+13. Runs interactively or as a macOS LaunchAgent installed into an isolated virtual environment.
 
 Provider collection is behind an adapter boundary, so another local source can be added without changing the firmware contract.
 
@@ -39,13 +42,15 @@ Provider collection is behind an adapter boundary, so another local source can b
 The ESP32 application:
 
 1. Advertises a private GATT service as `AgentMeter-XXXX`.
-2. Requires an encrypted bonded connection for data and status characteristics.
+2. Requires an encrypted bonded connection for snapshot, status, management, and telemetry characteristics.
 3. Queues BLE writes outside the callback, reassembles ordered fragments, and rejects incomplete, oversized, or malformed messages.
 4. Parses into a fixed-size static candidate model and swaps it in only after complete validation, avoiding large allocations on the Arduino loop-task stack.
 5. Filters the received providers through persistent on-device visibility settings.
 6. Renders the responsive overview, settings, provider detail, rotating full view, alert, waiting, reconnecting, stale, unavailable, and provider-error states.
 7. Updates countdowns and full-view rotation locally without network time or continuous host traffic.
-8. Protects the AMOLED with moderate brightness, optional dimming/screen-off, and one-pixel shifting.
+8. Persists one revisioned settings model shared by touchscreen and desktop controls.
+9. Reports only telemetry the board can measure honestly; unsupported values remain unavailable.
+10. Protects the AMOLED with moderate brightness, optional dimming/screen-off, and one-pixel shifting.
 
 The same parser accepts newline-delimited USB serial snapshots for diagnosis and recovery.
 
@@ -54,6 +59,8 @@ The same parser accepts newline-delimited USB serial snapshots for diagnosis and
 The display may receive provider IDs and names, short status values, quota labels, usage percentages, reset timestamps, display preferences, and short-lived event IDs. It must never receive API keys, OAuth tokens, cookies, email addresses, account IDs, prompts, code, file paths, repository names, raw responses, or local coding-session logs.
 
 CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXBAR_DASHBOARD_TOKEN`, not command arguments or files. The supervised server remains alive only while collecting one snapshot and is stopped before the bridge waits for its next interval.
+
+The desktop socket opens no TCP port and accepts only the current macOS user. Local history uses fixed columns for normalized percentages, reset times, connection codes, and supported power telemetry. It does not store identity, prompts, code, credentials, raw responses, or billing details.
 
 ## Reliability rules
 

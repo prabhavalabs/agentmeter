@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "requestId": 17,
+  "type": "settings.patch",
+  "payload": {
+    "baseRevision": 8,
+    "alwaysOn": true,
+    "fullView": true,
+    "rotationSeconds": 5,
+    "brightnessPercent": 65,
+    "dimAfterSeconds": 300,
+    "screenOffAfterSeconds": 1800,
+    "alertThresholds": [75, 90],
+    "soundEnabled": false,
+    "hiddenProviderIds": ["gemini"],
+    "providerOrder": ["codex", "claude", "cursor"]
+  }
+}

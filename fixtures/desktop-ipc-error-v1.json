@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "request-3",
+  "type": "error",
+  "status": "error",
+  "payload": {
+    "code": "revisionConflict",
+    "message": "Device settings changed before this update was applied",
+    "recoverable": true
+  }
+}

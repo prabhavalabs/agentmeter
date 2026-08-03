@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "request-2",
+  "type": "settings.result",
+  "status": "ok",
+  "payload": {
+    "syncStatus": "synced",
+    "settings": {
+      "revision": 9,
+      "alwaysOn": true,
+      "fullView": true,
+      "rotationSeconds": 5,
+      "brightnessPercent": 65,
+      "dimAfterSeconds": 300,
+      "screenOffAfterSeconds": 1800,
+      "alertThresholds": [75, 90],
+      "soundEnabled": false,
+      "hiddenProviderIds": ["gemini"],
+      "providerOrder": ["codex", "claude", "cursor"]
+    }
+  }
+}

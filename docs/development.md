@@ -3,6 +3,7 @@
 ## Working areas
 
 - `host/` contains the Python bridge, transports, alert engine, service manager, and tests.
+- `desktop/` contains the native Swift package and macOS application.
 - `firmware/` contains the PlatformIO application, fixed-size model, protocol, UI, and board support.
 - `schemas/` defines the shared JSON contract.
 - `fixtures/` contains safe synthetic messages used by both sides.
@@ -28,9 +29,49 @@ Useful manual commands are:
 .venv/bin/agentmeter snapshot --pretty
 .venv/bin/agentmeter send
 .venv/bin/agentmeter run
+.venv/bin/agentmeter ipc-path
 ```
 
 Do not run an interactive bridge and the background service at the same time; they would compete for one BLE connection.
+
+The fake server supports `connected-usb`, `disconnected`, `pairing`, `provider-unavailable`, `legacy`, and `settings-conflict`. It reads only synthetic checked-in fixtures and does not import provider collectors or Bluetooth code. Use it for SwiftUI work without an attached device or signed-in coding-agent accounts.
+
+## Native macOS workflow
+
+The desktop package targets macOS 14 or later and uses Swift 6, SwiftUI, Network, Observation, and ServiceManagement. It has no third-party Swift dependencies.
+
+```bash
+make desktop-test
+make desktop-build
+make desktop-app
+open desktop/dist/AgentMeter.app
+```
+
+The packaging script creates a self-contained local bundle with the production icon and bundled
+bridge. Set `CODE_SIGN_IDENTITY` to an installed Apple Development identity to test the managed
+background bridge locally, or to a Developer ID Application identity when preparing a notarized
+public build. An ad-hoc build can still be used with `AGENTMETER_IPC_PATH` for interface work, but
+macOS will not authorize its embedded launch agent.
+
+To develop without the bridge service or hardware, create a private fake-server runtime and point the Swift executable to it:
+
+```bash
+AGENTMETER_FAKE_RUNTIME="${TMPDIR:-/tmp/}agentmeter-$(id -u)"
+mkdir -p "$AGENTMETER_FAKE_RUNTIME"
+chmod 700 "$AGENTMETER_FAKE_RUNTIME"
+
+.venv/bin/agentmeter fake-server --scenario connected-usb \
+  --ipc-path "$AGENTMETER_FAKE_RUNTIME/development.sock"
+```
+
+In a second terminal:
+
+```bash
+AGENTMETER_IPC_PATH="$AGENTMETER_FAKE_RUNTIME/development.sock" \
+  swift run --package-path desktop AgentMeter
+```
+
+Do not point the fake server at the live bridge socket. The checked-in screenshots use only synthetic fixtures.
 
 ## Firmware workflow
 
@@ -53,6 +94,8 @@ Board pins and peripheral initialization live under `firmware/src/boards/`. New 
 make lint
 make test
 make firmware
+make desktop-test
+make desktop-app
 ```
 
 `make test` runs both host and native firmware tests. Hardware-dependent changes must additionally be flashed to the exact board and tested over the affected transport.
@@ -66,6 +109,8 @@ Any device-message change must update:
 3. Host validation or normalization tests
 4. Firmware parser tests
 5. `docs/protocol.md`
+
+Desktop IPC changes must also update `schemas/desktop-ipc-v1.schema.json`, every affected `desktop-ipc-*.json` fixture, Python protocol tests, and Swift decoding tests.
 
 Breaking changes require a new `schemaVersion`. Never add raw CodexBar responses as fixtures. Synthetic data should explicitly prove that identity, billing, status, and error fields are removed.
 
