@@ -86,7 +86,9 @@
       "lastProviderRefreshEpoch": 1785607200,
       "lastDeviceSyncEpoch": 1785607201,
       "lastErrorCode": null,
-      "providerHealth": { "codex": "ok" }
+      "providerHealth": { "codex": "ok" },
+      "configuredProviderIds": ["codex", "claude", "gemini", "cursor"],
+      "pollIntervalSeconds": 300
     }
   }
 }

@@ -47,7 +47,11 @@ make desktop-app
 open desktop/dist/AgentMeter.app
 ```
 
-The packaging script creates an ad-hoc-signed local bundle with the production icon. Set `CODE_SIGN_IDENTITY` to an installed Developer ID Application identity when preparing a distributable build.
+The packaging script creates a self-contained local bundle with the production icon and bundled
+bridge. Set `CODE_SIGN_IDENTITY` to an installed Apple Development identity to test the managed
+background bridge locally, or to a Developer ID Application identity when preparing a notarized
+public build. An ad-hoc build can still be used with `AGENTMETER_IPC_PATH` for interface work, but
+macOS will not authorize its embedded launch agent.
 
 To develop without the bridge service or hardware, create a private fake-server runtime and point the Swift executable to it:
 

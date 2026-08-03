@@ -34,12 +34,10 @@ public actor UnixBridgeClient: BridgeAPI {
                     switch state {
                     case .ready:
                         gate.succeed()
-                    case let .failed(error):
-                        gate.fail(.connectionFailed(error.localizedDescription))
-                    case .cancelled:
-                        gate.fail(.disconnected)
                     default:
-                        break
+                        if let error = Self.connectionError(for: state) {
+                            gate.fail(error)
+                        }
                     }
                 }
                 activeConnection.start(queue: queue)
@@ -54,6 +52,19 @@ public actor UnixBridgeClient: BridgeAPI {
         receiveNext()
         _ = try await request(type: "hello", payload: [:])
         _ = try await request(type: "events.subscribe", payload: [:])
+    }
+
+    nonisolated static func connectionError(
+        for state: NWConnection.State
+    ) -> BridgeClientError? {
+        switch state {
+        case let .failed(error), let .waiting(error):
+            .connectionFailed(error.localizedDescription)
+        case .cancelled:
+            .disconnected
+        default:
+            nil
+        }
     }
 
     public func status() async throws -> ControlState {

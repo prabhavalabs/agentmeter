@@ -63,6 +63,38 @@ import Testing
 }
 
 @MainActor
+@Test func providerAndConnectionEventsUpdateTheSharedState() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    await model.start()
+
+    await bridge.emitState(
+        makeState(revision: 2, phase: .degraded),
+        eventType: "providers.changed"
+    )
+    await allowEventsToDrain()
+
+    #expect(model.state.revision == 2)
+    #expect(model.state.connection.phase == .degraded)
+    await model.stop()
+}
+
+@MainActor
+@Test func sleepAndWakeAreForwardedToTheBridge() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    await model.start()
+
+    await model.systemWillSleep()
+    await model.systemDidWake()
+
+    let commands = await bridge.commandTypes()
+    #expect(commands.contains("system.sleep"))
+    #expect(commands.contains("system.wake"))
+    await model.stop()
+}
+
+@MainActor
 private func makePreferences() -> AppPreferences {
     let name = "AgentMeterModelTests.\(UUID().uuidString)"
     return AppPreferences(defaults: UserDefaults(suiteName: name)!)

@@ -51,7 +51,9 @@ No separate Arduino, screen, Bluetooth module, breadboard, jumper wires, microSD
 
 ## Quick start
 
-Prerequisites are macOS 14 or later, Python 3.11 or later, and a recent CodexBar CLI with `codexbar serve`.
+For a release build, the only prerequisites are macOS 14 or later, a Bluetooth-capable Mac, and a
+recent CodexBar installation. The signed application includes its own bridge runtime; Python and
+the source repository are needed only for development.
 
 ```bash
 git clone https://github.com/prabhavalabs/agentmeter.git
@@ -86,14 +88,19 @@ Once the display updates, install the isolated background bridge. It starts imme
 .venv/bin/agentmeter service status
 ```
 
-Build and open the native companion on macOS 14 or later:
+Build and open the native companion on macOS 14 or later. A local ServiceManagement test requires
+an installed Apple Development signing identity:
 
 ```bash
-make desktop-app
-open desktop/dist/AgentMeter.app
+CODE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" make desktop-app
+ditto desktop/dist/AgentMeter.app /Applications/AgentMeter.app
+open /Applications/AgentMeter.app
 ```
 
-The development bundle is ad-hoc signed locally. Move it to `/Applications` before enabling **Launch AgentMeter at login**. See the [macOS companion guide](docs/macos-app.md) for screens, fake-data development, packaging, and release signing.
+On first launch, the app registers its bundled bridge and walks through Bluetooth, device, and
+provider setup. An older repository-installed bridge is migrated automatically after the bundled
+bridge is ready. See the [macOS companion guide](docs/macos-app.md) for screens, synthetic-data
+development, packaging, and release signing.
 
 The first uncached collection or Bluetooth pairing may take up to two minutes. Later updates reuse the bond and connection. Detailed instructions and troubleshooting are in [Setup](docs/setup.md) and [Host bridge](docs/host.md).
 

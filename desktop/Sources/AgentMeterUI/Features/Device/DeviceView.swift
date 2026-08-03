@@ -1,4 +1,5 @@
 import AgentMeterCore
+import AppKit
 import SwiftUI
 
 public struct DeviceView: View {
@@ -174,7 +175,15 @@ public struct DeviceView: View {
                 if model.activeOperations.contains(.scanning) { ProgressView() }
                 Button("Scan Again") { Task { await model.scan() } }
             }
-            if model.discoveredDevices.isEmpty {
+            if model.state.connection.phase == .bluetoothUnavailable {
+                ContentUnavailableView {
+                    Label("Bluetooth unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
+                } description: {
+                    Text("Turn on Bluetooth and allow AgentMeter access in System Settings.")
+                } actions: {
+                    Button("Open Bluetooth Settings") { openBluetoothSettings() }
+                }
+            } else if model.discoveredDevices.isEmpty {
                 ContentUnavailableView(
                     "Searching nearby",
                     systemImage: "dot.radiowaves.left.and.right",
@@ -225,5 +234,12 @@ public struct DeviceView: View {
     private func byteCount(_ bytes: Int?) -> String {
         guard let bytes else { return "Unavailable" }
         return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .memory)
+    }
+
+    private func openBluetoothSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.Bluetooth-Settings.extension"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 }

@@ -7,7 +7,7 @@ PIO ?= $(VENV)/bin/pio
 setup:
 	$(PYTHON) -m venv $(VENV)
 	$(VENV)/bin/python -m pip install --upgrade pip
-	$(VENV)/bin/python -m pip install -e ".[dev,firmware]"
+	$(VENV)/bin/python -m pip install -e ".[dev,firmware,package]"
 
 lint:
 	$(VENV)/bin/ruff check .

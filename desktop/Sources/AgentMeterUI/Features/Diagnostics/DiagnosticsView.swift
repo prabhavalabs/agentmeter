@@ -32,6 +32,7 @@ public struct DiagnosticsView: View {
                 }
 
                 providerHealth
+                recentEvents
                 actionCard
                 privacyCard
             }
@@ -48,6 +49,7 @@ public struct DiagnosticsView: View {
         } message: {
             Text("Current provider usage and device settings are not removed.")
         }
+        .task { await model.refreshDiagnostics() }
     }
 
     private func diagnosticGroup(_ title: String, rows: [(String, String)]) -> some View {
@@ -112,6 +114,46 @@ public struct DiagnosticsView: View {
         .agentMeterCard()
     }
 
+    private var recentEvents: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Recent events").font(.headline)
+                Spacer()
+                Text("Sanitized · last \(model.diagnostics?.recentEvents.count ?? 0)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            Divider()
+            if let events = model.diagnostics?.recentEvents, events.isEmpty == false {
+                ForEach(events.suffix(12).reversed()) { event in
+                    HStack(spacing: 12) {
+                        Image(systemName: eventSymbol(event.type))
+                            .foregroundStyle(AgentMeterTheme.accent)
+                            .frame(width: 18)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(eventTitle(event.type))
+                            Text(Date(timeIntervalSince1970: Double(event.occurredAtEpoch)), style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text("r\(event.revision)")
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                }
+            } else {
+                Text("No recent bridge events are available.")
+                    .foregroundStyle(.secondary)
+                    .padding(16)
+            }
+        }
+        .agentMeterCard()
+    }
+
     private var privacyCard: some View {
         Label {
             Text("Diagnostics exclude credentials, prompts, source code, account identity, and raw provider responses.")
@@ -129,7 +171,7 @@ public struct DiagnosticsView: View {
             ("App", "0.1.0"),
             ("Bridge", model.state.bridge.version),
             ("Firmware", model.state.information?.firmwareVersion ?? "Unavailable"),
-            ("IPC schema", "1"),
+            ("IPC schema", model.diagnostics.map { String($0.ipcSchemaVersion) } ?? "1"),
             ("Snapshot schema", model.state.information.map { String($0.snapshotSchemaVersion) } ?? "Unavailable"),
             ("Management schema", model.state.information.map { String($0.managementSchemaVersion) } ?? "Unavailable"),
         ]
@@ -177,12 +219,28 @@ public struct DiagnosticsView: View {
         }
     }
 
+    private func eventTitle(_ type: String) -> String {
+        type.replacingOccurrences(of: ".", with: " ").capitalized
+    }
+
+    private func eventSymbol(_ type: String) -> String {
+        if type.hasPrefix("connection") { return "antenna.radiowaves.left.and.right" }
+        if type.hasPrefix("providers") { return "sparkles" }
+        if type.hasPrefix("settings") { return "slider.horizontal.3" }
+        if type.hasPrefix("device") { return "display" }
+        return "waveform.path.ecg"
+    }
+
     private var diagnosticsText: String {
         let software = softwareRows.map { "\($0.0): \($0.1)" }
         let connection = connectionRows.map { "\($0.0): \($0.1)" }
         let providers = model.state.bridge.providerHealth.keys.sorted().map {
             "Provider \($0): \(model.state.bridge.providerHealth[$0] ?? "unknown")"
         }
-        return (["AgentMeter diagnostics"] + software + connection + providers).joined(separator: "\n")
+        let events = model.diagnostics?.recentEvents.suffix(12).map {
+            "Event \($0.type): revision \($0.revision), epoch \($0.occurredAtEpoch)"
+        } ?? []
+        return (["AgentMeter diagnostics"] + software + connection + providers + events)
+            .joined(separator: "\n")
     }
 }

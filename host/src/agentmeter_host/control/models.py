@@ -205,6 +205,8 @@ class BridgeStatus:
     last_device_sync_epoch: int | None = None
     last_error_code: str | None = None
     provider_health: tuple[tuple[str, str], ...] = ()
+    configured_provider_ids: tuple[str, ...] = ()
+    poll_interval_seconds: int = 300
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -214,6 +216,8 @@ class BridgeStatus:
             "lastDeviceSyncEpoch": self.last_device_sync_epoch,
             "lastErrorCode": self.last_error_code,
             "providerHealth": dict(self.provider_health),
+            "configuredProviderIds": list(self.configured_provider_ids),
+            "pollIntervalSeconds": self.poll_interval_seconds,
         }
 
 

@@ -38,6 +38,9 @@ dev = [
 firmware = [
   "platformio>=6.1,<7",
 ]
+package = [
+  "pyinstaller>=6.21,<7",
+]
 
 [project.scripts]
 agentmeter = "agentmeter_host.cli:main"

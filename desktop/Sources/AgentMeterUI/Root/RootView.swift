@@ -3,6 +3,9 @@ import SwiftUI
 
 public struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(BridgeServiceController.self) private var bridgeService
+    @Environment(WorkspacePowerObserver.self) private var powerObserver
+    @Environment(UserNotificationController.self) private var notifications
 
     public init() {}
 
@@ -31,7 +34,34 @@ public struct RootView: View {
                 }
         }
         .frame(minWidth: 900, minHeight: 620)
-        .task { await model.start() }
+        .task {
+            model.stateEventHandler = { [weak notifications] event, previous, current in
+                notifications?.process(
+                    eventId: event.id,
+                    previous: previous,
+                    current: current,
+                    enabled: model.preferences.notificationsEnabled
+                )
+            }
+            if model.preferences.notificationsEnabled {
+                _ = await notifications.setEnabled(true)
+            }
+            await bridgeService.start()
+            await model.start()
+            if model.bridgeReachable { bridgeService.confirmBridgeReady() }
+        }
+        .onChange(of: model.bridgeReachable) { _, reachable in
+            if reachable { bridgeService.confirmBridgeReady() }
+        }
+        .sheet(
+            isPresented: Binding(
+                get: { model.preferences.onboardingComplete == false },
+                set: { _ in }
+            )
+        ) {
+            OnboardingView()
+        }
+        .onAppear { powerObserver.start(model: model) }
         .alert(
             model.notice?.title ?? "AgentMeter",
             isPresented: Binding(

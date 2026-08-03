@@ -148,7 +148,11 @@ class BridgeController:
                 selected_device_id=self._host_settings.selected_device_id,
                 selected_device_name=self._host_settings.selected_device_name,
             ),
-            bridge=BridgeStatus(version=__version__),
+            bridge=BridgeStatus(
+                version=__version__,
+                configured_provider_ids=self._host_settings.provider_ids,
+                poll_interval_seconds=self._host_settings.poll_interval_seconds,
+            ),
         )
 
     def _active_config(self) -> HostConfig:
@@ -635,6 +639,14 @@ class BridgeController:
             raise IpcCommandError("invalidPayload", str(error)) from error
         self._settings_store.save(updated)
         self._host_settings = updated
+        self.state = replace(
+            self.state,
+            bridge=replace(
+                self.state.bridge,
+                configured_provider_ids=updated.provider_ids,
+                poll_interval_seconds=updated.poll_interval_seconds,
+            ),
+        )
         await self.refresh_providers()
 
     async def handle_ipc(self, request: IpcRequest) -> dict[str, Any]:

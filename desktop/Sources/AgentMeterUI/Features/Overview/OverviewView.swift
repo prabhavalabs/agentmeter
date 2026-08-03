@@ -11,6 +11,9 @@ public struct OverviewView: View {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 metrics
+                if hasTrendData {
+                    UsageTrendChart(samples: model.historySamples, providers: visibleProviders)
+                }
                 providerSection
             }
             .padding(28)
@@ -141,6 +144,17 @@ public struct OverviewView: View {
     }
 
     private var nowEpoch: Int { Int(Date().timeIntervalSince1970) }
+
+    private var hasTrendData: Bool {
+        visibleProviders.contains { provider in
+            let kind = provider.windows.first(where: { $0.kind == "session" })?.kind
+                ?? provider.windows.first?.kind
+            guard let kind else { return false }
+            return model.historySamples.filter {
+                $0.providerId == provider.id && $0.windowKind == kind && $0.usedPercent != nil
+            }.count >= 2
+        }
+    }
 }
 
 private struct ProviderUsageCard: View {

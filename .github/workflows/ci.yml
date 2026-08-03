@@ -16,11 +16,38 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install bridge packager
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -e ".[package]"
+
       - name: Run Swift tests
         run: swift test --package-path desktop
 
       - name: Build application bundle
         run: desktop/scripts/package-app.sh
+
+      - name: Test bundled bridge contract
+        run: |
+          runtime="$RUNNER_TEMP/agentmeter-bundled"
+          mkdir -p "$runtime"
+          chmod 700 "$runtime"
+          helper="desktop/dist/AgentMeter.app/Contents/Resources/AgentMeterBridge/AgentMeterBridge"
+          "$helper" fake-server --scenario connected-usb --ipc-path "$runtime/bridge.sock" &
+          helper_pid=$!
+          trap 'kill "$helper_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..50}; do
+            [[ -S "$runtime/bridge.sock" ]] && break
+            sleep 0.1
+          done
+          AGENTMETER_IPC_TEST_PATH="$runtime/bridge.sock" \
+            swift test --package-path desktop --filter unixClientIntegration
 
   host:
     name: Host application

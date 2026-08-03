@@ -33,5 +33,5 @@ import Testing
     #expect(preferences.appearance == .system)
     #expect(preferences.selectedSection == .overview)
     #expect(preferences.sidebarVisible)
-    #expect(preferences.notificationsEnabled)
+    #expect(preferences.notificationsEnabled == false)
 }

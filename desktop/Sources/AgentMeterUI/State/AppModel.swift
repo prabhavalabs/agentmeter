@@ -54,6 +54,8 @@ public final class AppModel {
     public private(set) var bridgeReachable = false
     public private(set) var settingsSyncState: SettingsSyncState = .synced
     public private(set) var pendingSettingsPatch: DeviceSettingsPatch?
+    public private(set) var historySamples: [UsageHistorySample] = []
+    public private(set) var diagnostics: BridgeDiagnostics?
     public var notice: AppNotice?
 
     public let preferences: AppPreferences
@@ -62,6 +64,8 @@ public final class AppModel {
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     @ObservationIgnored private var hasStarted = false
+    @ObservationIgnored public var stateEventHandler:
+        (@MainActor @Sendable (BridgeEvent, ControlState, ControlState) -> Void)?
 
     public init(bridge: any BridgeAPI, preferences: AppPreferences) {
         self.bridge = bridge
@@ -84,6 +88,7 @@ public final class AppModel {
                 bridgeReachable = true
                 apply(try await bridge.status())
                 listenForEvents()
+                await loadSupplementalData()
             } catch {
                 bridgeReachable = false
                 hasStarted = false
@@ -149,6 +154,7 @@ public final class AppModel {
 
     public func refreshProviders() async {
         await perform(.providerRefresh, command: .refreshProviders)
+        await loadSupplementalData()
     }
 
     public func patchSettings(_ patch: DeviceSettingsPatch) async {
@@ -209,6 +215,21 @@ public final class AppModel {
 
     public func clearHistory() async {
         await perform(.diagnostics, command: .clearHistory)
+        historySamples = []
+    }
+
+    public func refreshDiagnostics() async {
+        await withOperation(.diagnostics) {
+            await loadDiagnostics(showFailure: true)
+        }
+    }
+
+    public func systemWillSleep() async {
+        await perform(.deviceConnection, command: .systemSleep, refreshAfterward: false)
+    }
+
+    public func systemDidWake() async {
+        await perform(.deviceConnection, command: .systemWake)
     }
 
     public func restartBridge() async {
@@ -261,10 +282,17 @@ public final class AppModel {
                         self.scheduleReconnect()
                         continue
                     }
-                    guard event.type == "state.changed" else { continue }
+                    let stateEventTypes: Set<String> = [
+                        "state.changed", "connection.changed", "discovery.changed",
+                        "providers.changed", "device.changed", "settings.changed",
+                        "bridge.changed", "device.forgotten",
+                    ]
+                    guard stateEventTypes.contains(event.type) else { continue }
                     let incoming = try event.decodePayload(ControlState.self)
                     guard incoming.revision > self.state.revision else { continue }
+                    let previous = self.state
                     self.apply(incoming)
+                    self.stateEventHandler?(event, previous, incoming)
                 }
             } catch is CancellationError {
                 return
@@ -302,6 +330,26 @@ public final class AppModel {
         bridgeReachable = incoming.bridge.running
         if pendingSettingsPatch == nil {
             settingsSyncState = .synced
+        }
+    }
+
+    private func loadSupplementalData() async {
+        let sinceEpoch = max(0, Int(Date().timeIntervalSince1970) - 86_400)
+        do {
+            let result = try await bridge.perform(.queryHistory(sinceEpoch: sinceEpoch))
+            historySamples = try result.decodePayload(UsageHistoryResult.self).usage
+        } catch {
+            // Current status remains useful when optional history cannot be loaded.
+        }
+        await loadDiagnostics(showFailure: false)
+    }
+
+    private func loadDiagnostics(showFailure: Bool) async {
+        do {
+            let result = try await bridge.perform(.diagnostics)
+            diagnostics = try result.decodePayload(BridgeDiagnostics.self)
+        } catch {
+            if showFailure { present(error, title: "Diagnostics unavailable") }
         }
     }
 

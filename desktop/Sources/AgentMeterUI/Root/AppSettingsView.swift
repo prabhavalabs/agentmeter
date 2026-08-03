@@ -3,6 +3,8 @@ import SwiftUI
 public struct AppSettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(LaunchAtLoginController.self) private var launchAtLogin
+    @Environment(BridgeServiceController.self) private var bridgeService
+    @Environment(UserNotificationController.self) private var notifications
 
     public init() {}
 
@@ -32,15 +34,45 @@ public struct AppSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(AgentMeterTheme.warning)
                 }
+                LabeledContent("Background bridge", value: bridgeService.state.title)
+                if case let .failed(message) = bridgeService.state {
+                    Label(message, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(AgentMeterTheme.warning)
+                    Button("Try Again") { Task { await bridgeService.retry() } }
+                } else if bridgeService.state == .needsApproval {
+                    Text("Allow AgentMeter in Login Items, then try again.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Open Login Items") { bridgeService.openLoginItemsSettings() }
+                }
             }
 
             Section("Notifications") {
-                Toggle("Usage and connection alerts", isOn: $preferences.notificationsEnabled)
+                Toggle("Usage and connection alerts", isOn: notificationBinding)
+                    .disabled(notifications.isUpdating)
+                Text("Alerts cover usage thresholds, allowance resets, and connections lost for more than one minute.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if let error = notifications.errorMessage {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(AgentMeterTheme.warning)
+                }
+            }
+
+            Section("Setup") {
+                Button("Run Setup Assistant Again…") {
+                    model.preferences.onboardingComplete = false
+                }
+                Text("Revisit bridge, Bluetooth, display, security, and agent checks without removing current settings.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
         .padding(12)
-        .frame(width: 500, height: 360)
+        .frame(width: 520, height: 460)
         .onAppear { launchAtLogin.refresh() }
     }
 
@@ -53,6 +85,18 @@ public struct AppSettingsView: View {
                     if saved {
                         model.preferences.launchAtLogin = enabled
                     }
+                }
+            }
+        )
+    }
+
+    private var notificationBinding: Binding<Bool> {
+        Binding(
+            get: { model.preferences.notificationsEnabled },
+            set: { enabled in
+                Task {
+                    let saved = await notifications.setEnabled(enabled)
+                    model.preferences.notificationsEnabled = enabled && saved
                 }
             }
         )

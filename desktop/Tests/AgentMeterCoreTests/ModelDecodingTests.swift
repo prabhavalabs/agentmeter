@@ -24,6 +24,8 @@ private enum Fixture {
     #expect(envelope.payload.telemetry?.batteryPercent == nil)
     #expect(envelope.payload.telemetry?.inputCurrentMa == nil)
     #expect(envelope.payload.providers.first?.windows.first?.usedPercent == 28)
+    #expect(envelope.payload.bridge.configuredProviderIds == ["codex", "claude", "gemini", "cursor"])
+    #expect(envelope.payload.bridge.pollIntervalSeconds == 300)
 }
 
 @Test func everyConnectionPhaseDecodesFromItsWireValue() throws {

@@ -62,6 +62,6 @@ public final class AppPreferences {
         sidebarVisible = defaults.object(forKey: Key.sidebarVisible) as? Bool ?? true
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
         launchAtLogin = defaults.bool(forKey: Key.launchAtLogin)
-        notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? true
+        notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? false
     }
 }

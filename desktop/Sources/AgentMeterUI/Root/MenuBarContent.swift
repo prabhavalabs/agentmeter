@@ -4,6 +4,8 @@ import SwiftUI
 
 public struct MenuBarContent: View {
     @Environment(AppModel.self) private var model
+    @Environment(LaunchAtLoginController.self) private var launchAtLogin
+    @Environment(BridgeServiceController.self) private var bridgeService
     @Environment(\.openWindow) private var openWindow
 
     public init() {}
@@ -19,6 +21,9 @@ public struct MenuBarContent: View {
                 )
                 .foregroundStyle(model.state.connection.phase.tint)
                 .font(.caption)
+                Label(bridgeService.state.title, systemImage: "point.3.connected.trianglepath.dotted")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
             }
 
             if model.state.providers.isEmpty == false {
@@ -48,11 +53,14 @@ public struct MenuBarContent: View {
                 Button("Reconnect") { Task { await model.reconnect() } }
             }
             Button("Refresh Usage") { Task { await model.refreshProviders() } }
+            Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                .disabled(launchAtLogin.isUpdating)
             Divider()
             SettingsLink { Text("Settings…") }
             Button("Quit AgentMeter") {
                 Task {
                     await model.stop()
+                    await bridgeService.stop()
                     NSApplication.shared.terminate(nil)
                 }
             }
@@ -60,6 +68,26 @@ public struct MenuBarContent: View {
         }
         .padding(8)
         .frame(width: 260)
-        .task { await model.start() }
+        .task {
+            await bridgeService.start()
+            await model.start()
+            if model.bridgeReachable { bridgeService.confirmBridgeReady() }
+        }
+        .onAppear { launchAtLogin.refresh() }
+        .onChange(of: model.bridgeReachable) { _, reachable in
+            if reachable { bridgeService.confirmBridgeReady() }
+        }
+    }
+
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLogin.isEnabled },
+            set: { enabled in
+                Task {
+                    let saved = await launchAtLogin.setEnabled(enabled)
+                    if saved { model.preferences.launchAtLogin = enabled }
+                }
+            }
+        )
     }
 }

@@ -8,12 +8,16 @@ enum AppEnvironment {
     static func makeModel() -> AppModel {
         let preferences = AppPreferences()
         return AppModel(
-            bridge: UnixBridgeClient(path: ipcPath()),
+            bridge: UnixBridgeClient(path: ipcPath),
             preferences: preferences
         )
     }
 
-    private static func ipcPath() -> String {
+    static var hasIPCOverride: Bool {
+        ProcessInfo.processInfo.environment["AGENTMETER_IPC_PATH"]?.isEmpty == false
+    }
+
+    static var ipcPath: String {
         if let override = ProcessInfo.processInfo.environment["AGENTMETER_IPC_PATH"],
            override.isEmpty == false {
             return override

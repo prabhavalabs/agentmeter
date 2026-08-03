@@ -7,6 +7,8 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
     public let lastDeviceSyncEpoch: Int?
     public let lastErrorCode: String?
     public let providerHealth: [String: String]
+    public let configuredProviderIds: [String]
+    public let pollIntervalSeconds: Int
 
     public init(
         version: String,
@@ -14,7 +16,9 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
         lastProviderRefreshEpoch: Int? = nil,
         lastDeviceSyncEpoch: Int? = nil,
         lastErrorCode: String? = nil,
-        providerHealth: [String: String] = [:]
+        providerHealth: [String: String] = [:],
+        configuredProviderIds: [String] = [],
+        pollIntervalSeconds: Int = 300
     ) {
         self.version = version
         self.running = running
@@ -22,6 +26,25 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
         self.lastDeviceSyncEpoch = lastDeviceSyncEpoch
         self.lastErrorCode = lastErrorCode
         self.providerHealth = providerHealth
+        self.configuredProviderIds = configuredProviderIds
+        self.pollIntervalSeconds = pollIntervalSeconds
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version, running, lastProviderRefreshEpoch, lastDeviceSyncEpoch, lastErrorCode
+        case providerHealth, configuredProviderIds, pollIntervalSeconds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(String.self, forKey: .version)
+        running = try values.decode(Bool.self, forKey: .running)
+        lastProviderRefreshEpoch = try values.decodeIfPresent(Int.self, forKey: .lastProviderRefreshEpoch)
+        lastDeviceSyncEpoch = try values.decodeIfPresent(Int.self, forKey: .lastDeviceSyncEpoch)
+        lastErrorCode = try values.decodeIfPresent(String.self, forKey: .lastErrorCode)
+        providerHealth = try values.decodeIfPresent([String: String].self, forKey: .providerHealth) ?? [:]
+        configuredProviderIds = try values.decodeIfPresent([String].self, forKey: .configuredProviderIds) ?? []
+        pollIntervalSeconds = try values.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds) ?? 300
     }
 }
 

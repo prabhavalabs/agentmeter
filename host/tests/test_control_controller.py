@@ -438,3 +438,19 @@ async def test_invalid_settings_patch_is_an_actionable_ipc_error(tmp_path) -> No
 
     assert error.value.code == "invalidPayload"
     history.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_collection_settings_are_persisted_and_published(tmp_path) -> None:
+    controller, settings_store, history = make_controller(tmp_path)
+
+    await controller.update_providers(
+        {"providerIds": ["codex", "cursor"], "pollIntervalSeconds": 120}
+    )
+
+    assert controller.state.bridge.configured_provider_ids == ("codex", "cursor")
+    assert controller.state.bridge.poll_interval_seconds == 120
+    saved = settings_store.load(controller._base_config)
+    assert saved.provider_ids == ("codex", "cursor")
+    assert saved.poll_interval_seconds == 120
+    history.close()

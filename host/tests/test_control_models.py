@@ -59,7 +59,12 @@ def test_control_state_serializes_device_and_provider_state() -> None:
                 windows=(ProviderWindow("session", "Session", 28, 1_785_614_400),),
             ),
         ),
-        bridge=BridgeStatus(running=True, provider_health=(("codex", "ok"),)),
+        bridge=BridgeStatus(
+            running=True,
+            provider_health=(("codex", "ok"),),
+            configured_provider_ids=("codex", "claude"),
+            poll_interval_seconds=120,
+        ),
     )
 
     document = state.to_document()
@@ -68,3 +73,5 @@ def test_control_state_serializes_device_and_provider_state() -> None:
     assert document["settings"]["hiddenProviderIds"] == ["gemini"]
     assert document["providers"][0]["windows"][0]["usedPercent"] == 28
     assert document["bridge"]["providerHealth"] == {"codex": "ok"}
+    assert document["bridge"]["configuredProviderIds"] == ["codex", "claude"]
+    assert document["bridge"]["pollIntervalSeconds"] == 120

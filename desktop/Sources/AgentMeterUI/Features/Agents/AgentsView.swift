@@ -23,16 +23,19 @@ public struct AgentsView: View {
                     .disabled(model.activeOperations.contains(.providerRefresh))
                 }
 
+                providerList
+
                 if model.state.settings == nil {
-                    ContentUnavailableView(
-                        "Display controls unavailable",
-                        systemImage: "display.trianglebadge.exclamationmark",
-                        description: Text("Connect a management-capable AgentMeter to change agent visibility.")
+                    Label(
+                        "Connect a management-capable AgentMeter to change what is shown on the display.",
+                        systemImage: "display.trianglebadge.exclamationmark"
                     )
-                    .frame(maxWidth: .infinity, minHeight: 220)
-                    .agentMeterCard()
-                } else {
-                    providerList
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                }
+
+                if model.state.providers.contains(where: { $0.status == "unavailable" }) {
+                    providerSetupHelp
                 }
 
                 privacyNote
@@ -44,6 +47,15 @@ public struct AgentsView: View {
 
     private var providerList: some View {
         VStack(spacing: 0) {
+            HStack {
+                Text("Agent").font(.caption.bold()).foregroundStyle(.secondary)
+                Spacer()
+                Text("Collect").font(.caption.bold()).foregroundStyle(.secondary).frame(width: 58)
+                Text("Show").font(.caption.bold()).foregroundStyle(.secondary).frame(width: 58)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            Divider()
             ForEach(Array(providerCatalog.enumerated()), id: \.element.id) { index, provider in
                 providerRow(provider, index: index)
                 if index < providerCatalog.count - 1 { Divider().padding(.leading, 68) }
@@ -83,10 +95,24 @@ public struct AgentsView: View {
                 .disabled(index == providerCatalog.count - 1 || model.activeOperations.contains(.settings))
                 .help("Move down")
             }
+            Toggle("Collected", isOn: collectionBinding(provider.id))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .frame(width: 58)
+                .disabled(
+                    model.activeOperations.contains(.providerRefresh)
+                        || isLastCollectedProvider(provider.id)
+                )
+                .accessibilityLabel("Collect \(provider.name) usage")
             Toggle("Shown", isOn: visibilityBinding(provider.id))
                 .toggleStyle(.switch)
                 .labelsHidden()
-                .disabled(model.activeOperations.contains(.settings))
+                .frame(width: 58)
+                .disabled(
+                    model.state.settings == nil
+                        || model.activeOperations.contains(.settings)
+                        || isLastVisibleProvider(provider.id)
+                )
                 .accessibilityLabel("Show \(provider.name) on AgentMeter")
         }
         .padding(.horizontal, 18)
@@ -95,16 +121,20 @@ public struct AgentsView: View {
 
     @ViewBuilder
     private func statusPill(_ id: String) -> some View {
-        let status = model.state.providers.first(where: { $0.id == id })?.status
-        switch status {
-        case "ok":
-            StatusPill("Live", symbol: "waveform.path.ecg", tint: AgentMeterTheme.success)
-        case "stale":
-            StatusPill("Stale", symbol: "clock.badge.exclamationmark", tint: AgentMeterTheme.warning)
-        case "unavailable":
-            StatusPill("Unavailable", symbol: "exclamationmark.circle", tint: AgentMeterTheme.warning)
-        default:
-            StatusPill("Not detected", symbol: "minus.circle", tint: AgentMeterTheme.secondaryText)
+        if model.state.bridge.configuredProviderIds.contains(id) == false {
+            StatusPill("Disabled", symbol: "pause.circle", tint: AgentMeterTheme.secondaryText)
+        } else {
+            let status = model.state.providers.first(where: { $0.id == id })?.status
+            switch status {
+            case "ok":
+                StatusPill("Live", symbol: "waveform.path.ecg", tint: AgentMeterTheme.success)
+            case "stale":
+                StatusPill("Stale", symbol: "clock.badge.exclamationmark", tint: AgentMeterTheme.warning)
+            case "unavailable":
+                StatusPill("Unavailable", symbol: "exclamationmark.circle", tint: AgentMeterTheme.warning)
+            default:
+                StatusPill("Not detected", symbol: "minus.circle", tint: AgentMeterTheme.secondaryText)
+            }
         }
     }
 
@@ -118,6 +148,27 @@ public struct AgentsView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+        }
+        .padding(18)
+        .agentMeterCard()
+    }
+
+    private var providerSetupHelp: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "person.crop.circle.badge.exclamationmark")
+                .font(.title2)
+                .foregroundStyle(AgentMeterTheme.warning)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("A provider needs attention").font(.headline)
+                Text("Sign in or verify the provider in CodexBar, then refresh usage here.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Link(
+                "Setup Help",
+                destination: URL(string: "https://github.com/steipete/CodexBar/blob/main/docs/cli.md")!
+            )
         }
         .padding(18)
         .agentMeterCard()
@@ -158,6 +209,38 @@ public struct AgentsView: View {
         )
     }
 
+    private func collectionBinding(_ id: String) -> Binding<Bool> {
+        Binding(
+            get: { model.state.bridge.configuredProviderIds.contains(id) },
+            set: { enabled in
+                var ids = model.state.bridge.configuredProviderIds
+                if enabled {
+                    if ids.contains(id) == false { ids.append(id) }
+                } else {
+                    ids.removeAll { $0 == id }
+                }
+                guard ids.isEmpty == false else { return }
+                Task {
+                    await model.updateProviderCollection(
+                        ids: ids,
+                        pollIntervalSeconds: model.state.bridge.pollIntervalSeconds
+                    )
+                }
+            }
+        )
+    }
+
+    private func isLastCollectedProvider(_ id: String) -> Bool {
+        let configured = model.state.bridge.configuredProviderIds
+        return configured.count == 1 && configured.first == id
+    }
+
+    private func isLastVisibleProvider(_ id: String) -> Bool {
+        guard let settings = model.state.settings,
+              settings.hiddenProviderIds.contains(id) == false else { return false }
+        return providerCatalog.filter { settings.hiddenProviderIds.contains($0.id) == false }.count == 1
+    }
+
     private func moveProvider(at index: Int, by delta: Int) {
         let destination = index + delta
         guard providerCatalog.indices.contains(destination) else { return }
@@ -169,6 +252,9 @@ public struct AgentsView: View {
     }
 
     private func providerDescription(_ id: String) -> String {
+        if model.state.bridge.configuredProviderIds.contains(id) == false {
+            return "Collection is disabled on this Mac"
+        }
         guard let provider = model.state.providers.first(where: { $0.id == id }) else {
             return "No local usage source detected"
         }
