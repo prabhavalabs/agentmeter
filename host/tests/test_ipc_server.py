@@ -2,6 +2,7 @@ import asyncio
 import json
 import stat
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -55,11 +56,12 @@ async def test_ipc_server_accepts_the_real_current_user(socket_path) -> None:
 @pytest.mark.asyncio
 async def test_ipc_socket_is_private_and_streams_state_events(socket_path) -> None:
     api = RecordingControlApi()
+    owner_uid = socket_path.parent.stat().st_uid
     server = IpcServer(
         socket_path,
         api=api,
-        current_uid=lambda: 501,
-        peer_uid=lambda _socket: 501,
+        current_uid=lambda: owner_uid,
+        peer_uid=lambda _socket: owner_uid,
     )
     await server.start()
     reader, writer = await asyncio.open_unix_connection(server.path)
@@ -83,11 +85,12 @@ async def test_ipc_socket_is_private_and_streams_state_events(socket_path) -> No
 @pytest.mark.asyncio
 async def test_ipc_server_correlates_results_and_maps_command_errors(socket_path) -> None:
     api = RecordingControlApi()
+    owner_uid = socket_path.parent.stat().st_uid
     server = IpcServer(
         socket_path,
         api=api,
-        current_uid=lambda: 501,
-        peer_uid=lambda _socket: 501,
+        current_uid=lambda: owner_uid,
+        peer_uid=lambda _socket: owner_uid,
     )
     await server.start()
     reader, writer = await asyncio.open_unix_connection(server.path)
@@ -108,21 +111,27 @@ async def test_ipc_server_correlates_results_and_maps_command_errors(socket_path
 @pytest.mark.asyncio
 async def test_ipc_server_rejects_another_user_before_decoding(socket_path) -> None:
     api = RecordingControlApi()
+    owner_uid = socket_path.parent.stat().st_uid
     server = IpcServer(
         socket_path,
         api=api,
-        current_uid=lambda: 501,
-        peer_uid=lambda _socket: 502,
+        current_uid=lambda: owner_uid,
+        peer_uid=lambda _socket: owner_uid + 1,
     )
     await server.start()
     reader, writer = await asyncio.open_unix_connection(server.path)
     writer.write(b'{"schemaVersion":1,"id":"1","type":"status.get","payload":{}}\n')
     await writer.drain()
 
-    assert await reader.read() == b""
+    try:
+        response = await reader.read()
+    except ConnectionResetError:
+        response = b""
+    assert response == b""
     assert api.requests == []
     writer.close()
-    await writer.wait_closed()
+    with suppress(ConnectionResetError):
+        await writer.wait_closed()
     await server.close()
 
 
