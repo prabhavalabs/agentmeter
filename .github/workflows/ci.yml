@@ -9,6 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  desktop:
+    name: Native macOS application
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Run Swift tests
+        run: swift test --package-path desktop
+
+      - name: Build application bundle
+        run: desktop/scripts/package-app.sh
+
   host:
     name: Host application
     runs-on: ubuntu-latest

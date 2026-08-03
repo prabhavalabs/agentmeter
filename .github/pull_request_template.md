@@ -7,6 +7,7 @@ Describe what changed and why.
 - [ ] Host tests pass with `make test`
 - [ ] Formatting and static checks pass with `make lint`
 - [ ] Firmware builds with `make firmware`
+- [ ] Native app tests pass with `make desktop-test` when macOS code changed
 - [ ] Documentation is updated when behavior or setup changed
 
 ## Hardware verification
@@ -16,4 +17,3 @@ Describe any board, operating-system, or Bluetooth testing performed. Write “N
 ## Privacy checklist
 
 - [ ] No credentials, cookies, email addresses, account identifiers, or private logs are included
-

@@ -8,7 +8,9 @@
 
 It pairs a 480×480 AMOLED touchscreen with a lightweight macOS bridge. Provider authentication stays on the computer; the display receives only the bounded, privacy-filtered values required by its interface.
 
-The first hardware version is working end to end with Codex, Claude, Gemini, and Cursor data supplied by CodexBar. Bluetooth delivery, acknowledgement, reconnection, USB fallback, the dashboard UI, alerts, and launch-at-login installation are implemented.
+The first hardware version is working end to end with Codex, Claude, Gemini, and Cursor data supplied by CodexBar. Bluetooth delivery, acknowledgement, reconnection, USB fallback, the dashboard UI, alerts, and launch-at-login installation are implemented. A native macOS companion adds menu-bar status, device connection management, live telemetry, and complete display controls in polished light and dark themes.
+
+![AgentMeter macOS companion in dark mode](docs/assets/screenshots/macos-overview-dark.png)
 
 ## What it shows
 
@@ -30,9 +32,10 @@ flowchart LR
     C -->|"Encrypted Bluetooth LE"| D["ESP32-S3 firmware"]
     C -.->|"USB serial fallback"| D
     D --> E["AMOLED dashboard"]
+    F["Native macOS app"] <-->|"Private local IPC"| C
 ```
 
-The host keeps CodexBar running on loopback with a temporary bearer token, normalizes the selected providers, removes identity and billing fields, and transmits a document capped at 4096 bytes. Keeping one collector process alive preserves CodexBar's per-provider cache, while AgentMeter retains recent valid windows as visibly delayed data through transient provider failures. The firmware acknowledges a message only after complete reassembly and validation.
+The host starts a bounded CodexBar loopback collection with a temporary bearer token only when an update is due, normalizes the selected providers, removes identity and billing fields, and transmits a document capped at 4096 bytes. Provider helpers are released between updates, while AgentMeter retains recent valid windows as visibly delayed data through transient failures. The firmware acknowledges a message only after complete reassembly and validation.
 
 See [Architecture](docs/architecture.md) and [Device protocol](docs/protocol.md) for the complete design.
 
@@ -83,6 +86,15 @@ Once the display updates, install the isolated background bridge. It starts imme
 .venv/bin/agentmeter service status
 ```
 
+Build and open the native companion on macOS 14 or later:
+
+```bash
+make desktop-app
+open desktop/dist/AgentMeter.app
+```
+
+The development bundle is ad-hoc signed locally. Move it to `/Applications` before enabling **Launch AgentMeter at login**. See the [macOS companion guide](docs/macos-app.md) for screens, fake-data development, packaging, and release signing.
+
 The first uncached collection or Bluetooth pairing may take up to two minutes. Later updates reuse the bond and connection. Detailed instructions and troubleshooting are in [Setup](docs/setup.md) and [Host bridge](docs/host.md).
 
 ## Repository layout
@@ -91,6 +103,7 @@ The first uncached collection or Bluetooth pairing may take up to two minutes. L
 agentmeter/
 ├── firmware/       ESP32-S3 application, UI, protocol, and board support
 ├── host/           macOS bridge, transports, alert engine, and tests
+├── desktop/        Native SwiftUI menu-bar app, tests, icon, and packaging
 ├── schemas/        Versioned device data contract
 ├── fixtures/       Safe synthetic payloads
 ├── docs/           Build, setup, architecture, and protocol guides

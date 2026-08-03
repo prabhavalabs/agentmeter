@@ -11,9 +11,10 @@ Use these guides in order when building or contributing:
 7. [Protocol](protocol.md) — JSON contract, BLE framing, ACKs, and serial fallback
 8. [macOS companion design](design/macos-companion.md) — approved desktop experience and
    system contract
-9. [macOS companion implementation](implementation/macos-companion/README.md) — ordered firmware,
+9. [macOS companion app](macos-app.md) — build, run, configure, and package the native app
+10. [macOS companion implementation](implementation/macos-companion/README.md) — ordered firmware,
    bridge, app, and release plans
-10. [Development](development.md) — repository workflow and validation
-11. [Roadmap](roadmap.md) — completed milestones and future work
+11. [Development](development.md) — repository workflow and validation
+12. [Roadmap](roadmap.md) — completed milestones and future work
 
 A photographed build and enclosure guide will be added when the first reproducible mechanical design is ready.

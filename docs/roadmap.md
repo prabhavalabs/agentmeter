@@ -47,6 +47,14 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 - Isolated macOS runtime and launch-at-login service management
 - Service status, retained logs, and documented uninstall/update flow
 
+## Native macOS companion — complete
+
+- Lightweight SwiftUI window and menu-bar status panel with one private bridge connection
+- Device discovery, connection controls, power telemetry, settings, and sanitized diagnostics
+- Agent visibility and ordering, always-on, full-view rotation, and display configuration
+- System, Light, and Dark appearance with responsive resizing and native full screen
+- Original production icon, deterministic fake bridge, Swift tests, and local app packaging
+
 ## First public hardware release
 
 - Publish signed source archives and prebuilt firmware binaries

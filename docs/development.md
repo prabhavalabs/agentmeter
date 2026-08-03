@@ -30,13 +30,44 @@ Useful manual commands are:
 .venv/bin/agentmeter send
 .venv/bin/agentmeter run
 .venv/bin/agentmeter ipc-path
-.venv/bin/agentmeter fake-server --scenario connected-usb \
-  --ipc-path /tmp/agentmeter-development.sock
 ```
 
 Do not run an interactive bridge and the background service at the same time; they would compete for one BLE connection.
 
 The fake server supports `connected-usb`, `disconnected`, `pairing`, `provider-unavailable`, `legacy`, and `settings-conflict`. It reads only synthetic checked-in fixtures and does not import provider collectors or Bluetooth code. Use it for SwiftUI work without an attached device or signed-in coding-agent accounts.
+
+## Native macOS workflow
+
+The desktop package targets macOS 14 or later and uses Swift 6, SwiftUI, Network, Observation, and ServiceManagement. It has no third-party Swift dependencies.
+
+```bash
+make desktop-test
+make desktop-build
+make desktop-app
+open desktop/dist/AgentMeter.app
+```
+
+The packaging script creates an ad-hoc-signed local bundle with the production icon. Set `CODE_SIGN_IDENTITY` to an installed Developer ID Application identity when preparing a distributable build.
+
+To develop without the bridge service or hardware, create a private fake-server runtime and point the Swift executable to it:
+
+```bash
+AGENTMETER_FAKE_RUNTIME="${TMPDIR:-/tmp/}agentmeter-$(id -u)"
+mkdir -p "$AGENTMETER_FAKE_RUNTIME"
+chmod 700 "$AGENTMETER_FAKE_RUNTIME"
+
+.venv/bin/agentmeter fake-server --scenario connected-usb \
+  --ipc-path "$AGENTMETER_FAKE_RUNTIME/development.sock"
+```
+
+In a second terminal:
+
+```bash
+AGENTMETER_IPC_PATH="$AGENTMETER_FAKE_RUNTIME/development.sock" \
+  swift run --package-path desktop AgentMeter
+```
+
+Do not point the fake server at the live bridge socket. The checked-in screenshots use only synthetic fixtures.
 
 ## Firmware workflow
 
@@ -59,6 +90,8 @@ Board pins and peripheral initialization live under `firmware/src/boards/`. New 
 make lint
 make test
 make firmware
+make desktop-test
+make desktop-app
 ```
 
 `make test` runs both host and native firmware tests. Hardware-dependent changes must additionally be flashed to the exact board and tested over the affected transport.
