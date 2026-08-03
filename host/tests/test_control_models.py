@@ -1,4 +1,5 @@
 import pytest
+from agentmeter_host import __version__
 from agentmeter_host.control.models import (
     BridgeStatus,
     ConnectionPhase,
@@ -8,6 +9,10 @@ from agentmeter_host.control.models import (
     ProviderSummary,
     ProviderWindow,
 )
+
+
+def test_bridge_status_defaults_to_the_package_version() -> None:
+    assert BridgeStatus().version == __version__
 
 
 def test_control_state_serializes_unknown_hardware_as_null() -> None:
