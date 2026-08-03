@@ -1,25 +1,15 @@
 #pragma once
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 
-#include "dashboard_model.h"
+#include "management_model.h"
 
 namespace agentmeter {
 
-inline constexpr uint8_t kMinimumRotationSeconds = 3;
-inline constexpr uint8_t kMaximumRotationSeconds = 60;
 inline constexpr uint8_t kNoProviderIndex = 0xFF;
 
-struct DashboardPreferences {
-  bool always_on = false;
-  bool full_view = false;
-  uint8_t rotation_seconds = kMinimumRotationSeconds;
-  std::array<std::array<char, kDeviceTextBytes>, kMaximumProviders>
-      hidden_provider_ids{};
-  uint8_t hidden_provider_count = 0;
-};
+using DashboardPreferences = DeviceSettings;
 
 bool is_provider_visible(const DashboardPreferences& preferences,
                          const char* provider_id);

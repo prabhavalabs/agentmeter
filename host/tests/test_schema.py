@@ -12,3 +12,16 @@ def test_example_snapshot_matches_schema() -> None:
 
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(snapshot)
+
+
+def test_example_management_messages_match_schema() -> None:
+    schema = json.loads((ROOT / "schemas/device-management-v1.schema.json").read_text())
+    validator = Draft202012Validator(schema)
+
+    Draft202012Validator.check_schema(schema)
+    for fixture_name in (
+        "device-management-patch-v1.json",
+        "device-management-state-v1.json",
+    ):
+        document = json.loads((ROOT / "fixtures" / fixture_name).read_text())
+        validator.validate(document)

@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/prabhavalabs/agentmeter/schemas/device-management-v1.schema.json",
+  "title": "AgentMeter device management message version 1",
+  "oneOf": [
+    { "$ref": "#/$defs/settingsPatchEnvelope" },
+    { "$ref": "#/$defs/deviceStateEnvelope" }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 23,
+      "pattern": "^[a-z0-9_-]+$"
+    },
+    "providerIds": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/identifier" }
+    },
+    "alertThresholds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "integer", "minimum": 1, "maximum": 100 }
+    },
+    "settingsPatchEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "requestId", "type", "payload"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "requestId": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "type": { "const": "settings.patch" },
+        "payload": { "$ref": "#/$defs/settingsPatch" }
+      }
+    },
+    "settingsPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseRevision"],
+      "minProperties": 2,
+      "properties": {
+        "baseRevision": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "alwaysOn": { "type": "boolean" },
+        "fullView": { "type": "boolean" },
+        "rotationSeconds": { "type": "integer", "minimum": 3, "maximum": 60 },
+        "brightnessPercent": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "dimAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
+        "screenOffAfterSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "alertThresholds": { "$ref": "#/$defs/alertThresholds" },
+        "soundEnabled": { "type": "boolean" },
+        "hiddenProviderIds": { "$ref": "#/$defs/providerIds" },
+        "providerOrder": { "$ref": "#/$defs/providerIds" }
+      }
+    },
+    "deviceStateEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "requestId", "type", "payload"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "requestId": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "type": { "const": "device.state" },
+        "payload": { "$ref": "#/$defs/deviceState" }
+      }
+    },
+    "deviceState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["information", "telemetry", "settings"],
+      "properties": {
+        "information": { "$ref": "#/$defs/information" },
+        "telemetry": { "$ref": "#/$defs/telemetry" },
+        "settings": { "$ref": "#/$defs/settings" }
+      }
+    },
+    "information": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "name",
+        "firmwareVersion",
+        "hardwareRevision",
+        "snapshotSchemaVersion",
+        "managementSchemaVersion",
+        "capabilities"
+      ],
+      "properties": {
+        "model": { "type": "string", "minLength": 1, "maxLength": 23 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 23 },
+        "firmwareVersion": { "type": "string", "minLength": 1, "maxLength": 15 },
+        "hardwareRevision": { "type": "string", "minLength": 1, "maxLength": 15 },
+        "snapshotSchemaVersion": { "type": "integer", "minimum": 1, "maximum": 255 },
+        "managementSchemaVersion": { "const": 1 },
+        "capabilities": { "$ref": "#/$defs/capabilities" }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "settings",
+        "identify",
+        "restart",
+        "forget",
+        "brightness",
+        "battery",
+        "vbusVoltage",
+        "inputCurrent"
+      ],
+      "properties": {
+        "settings": { "type": "boolean" },
+        "identify": { "type": "boolean" },
+        "restart": { "type": "boolean" },
+        "forget": { "type": "boolean" },
+        "brightness": { "type": "boolean" },
+        "battery": { "type": "boolean" },
+        "vbusVoltage": { "type": "boolean" },
+        "inputCurrent": { "type": "boolean" }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uptimeSeconds",
+        "freeHeapBytes",
+        "minimumFreeHeapBytes",
+        "displayOn",
+        "displayDimmed",
+        "brightnessPercent",
+        "powerSource",
+        "usbPresent",
+        "batteryPresent",
+        "charging",
+        "batteryVoltageMv",
+        "batteryPercent",
+        "vbusVoltageMv",
+        "inputCurrentMa",
+        "boardTemperatureC"
+      ],
+      "properties": {
+        "uptimeSeconds": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "freeHeapBytes": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "minimumFreeHeapBytes": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "displayOn": { "type": "boolean" },
+        "displayDimmed": { "type": "boolean" },
+        "brightnessPercent": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "powerSource": { "enum": ["unknown", "usb", "battery"] },
+        "usbPresent": { "type": "boolean" },
+        "batteryPresent": { "type": "boolean" },
+        "charging": { "type": ["boolean", "null"] },
+        "batteryVoltageMv": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "batteryPercent": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "vbusVoltageMv": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "inputCurrentMa": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "boardTemperatureC": {
+          "type": ["number", "null"],
+          "minimum": -100,
+          "maximum": 200
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "alwaysOn",
+        "fullView",
+        "rotationSeconds",
+        "brightnessPercent",
+        "dimAfterSeconds",
+        "screenOffAfterSeconds",
+        "alertThresholds",
+        "soundEnabled",
+        "hiddenProviderIds",
+        "providerOrder"
+      ],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "alwaysOn": { "type": "boolean" },
+        "fullView": { "type": "boolean" },
+        "rotationSeconds": { "type": "integer", "minimum": 3, "maximum": 60 },
+        "brightnessPercent": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "dimAfterSeconds": { "type": "integer", "minimum": 30, "maximum": 3600 },
+        "screenOffAfterSeconds": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "alertThresholds": { "$ref": "#/$defs/alertThresholds" },
+        "soundEnabled": { "type": "boolean" },
+        "hiddenProviderIds": { "$ref": "#/$defs/providerIds" },
+        "providerOrder": { "$ref": "#/$defs/providerIds" }
+      }
+    }
+  }
+}
