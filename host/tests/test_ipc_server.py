@@ -2,6 +2,7 @@ import asyncio
 import json
 import stat
 import tempfile
+from contextlib import suppress
 from pathlib import Path
 
 import pytest
@@ -129,7 +130,8 @@ async def test_ipc_server_rejects_another_user_before_decoding(socket_path) -> N
     assert response == b""
     assert api.requests == []
     writer.close()
-    await writer.wait_closed()
+    with suppress(ConnectionResetError):
+        await writer.wait_closed()
     await server.close()
 
 
