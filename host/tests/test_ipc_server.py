@@ -122,7 +122,11 @@ async def test_ipc_server_rejects_another_user_before_decoding(socket_path) -> N
     writer.write(b'{"schemaVersion":1,"id":"1","type":"status.get","payload":{}}\n')
     await writer.drain()
 
-    assert await reader.read() == b""
+    try:
+        response = await reader.read()
+    except ConnectionResetError:
+        response = b""
+    assert response == b""
     assert api.requests == []
     writer.close()
     await writer.wait_closed()
