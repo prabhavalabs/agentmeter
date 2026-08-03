@@ -35,6 +35,10 @@ public enum ProviderPalette {
     }
 }
 
+enum ProviderCardLayout {
+    static func height(windowCount _: Int) -> CGFloat { 270 }
+}
+
 public extension AppearancePreference {
     var colorScheme: ColorScheme? {
         switch self {
@@ -98,8 +102,51 @@ public struct CardStyle: ViewModifier {
     }
 }
 
+private struct ProviderCardStyle: ViewModifier {
+    let accent: Color
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        content
+            .background {
+                ZStack(alignment: .top) {
+                    shape.fill(AgentMeterTheme.surface)
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.18),
+                            accent.opacity(0.055),
+                            .clear,
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 92)
+                }
+                .clipShape(shape)
+                .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+            }
+            .overlay {
+                shape.stroke(
+                    LinearGradient(
+                        colors: [
+                            accent.opacity(0.32),
+                            AgentMeterTheme.border.opacity(0.65),
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+            }
+    }
+}
+
 public extension View {
     func agentMeterCard(emphasized: Bool = false) -> some View {
         modifier(CardStyle(emphasized: emphasized))
+    }
+
+    func agentMeterProviderCard(accent: Color) -> some View {
+        modifier(ProviderCardStyle(accent: accent))
     }
 }

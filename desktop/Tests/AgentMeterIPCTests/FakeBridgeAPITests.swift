@@ -30,3 +30,19 @@ import Testing
     #expect(try event.decodePayload(ControlState.self) == next)
     await bridge.close()
 }
+
+@Test func historyCommandCarriesAggregationOptions() throws {
+    let command = BridgeCommand.queryHistory(
+        sinceEpoch: 3_600,
+        providerId: "claude",
+        bucketSeconds: 3_600,
+        currentCycle: true
+    )
+
+    #expect(try command.payload() == [
+        "sinceEpoch": .integer(3_600),
+        "providerId": .string("claude"),
+        "bucketSeconds": .integer(3_600),
+        "currentCycle": .boolean(true),
+    ])
+}

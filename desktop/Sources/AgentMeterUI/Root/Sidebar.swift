@@ -1,13 +1,21 @@
 import SwiftUI
 
 public struct Sidebar: View {
-    @Environment(AppModel.self) private var model
+    @Binding private var selection: NavigationSection
+    private let version: String
 
-    public init() {}
+    public init(
+        selection: Binding<NavigationSection>,
+        version: String = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "Development"
+    ) {
+        _selection = selection
+        self.version = version
+    }
 
     public var body: some View {
-        @Bindable var preferences = model.preferences
-        List(selection: $preferences.selectedSection) {
+        List(selection: $selection) {
             Section {
                 ForEach(NavigationSection.allCases) { section in
                     NavigationLink(value: section) {
@@ -22,7 +30,7 @@ public struct Sidebar: View {
                 VStack(alignment: .leading, spacing: 7) {
                     Label("Open source", systemImage: "chevron.left.forwardslash.chevron.right")
                         .font(.caption.weight(.medium))
-                    Text("AgentMeter \(model.state.bridge.version)")
+                    Text("AgentMeter \(version)")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.tertiary)
                 }

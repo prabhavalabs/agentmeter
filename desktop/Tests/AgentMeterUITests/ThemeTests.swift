@@ -1,5 +1,5 @@
-import AgentMeterUI
 import Testing
+@testable import AgentMeterUI
 
 @Test func providerPaletteMatchesTheDevicePalette() {
     #expect(ProviderPalette.accentHex(for: "codex") == 0x52E3B2)
@@ -14,4 +14,11 @@ import Testing
     #expect(AppearancePreference.system.colorScheme == nil)
     #expect(AppearancePreference.light.colorScheme != nil)
     #expect(AppearancePreference.dark.colorScheme != nil)
+}
+
+@Test func providerCardsKeepOneHeightAcrossSupportedWindowCounts() {
+    let heights = (0...3).map { ProviderCardLayout.height(windowCount: $0) }
+
+    #expect(Set(heights).count == 1)
+    #expect(heights.allSatisfy { $0 >= 260 })
 }

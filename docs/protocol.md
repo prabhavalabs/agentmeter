@@ -59,11 +59,19 @@ A threshold event uses an ID such as `threshold:claude:weekly:90`, a `warning` o
 
 | Purpose | UUID | Properties |
 | --- | --- | --- |
-| AgentMeter service | `a77e0001-8f7b-4f63-9a53-65f93f0d6d01` | Primary service |
-| Snapshot data | `a77e0002-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted write / write without response |
-| Delivery status | `a77e0003-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted read / notify |
-| Management request | `a77e0004-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted write with response |
-| Device state and events | `a77e0005-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted read / notify |
+| AgentMeter service | `a77e0101-8f7b-4f63-9a53-65f93f0d6d01` | Versioned management service |
+| Snapshot data | `a77e0102-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted write / write without response |
+| Delivery status | `a77e0103-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted read / notify |
+| Management request | `a77e0104-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted write with response |
+| Device state and events | `a77e0105-8f7b-4f63-9a53-65f93f0d6d01` | Encrypted read / notify |
+
+The desktop bridge also scans the original `a77e0001` service and uses its
+`a77e0002`–`a77e0005` characteristics when present. The versioned profile prevents
+operating-system GATT caches from hiding newly added management characteristics during an
+upgrade while preserving snapshot delivery to legacy firmware. After an encrypted bond is
+restored, upgraded firmware sends one standard GATT Service Changed indication per boot so
+bonded macOS clients discard any cached snapshot-only service table and rediscover the
+management characteristics.
 
 The ESP32 requests secure-connections bonding with no input/output capability. A long physical-button press clears its saved bonds.
 

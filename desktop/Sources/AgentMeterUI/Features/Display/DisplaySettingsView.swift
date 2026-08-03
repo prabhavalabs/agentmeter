@@ -1,6 +1,17 @@
 import AgentMeterCore
 import SwiftUI
 
+enum DisplaySettingsControlPolicy {
+    static func rotationOptions(current: Int) -> [Int] {
+        var options = [3, 5, 10, 15]
+        if (3...60).contains(current), options.contains(current) == false {
+            options.append(current)
+            options.sort()
+        }
+        return options
+    }
+}
+
 public struct DisplaySettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var showingAlertEditor = false
@@ -35,9 +46,15 @@ public struct DisplaySettingsView: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        "Settings unavailable",
-                        systemImage: "slider.horizontal.3",
-                        description: Text("Connect a management-capable AgentMeter to configure its display.")
+                        requiresManagementFirmware ? "Firmware update required" : "Settings unavailable",
+                        systemImage: requiresManagementFirmware
+                            ? "externaldrive.badge.exclamationmark"
+                            : "slider.horizontal.3",
+                        description: Text(
+                            requiresManagementFirmware
+                                ? "This AgentMeter is connected with its legacy Bluetooth profile. Connect it to this Mac with a USB-C data cable and install the current firmware once to enable display settings and two-way sync."
+                                : "Connect an AgentMeter to configure its display."
+                        )
                     )
                     .frame(maxWidth: .infinity, minHeight: 300)
                     .agentMeterCard()
@@ -51,15 +68,28 @@ public struct DisplaySettingsView: View {
 
     private var syncStatus: some View {
         Group {
-            switch model.settingsSyncState {
-            case .synced:
-                StatusPill("Synced", symbol: "checkmark.circle.fill", tint: AgentMeterTheme.success)
-            case .saving:
-                StatusPill("Saving", symbol: "arrow.triangle.2.circlepath", tint: AgentMeterTheme.accent)
-            case .waitingForDevice:
-                StatusPill("Waiting for device", symbol: "clock", tint: AgentMeterTheme.warning)
+            if requiresManagementFirmware {
+                StatusPill(
+                    "Firmware update required",
+                    symbol: "externaldrive.badge.exclamationmark",
+                    tint: AgentMeterTheme.warning
+                )
+            } else {
+                switch model.settingsSyncState {
+                case .synced:
+                    StatusPill("Synced", symbol: "checkmark.circle.fill", tint: AgentMeterTheme.success)
+                case .saving:
+                    StatusPill("Saving", symbol: "arrow.triangle.2.circlepath", tint: AgentMeterTheme.accent)
+                case .waitingForDevice:
+                    StatusPill("Waiting for device", symbol: "clock", tint: AgentMeterTheme.warning)
+                }
             }
         }
+    }
+
+    private var requiresManagementFirmware: Bool {
+        model.state.connection.phase == .connected
+            && model.state.connection.managementAvailable == false
     }
 
     private func controls(_ settings: DeviceSettings) -> some View {
@@ -94,7 +124,12 @@ public struct DisplaySettingsView: View {
                 Picker("", selection: intBinding(settings.rotationSeconds) { patch, value in
                     patch.rotationSeconds = value
                 }) {
-                    ForEach([3, 5, 10, 15], id: \.self) { seconds in
+                    ForEach(
+                        DisplaySettingsControlPolicy.rotationOptions(
+                            current: settings.rotationSeconds
+                        ),
+                        id: \.self
+                    ) { seconds in
                         Text("\(seconds) sec").tag(seconds)
                     }
                 }
@@ -181,7 +216,7 @@ public struct DisplaySettingsView: View {
             }
         }
         .agentMeterCard(emphasized: true)
-        .disabled(model.activeOperations.contains(.settings))
+        .allowsHitTesting(model.activeOperations.contains(.settings) == false)
     }
 
     private var alertEditor: some View {

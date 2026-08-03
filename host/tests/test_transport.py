@@ -163,37 +163,55 @@ async def test_ble_transport_never_accepts_ack_for_another_message() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bleak_backend_discovers_agentmeter_and_uses_protocol_characteristics() -> None:
-    from agentmeter_host.transport.ble import (
-        DATA_CHARACTERISTIC_UUID,
-        SERVICE_UUID,
-        STATUS_CHARACTERISTIC_UUID,
-        BleakBackend,
-    )
+async def test_bleak_backend_discovers_the_versioned_management_profile() -> None:
+    from agentmeter_host.transport.ble import BleakBackend
+
+    current_service_uuid = "a77e0101-8f7b-4f63-9a53-65f93f0d6d01"
+    legacy_service_uuid = "a77e0001-8f7b-4f63-9a53-65f93f0d6d01"
+    current_data_uuid = "a77e0102-8f7b-4f63-9a53-65f93f0d6d01"
+    current_status_uuid = "a77e0103-8f7b-4f63-9a53-65f93f0d6d01"
+    current_request_uuid = "a77e0104-8f7b-4f63-9a53-65f93f0d6d01"
+    current_event_uuid = "a77e0105-8f7b-4f63-9a53-65f93f0d6d01"
 
     matching_device = SimpleNamespace(name="AgentMeter-A1B2", address="device-id")
 
     class Scanner:
         @staticmethod
         async def discover(**kwargs):
-            assert kwargs["service_uuids"] == [SERVICE_UUID]
+            assert kwargs["service_uuids"] == [
+                current_service_uuid,
+                legacy_service_uuid,
+            ]
             return {
                 "other": (
                     SimpleNamespace(name="Headphones", address="other"),
-                    SimpleNamespace(local_name="Headphones", service_uuids=[SERVICE_UUID]),
+                    SimpleNamespace(
+                        local_name="Headphones",
+                        service_uuids=[current_service_uuid],
+                    ),
                 ),
                 "match": (
                     matching_device,
-                    SimpleNamespace(local_name="AgentMeter-A1B2", service_uuids=[SERVICE_UUID]),
+                    SimpleNamespace(
+                        local_name="AgentMeter-A1B2",
+                        service_uuids=[current_service_uuid],
+                    ),
                 ),
             }
 
     class Client:
         def __init__(self) -> None:
             self.services = SimpleNamespace(
-                get_characteristic=lambda uuid: SimpleNamespace(
-                    uuid=uuid,
-                    max_write_without_response_size=64,
+                get_characteristic=lambda uuid: (
+                    SimpleNamespace(uuid=uuid, max_write_without_response_size=64)
+                    if uuid
+                    in {
+                        current_data_uuid,
+                        current_status_uuid,
+                        current_request_uuid,
+                        current_event_uuid,
+                    }
+                    else None
                 )
             )
             self.connected = False
@@ -230,14 +248,77 @@ async def test_bleak_backend_discovers_agentmeter_and_uses_protocol_characterist
     await backend.start_notify(notifications.append)
     client.notification[1](None, bytearray(b"ack"))
     await backend.write(b"frame")
+    management_available = backend.management_available
     await backend.disconnect()
 
     assert selected_devices == [matching_device]
     assert backend.max_write_without_response_size == 64
-    assert client.notification[0] == STATUS_CHARACTERISTIC_UUID
+    assert management_available is True
+    assert client.notification[0] == current_status_uuid
     assert notifications == [b"ack"]
-    assert client.writes == [(DATA_CHARACTERISTIC_UUID, b"frame", False)]
+    assert client.writes == [(current_data_uuid, b"frame", False)]
     assert client.connected is False
+
+
+@pytest.mark.asyncio
+async def test_bleak_backend_keeps_snapshot_delivery_for_legacy_firmware() -> None:
+    from agentmeter_host.transport.ble import BleakBackend
+
+    legacy_service_uuid = "a77e0001-8f7b-4f63-9a53-65f93f0d6d01"
+    legacy_data_uuid = "a77e0002-8f7b-4f63-9a53-65f93f0d6d01"
+    legacy_status_uuid = "a77e0003-8f7b-4f63-9a53-65f93f0d6d01"
+    device = SimpleNamespace(name="AgentMeter-0001", address="legacy-device")
+
+    class Scanner:
+        @staticmethod
+        async def discover(**_kwargs):
+            return {
+                "legacy": (
+                    device,
+                    SimpleNamespace(
+                        local_name="AgentMeter-0001",
+                        service_uuids=[legacy_service_uuid],
+                    ),
+                )
+            }
+
+    class Client:
+        def __init__(self) -> None:
+            self.services = SimpleNamespace(
+                get_characteristic=lambda uuid: (
+                    SimpleNamespace(uuid=uuid, max_write_without_response_size=64)
+                    if uuid in {legacy_data_uuid, legacy_status_uuid}
+                    else None
+                )
+            )
+            self.notification_uuid = None
+            self.writes = []
+
+        async def connect(self) -> None:
+            pass
+
+        async def start_notify(self, uuid, _notification) -> None:
+            self.notification_uuid = uuid
+
+        async def write_gatt_char(self, uuid, data, *, response) -> None:
+            self.writes.append((uuid, data, response))
+
+        async def disconnect(self) -> None:
+            pass
+
+    client = Client()
+    backend = BleakBackend(
+        scanner=Scanner,
+        client_factory=lambda *_args, **_kwargs: client,
+    )
+
+    await backend.connect()
+    await backend.start_notify(lambda _value: None)
+    await backend.write(b"legacy-frame")
+
+    assert backend.management_available is False
+    assert client.notification_uuid == legacy_status_uuid
+    assert client.writes == [(legacy_data_uuid, b"legacy-frame", False)]
 
 
 @pytest.mark.asyncio

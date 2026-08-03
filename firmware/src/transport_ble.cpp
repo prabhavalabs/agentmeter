@@ -17,13 +17,13 @@
 namespace agentmeter {
 namespace {
 
-constexpr char kServiceUuid[] = "a77e0001-8f7b-4f63-9a53-65f93f0d6d01";
-constexpr char kDataUuid[] = "a77e0002-8f7b-4f63-9a53-65f93f0d6d01";
-constexpr char kStatusUuid[] = "a77e0003-8f7b-4f63-9a53-65f93f0d6d01";
+constexpr char kServiceUuid[] = "a77e0101-8f7b-4f63-9a53-65f93f0d6d01";
+constexpr char kDataUuid[] = "a77e0102-8f7b-4f63-9a53-65f93f0d6d01";
+constexpr char kStatusUuid[] = "a77e0103-8f7b-4f63-9a53-65f93f0d6d01";
 constexpr char kManagementRequestUuid[] =
-    "a77e0004-8f7b-4f63-9a53-65f93f0d6d01";
+    "a77e0104-8f7b-4f63-9a53-65f93f0d6d01";
 constexpr char kManagementEventUuid[] =
-    "a77e0005-8f7b-4f63-9a53-65f93f0d6d01";
+    "a77e0105-8f7b-4f63-9a53-65f93f0d6d01";
 constexpr size_t kMaximumFrameBytes = 512;
 
 struct QueuedFrame {
@@ -45,6 +45,7 @@ volatile bool encrypted = false;
 volatile bool reset_reassembler = false;
 uint16_t connection_handle = BLE_HS_CONN_HANDLE_NONE;
 char device_name[24] = "AgentMeter";
+bool service_database_change_sent = false;
 
 uint16_t frame_message_id(const QueuedFrame& frame) {
   if (frame.length < 4) {
@@ -82,6 +83,14 @@ class ServerCallbacks final : public NimBLEServerCallbacks {
     encrypted = true;
     connection_handle = info.getConnHandle();
     Serial.println("BLE: encrypted bond ready");
+
+    // Existing macOS bonds can retain the original snapshot-only GATT table.
+    // Tell the bonded client to rediscover services once after each device boot.
+    if (!service_database_change_sent) {
+      NimBLEDevice::getServer()->sendServiceChangedIndication();
+      service_database_change_sent = true;
+      Serial.println("BLE: service database change indicated");
+    }
   }
 };
 

@@ -12,7 +12,7 @@ from agentmeter_host.control.events import EventBroker
 from agentmeter_host.control.history import HistoryStore
 from agentmeter_host.control.models import ConnectionPhase, PeripheralSummary
 from agentmeter_host.control.settings import ControlSettingsStore
-from agentmeter_host.ipc.protocol import IpcCommandError
+from agentmeter_host.ipc.protocol import IpcCommandError, IpcRequest
 from agentmeter_host.normalization import DisplayPreferences
 from agentmeter_host.transport.ble import ConnectedPeripheral, TransportError
 from agentmeter_host.transport.management import ManagementError
@@ -236,6 +236,53 @@ def make_controller(
 
 
 @pytest.mark.asyncio
+async def test_history_ipc_accepts_bucketed_queries(tmp_path) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+    history.record_usage("claude", "session", 3_610, 11, 9_000)
+    history.record_usage("claude", "session", 3_900, 12, 9_000)
+
+    result = await controller.handle_ipc(
+        IpcRequest(
+            id="history-1",
+            type="history.query",
+            payload={"sinceEpoch": 3_600, "bucketSeconds": 3_600},
+        )
+    )
+
+    assert result["usage"] == [
+        {
+            "providerId": "claude",
+            "windowKind": "session",
+            "sampledAtEpoch": 3_900,
+            "usedPercent": 12,
+            "resetAtEpoch": 9_000,
+        }
+    ]
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_cached_provider_keeps_last_successful_update_time(tmp_path) -> None:
+    good = device_snapshot(message_id=0)
+    failed = copy.deepcopy(good)
+    failed["generatedAtEpoch"] += 60
+    failed["providers"][0]["status"] = "error"
+    failed["providers"][0]["windows"] = []
+    controller, _settings_store, history = make_controller(
+        tmp_path,
+        collector_factory=SequenceCollectorFactory(good, failed),
+    )
+
+    await controller.refresh_providers(send_to_device=False)
+    await controller.refresh_providers(send_to_device=False)
+
+    provider = controller.state.providers[0]
+    assert provider.status == "ok"
+    assert provider.updated_at_epoch == good["generatedAtEpoch"]
+    history.close()
+
+
+@pytest.mark.asyncio
 async def test_controller_connects_syncs_and_publishes_confirmed_state(tmp_path) -> None:
     transport = FakeManagedTransport(state=device_state(revision=8))
     controller, _settings_store, history = make_controller(tmp_path, transport=transport)
@@ -268,6 +315,39 @@ async def test_legacy_firmware_still_receives_snapshots_with_management_unavaila
     assert controller.state.settings is None
     assert not any(operation.startswith("request:") for operation in transport.operations)
     assert transport.operations[-1] == "send:0"
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_scan_does_not_replace_a_healthy_connected_phase(tmp_path) -> None:
+    transport = FakeManagedTransport()
+    controller, _settings_store, history = make_controller(tmp_path, transport=transport)
+    await controller.connect("device-1")
+
+    await controller.scan()
+
+    assert controller.state.connection.phase is ConnectionPhase.CONNECTED
+    assert controller.state.connection.management_available is True
+    assert controller.state.settings is not None
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_completed_scan_returns_a_saved_but_disconnected_device_to_stopped(
+    tmp_path,
+) -> None:
+    controller, _settings_store, history = make_controller(
+        tmp_path,
+        settings_transform=lambda settings: replace(
+            settings,
+            selected_device_id="device-1",
+            selected_device_name="AgentMeter-0001",
+        ),
+    )
+
+    await controller.scan()
+
+    assert controller.state.connection.phase is ConnectionPhase.STOPPED
     history.close()
 
 
@@ -344,6 +424,49 @@ async def test_provider_failure_does_not_change_healthy_ble_phase(tmp_path) -> N
     assert controller.state.connection.phase is ConnectionPhase.CONNECTED
     assert controller.state.bridge.last_error_code == "providerRefreshFailed"
     assert "raw provider" not in json.dumps(controller.diagnostics())
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_overlapping_provider_refreshes_share_one_collection_when_disconnected(
+    tmp_path,
+) -> None:
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class BlockingCollector:
+        calls = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            pass
+
+        async def collect(self, _config, *, message_id: int):
+            self.calls += 1
+            started.set()
+            await release.wait()
+            result = copy.deepcopy(device_snapshot())
+            result["messageId"] = message_id
+            return result
+
+    collector = BlockingCollector()
+    controller, _settings_store, history = make_controller(
+        tmp_path,
+        collector_factory=lambda _config: collector,
+    )
+
+    first = asyncio.create_task(controller.refresh_providers())
+    await started.wait()
+    second = asyncio.create_task(controller.refresh_providers())
+    await asyncio.sleep(0)
+    release.set()
+    await asyncio.gather(first, second)
+
+    assert collector.calls == 1
+    assert [provider.identifier for provider in controller.state.providers] == ["codex"]
+    assert controller.state.connection.phase is ConnectionPhase.STOPPED
     history.close()
 
 

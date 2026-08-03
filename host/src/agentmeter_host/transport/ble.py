@@ -26,11 +26,34 @@ _FRAME_VERSION = 1
 _SNAPSHOT_MESSAGE_TYPE = 1
 _ACK_MESSAGE_TYPE = 0x81
 
-SERVICE_UUID = "a77e0001-8f7b-4f63-9a53-65f93f0d6d01"
-DATA_CHARACTERISTIC_UUID = "a77e0002-8f7b-4f63-9a53-65f93f0d6d01"
-STATUS_CHARACTERISTIC_UUID = "a77e0003-8f7b-4f63-9a53-65f93f0d6d01"
-MANAGEMENT_REQUEST_CHARACTERISTIC_UUID = "a77e0004-8f7b-4f63-9a53-65f93f0d6d01"
-DEVICE_EVENT_CHARACTERISTIC_UUID = "a77e0005-8f7b-4f63-9a53-65f93f0d6d01"
+SERVICE_UUID = "a77e0101-8f7b-4f63-9a53-65f93f0d6d01"
+DATA_CHARACTERISTIC_UUID = "a77e0102-8f7b-4f63-9a53-65f93f0d6d01"
+STATUS_CHARACTERISTIC_UUID = "a77e0103-8f7b-4f63-9a53-65f93f0d6d01"
+MANAGEMENT_REQUEST_CHARACTERISTIC_UUID = "a77e0104-8f7b-4f63-9a53-65f93f0d6d01"
+DEVICE_EVENT_CHARACTERISTIC_UUID = "a77e0105-8f7b-4f63-9a53-65f93f0d6d01"
+
+LEGACY_SERVICE_UUID = "a77e0001-8f7b-4f63-9a53-65f93f0d6d01"
+LEGACY_DATA_CHARACTERISTIC_UUID = "a77e0002-8f7b-4f63-9a53-65f93f0d6d01"
+LEGACY_STATUS_CHARACTERISTIC_UUID = "a77e0003-8f7b-4f63-9a53-65f93f0d6d01"
+LEGACY_MANAGEMENT_REQUEST_CHARACTERISTIC_UUID = "a77e0004-8f7b-4f63-9a53-65f93f0d6d01"
+LEGACY_DEVICE_EVENT_CHARACTERISTIC_UUID = "a77e0005-8f7b-4f63-9a53-65f93f0d6d01"
+
+_BLE_PROFILES = (
+    (
+        SERVICE_UUID,
+        DATA_CHARACTERISTIC_UUID,
+        STATUS_CHARACTERISTIC_UUID,
+        MANAGEMENT_REQUEST_CHARACTERISTIC_UUID,
+        DEVICE_EVENT_CHARACTERISTIC_UUID,
+    ),
+    (
+        LEGACY_SERVICE_UUID,
+        LEGACY_DATA_CHARACTERISTIC_UUID,
+        LEGACY_STATUS_CHARACTERISTIC_UUID,
+        LEGACY_MANAGEMENT_REQUEST_CHARACTERISTIC_UUID,
+        LEGACY_DEVICE_EVENT_CHARACTERISTIC_UUID,
+    ),
+)
 
 _ACK_STATUS_MESSAGES = {
     1: "malformed frame",
@@ -100,6 +123,10 @@ class BleakBackend:
         self._discovered: dict[str, tuple[Any, PeripheralSummary]] = {}
         self._disconnect_callback: Callable[[], None] | None = None
         self._write_lock = asyncio.Lock()
+        self._data_characteristic_uuid = DATA_CHARACTERISTIC_UUID
+        self._status_characteristic_uuid = STATUS_CHARACTERISTIC_UUID
+        self._management_request_characteristic_uuid = MANAGEMENT_REQUEST_CHARACTERISTIC_UUID
+        self._device_event_characteristic_uuid = DEVICE_EVENT_CHARACTERISTIC_UUID
         self.max_write_without_response_size = 20
         self.management_available = False
 
@@ -108,7 +135,7 @@ class BleakBackend:
             discovered = await self._scanner.discover(
                 timeout=self._scan_timeout_seconds,
                 return_adv=True,
-                service_uuids=[SERVICE_UUID],
+                service_uuids=[profile[0] for profile in _BLE_PROFILES],
             )
         except BleakBluetoothNotAvailableError as error:
             denied = {
@@ -185,13 +212,27 @@ class BleakBackend:
             client = self._client_factory(device, disconnected_callback=self._disconnected)
             self._client = client
             await client.connect()
-            characteristic = client.services.get_characteristic(DATA_CHARACTERISTIC_UUID)
+            characteristic = None
+            active_profile = None
+            for profile in _BLE_PROFILES:
+                candidate = client.services.get_characteristic(profile[1])
+                if candidate is not None:
+                    characteristic = candidate
+                    active_profile = profile
+                    break
             if characteristic is None:
                 await client.disconnect()
                 raise TransportError(
                     "The discovered display does not expose the AgentMeter data characteristic",
                     retryable=False,
                 )
+            (
+                _service_uuid,
+                self._data_characteristic_uuid,
+                self._status_characteristic_uuid,
+                self._management_request_characteristic_uuid,
+                self._device_event_characteristic_uuid,
+            ) = active_profile
             write_size = int(characteristic.max_write_without_response_size)
             if not 20 <= write_size <= 512:
                 await client.disconnect()
@@ -201,10 +242,11 @@ class BleakBackend:
                 )
             self.max_write_without_response_size = write_size
             management_request = client.services.get_characteristic(
-                MANAGEMENT_REQUEST_CHARACTERISTIC_UUID
+                self._management_request_characteristic_uuid
             )
-            event_uuid = DEVICE_EVENT_CHARACTERISTIC_UUID
-            management_event = client.services.get_characteristic(event_uuid)
+            management_event = client.services.get_characteristic(
+                self._device_event_characteristic_uuid
+            )
             self.management_available = (
                 management_request is not None and management_event is not None
             )
@@ -223,7 +265,7 @@ class BleakBackend:
         def receive(_sender: object, data: bytearray) -> None:
             notification(bytes(data))
 
-        await client.start_notify(STATUS_CHARACTERISTIC_UUID, receive)
+        await client.start_notify(self._status_characteristic_uuid, receive)
 
     async def start_management_notify(self, notification) -> None:
         if not self.management_available:
@@ -233,12 +275,12 @@ class BleakBackend:
         def receive(_sender: object, data: bytearray) -> None:
             notification(bytes(data))
 
-        await client.start_notify(DEVICE_EVENT_CHARACTERISTIC_UUID, receive)
+        await client.start_notify(self._device_event_characteristic_uuid, receive)
 
     async def write(self, frame: bytes) -> None:
         async with self._write_lock:
             await self._require_client().write_gatt_char(
-                DATA_CHARACTERISTIC_UUID,
+                self._data_characteristic_uuid,
                 frame,
                 response=False,
             )
@@ -251,7 +293,7 @@ class BleakBackend:
             )
         async with self._write_lock:
             await self._require_client().write_gatt_char(
-                MANAGEMENT_REQUEST_CHARACTERISTIC_UUID,
+                self._management_request_characteristic_uuid,
                 frame,
                 response=True,
             )
@@ -474,6 +516,7 @@ class BleTransport:
                     timeout=self._management_timeout_seconds,
                 )
             except TimeoutError:
+                await self._disconnect()
                 raise TransportError(
                     "AgentMeter did not answer the management request",
                     retryable=True,

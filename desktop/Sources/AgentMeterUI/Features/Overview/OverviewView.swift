@@ -3,22 +3,33 @@ import SwiftUI
 
 public struct OverviewView: View {
     @Environment(AppModel.self) private var model
+    @State private var selectedProvider: ProviderSummary?
 
     public init() {}
 
     public var body: some View {
-        ScrollView {
+        let providers = visibleProviders
+        ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
                 header
                 metrics
-                if hasTrendData {
-                    UsageTrendChart(samples: model.historySamples, providers: visibleProviders)
+                if providers.isEmpty == false {
+                    UsageTrendChart(
+                        samples: model.historySamples,
+                        providers: providers,
+                        range: model.historyRange
+                    ) { range in
+                        Task { await model.loadHistory(range) }
+                    }
                 }
-                providerSection
+                providerSection(providers)
             }
             .padding(28)
         }
         .navigationTitle("Overview")
+        .sheet(item: $selectedProvider) { provider in
+            ProviderUsageDetailsView(provider: provider, nowEpoch: nowEpoch)
+        }
     }
 
     private var header: some View {
@@ -97,7 +108,7 @@ public struct OverviewView: View {
         }
     }
 
-    private var providerSection: some View {
+    private func providerSection(_ providers: [ProviderSummary]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
@@ -112,7 +123,7 @@ public struct OverviewView: View {
                 }
             }
 
-            if visibleProviders.isEmpty {
+            if providers.isEmpty {
                 ContentUnavailableView(
                     "No usage available",
                     systemImage: "sparkles",
@@ -125,8 +136,12 @@ public struct OverviewView: View {
                     columns: [GridItem(.adaptive(minimum: 230, maximum: 340), spacing: 14)],
                     spacing: 14
                 ) {
-                    ForEach(visibleProviders) { provider in
-                        ProviderUsageCard(provider: provider, nowEpoch: nowEpoch)
+                    ForEach(providers) { provider in
+                        ProviderUsageCard(
+                            provider: provider,
+                            nowEpoch: nowEpoch,
+                            onShowDetails: { selectedProvider = provider }
+                        )
                     }
                 }
             }
@@ -145,21 +160,12 @@ public struct OverviewView: View {
 
     private var nowEpoch: Int { Int(Date().timeIntervalSince1970) }
 
-    private var hasTrendData: Bool {
-        visibleProviders.contains { provider in
-            let kind = provider.windows.first(where: { $0.kind == "session" })?.kind
-                ?? provider.windows.first?.kind
-            guard let kind else { return false }
-            return model.historySamples.filter {
-                $0.providerId == provider.id && $0.windowKind == kind && $0.usedPercent != nil
-            }.count >= 2
-        }
-    }
 }
 
 private struct ProviderUsageCard: View {
     let provider: ProviderSummary
     let nowEpoch: Int
+    let onShowDetails: () -> Void
 
     var body: some View {
         let accent = ProviderPalette.accent(for: provider.id)
@@ -205,22 +211,52 @@ private struct ProviderUsageCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Text(UsageFormatting.updatedAge(updatedAtEpoch: provider.updatedAtEpoch, nowEpoch: nowEpoch))
+            if secondaryWindows.isEmpty == false {
+                Divider()
+                VStack(spacing: 8) {
+                    ForEach(secondaryWindows) { window in
+                        HStack(spacing: 10) {
+                            Text(window.label)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(UsageFormatting.percentage(window.usedPercent))
+                                .font(.caption.bold().monospacedDigit())
+                                .foregroundStyle(
+                                    window.usedPercent == nil ? .secondary : .primary
+                                )
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+
+            HStack {
+                Text(UsageFormatting.updatedAge(
+                    updatedAtEpoch: provider.updatedAtEpoch,
+                    nowEpoch: nowEpoch
+                ))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
+                Spacer()
+                Button("Details", systemImage: "chevron.right", action: onShowDetails)
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(accent)
+            }
         }
         .padding(18)
-        .agentMeterCard(emphasized: true)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(accent)
-                .frame(height: 2)
-                .clipShape(.rect(topLeadingRadius: 14, topTrailingRadius: 14))
-        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: ProviderCardLayout.height(windowCount: provider.windows.count),
+            maxHeight: ProviderCardLayout.height(windowCount: provider.windows.count),
+            alignment: .topLeading
+        )
+        .agentMeterProviderCard(accent: accent)
         .accessibilityElement(children: .contain)
     }
 
     private var primaryWindow: ProviderWindow? { provider.windows.first }
+    private var secondaryWindows: ArraySlice<ProviderWindow> { provider.windows.dropFirst() }
     private var statusText: String {
         switch provider.status {
         case "ok": "Live"
@@ -236,5 +272,236 @@ private struct ProviderUsageCard: View {
         case "stale": AgentMeterTheme.warning
         default: AgentMeterTheme.secondaryText
         }
+    }
+}
+
+private struct ProviderUsageDetailsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let provider: ProviderSummary
+    let nowEpoch: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            detailHeader
+            Divider()
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 20) {
+                    if usesSessionAndCycleLayout {
+                        sessionAndCycleDetails
+                    } else {
+                        usageWindowDetails
+                    }
+
+                    Label(
+                        "Usage is read locally from the signed-in provider tool. Missing values are never treated as zero.",
+                        systemImage: "lock.shield"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+                }
+                .padding(24)
+            }
+        }
+        .frame(minWidth: 560, idealWidth: 620, minHeight: 500, idealHeight: 590)
+        .background(AgentMeterTheme.windowBackground)
+    }
+
+    private var detailHeader: some View {
+        HStack(spacing: 14) {
+            ProviderMark(providerId: provider.id, name: provider.name, size: 46)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(provider.name) usage")
+                    .font(.title2.bold())
+                HStack(spacing: 8) {
+                    StatusPill(statusText, symbol: statusSymbol, tint: statusTint)
+                    Text(UsageFormatting.updatedAge(
+                        updatedAtEpoch: provider.updatedAtEpoch,
+                        nowEpoch: nowEpoch
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Button("Close", systemImage: "xmark", action: dismiss.callAsFunction)
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .help("Close usage details")
+        }
+        .padding(20)
+    }
+
+    @ViewBuilder
+    private var sessionAndCycleDetails: some View {
+        if let sessionWindow {
+            detailSection("Current session") {
+                UsageWindowPanel(
+                    window: sessionWindow,
+                    accent: accent,
+                    nowEpoch: nowEpoch
+                )
+            }
+        }
+
+        if let cycleWindow {
+            detailSection("Overall cycle") {
+                UsageWindowPanel(
+                    window: cycleWindow,
+                    accent: accent,
+                    nowEpoch: nowEpoch
+                )
+            }
+        }
+
+        if modelWindows.isEmpty == false {
+            detailSection("Usage by model") {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 220), spacing: 12)],
+                    spacing: 12
+                ) {
+                    ForEach(modelWindows) { window in
+                        UsageWindowPanel(
+                            window: window,
+                            accent: accent,
+                            nowEpoch: nowEpoch
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var usageWindowDetails: some View {
+        detailSection("Usage windows") {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 220), spacing: 12)],
+                spacing: 12
+            ) {
+                ForEach(provider.windows) { window in
+                    UsageWindowPanel(
+                        window: window,
+                        accent: accent,
+                        nowEpoch: nowEpoch
+                    )
+                }
+            }
+        }
+    }
+
+    private func detailSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            content()
+        }
+    }
+
+    private var usesSessionAndCycleLayout: Bool {
+        provider.id == "claude" || provider.id == "codex"
+    }
+
+    private var sessionWindow: ProviderWindow? {
+        provider.windows.first {
+            $0.kind == "session" && $0.label.localizedCaseInsensitiveContains("session")
+        }
+    }
+
+    private var cycleWindow: ProviderWindow? {
+        provider.windows.first { $0.kind == "weekly" }
+    }
+
+    private var modelWindows: [ProviderWindow] {
+        let excluded = Set([sessionWindow?.id, cycleWindow?.id].compactMap { $0 })
+        return provider.windows.filter { excluded.contains($0.id) == false }
+    }
+
+    private var accent: Color { ProviderPalette.accent(for: provider.id) }
+
+    private var statusText: String {
+        switch provider.status {
+        case "ok": "Live"
+        case "stale": "Last known value"
+        case "unavailable": "Unavailable"
+        default: provider.status.capitalized
+        }
+    }
+
+    private var statusSymbol: String {
+        switch provider.status {
+        case "ok": "waveform.path.ecg"
+        case "stale": "clock.arrow.circlepath"
+        default: "exclamationmark.circle"
+        }
+    }
+
+    private var statusTint: Color {
+        switch provider.status {
+        case "ok": AgentMeterTheme.success
+        case "stale": AgentMeterTheme.warning
+        default: AgentMeterTheme.secondaryText
+        }
+    }
+}
+
+private struct UsageWindowPanel: View {
+    let window: ProviderWindow
+    let accent: Color
+    let nowEpoch: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(window.label)
+                    .font(.headline)
+                Spacer()
+                Text(valueText)
+                    .font(.title3.bold().monospacedDigit())
+                    .foregroundStyle(window.usedPercent == nil ? .secondary : .primary)
+            }
+
+            if let percent = window.usedPercent {
+                ProgressView(value: Double(percent), total: 100)
+                    .tint(accent)
+            } else {
+                Label("Provider did not report a value", systemImage: "minus.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Label(
+                    UsageFormatting.resetCountdown(
+                        resetAtEpoch: window.resetAtEpoch,
+                        nowEpoch: nowEpoch
+                    ),
+                    systemImage: "clock"
+                )
+                if let resetAtEpoch = window.resetAtEpoch {
+                    Text(
+                        Date(timeIntervalSince1970: Double(resetAtEpoch)),
+                        format: .dateTime
+                            .weekday(.abbreviated)
+                            .day()
+                            .month(.abbreviated)
+                            .hour()
+                            .minute()
+                    )
+                    .padding(.leading, 20)
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(16)
+        .agentMeterCard(emphasized: true)
+    }
+
+    private var valueText: String {
+        window.usedPercent.map { "\($0)% used" } ?? "Not reported"
     }
 }

@@ -20,7 +20,12 @@ public enum BridgeCommand: Sendable {
     case patchSettings(DeviceSettingsPatch)
     case refreshProviders
     case updateProviders(ids: [String], pollIntervalSeconds: Int)
-    case queryHistory(sinceEpoch: Int, providerId: String? = nil)
+    case queryHistory(
+        sinceEpoch: Int,
+        providerId: String? = nil,
+        bucketSeconds: Int? = nil,
+        currentCycle: Bool = false
+    )
     case clearHistory
     case diagnostics
     case restartBridge
@@ -62,9 +67,11 @@ public enum BridgeCommand: Sendable {
                 "providerIds": .array(ids.map(JSONValue.string)),
                 "pollIntervalSeconds": .integer(interval),
             ]
-        case let .queryHistory(sinceEpoch, providerId):
+        case let .queryHistory(sinceEpoch, providerId, bucketSeconds, currentCycle):
             var payload: [String: JSONValue] = ["sinceEpoch": .integer(sinceEpoch)]
             if let providerId { payload["providerId"] = .string(providerId) }
+            if let bucketSeconds { payload["bucketSeconds"] = .integer(bucketSeconds) }
+            if currentCycle { payload["currentCycle"] = .boolean(true) }
             return payload
         default:
             return [:]

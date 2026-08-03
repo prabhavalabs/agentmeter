@@ -78,6 +78,9 @@ cp \
 ditto \
   "${PACKAGE_WORK}/bridge-dist/AgentMeterBridge" \
   "${APP_BUNDLE}/Contents/Resources/AgentMeterBridge"
+ln -s \
+  AgentMeterBridge \
+  "${APP_BUNDLE}/Contents/Resources/AgentMeterBridge/agentmeter-claude-probe"
 
 if [[ "${SIGNING_IDENTITY}" == "-" ]]; then
   codesign --force --options runtime --timestamp=none --sign - "${APP_BUNDLE}"

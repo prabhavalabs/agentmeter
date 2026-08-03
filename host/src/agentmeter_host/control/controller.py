@@ -133,6 +133,8 @@ class BridgeController:
         self._alerts = AlertEngine(config.display.alert_thresholds)
         self._connection_lock = asyncio.Lock()
         self._refresh_lock = asyncio.Lock()
+        self._provider_refresh_task: asyncio.Task[None] | None = None
+        self._provider_refresh_send_requested = False
         self._reconnect_needed = asyncio.Event()
         self._latest_snapshot: dict[str, Any] | None = None
         self._next_snapshot_id = 0
@@ -214,18 +216,21 @@ class BridgeController:
         self._commit("connection.changed")
 
     async def scan(self) -> list[dict[str, object]]:
-        self._set_connection(ConnectionPhase.SEARCHING)
+        scanning_while_connected = self.state.connection.phase is ConnectionPhase.CONNECTED
+        if not scanning_while_connected:
+            self._set_connection(ConnectionPhase.SEARCHING)
         try:
             peripherals = tuple(await self._transport.scan())
         except TransportError as error:
-            self._set_connection(
-                ConnectionPhase.BLUETOOTH_UNAVAILABLE,
-                error_code=self._transport_error_code(error),
-            )
+            if self.state.connection.phase is ConnectionPhase.SEARCHING:
+                self._set_connection(
+                    ConnectionPhase.BLUETOOTH_UNAVAILABLE,
+                    error_code=self._transport_error_code(error),
+                )
             raise IpcCommandError(self._transport_error_code(error), str(error)) from error
         self.state = replace(self.state, peripherals=peripherals)
         self._commit("discovery.changed")
-        if self._host_settings.selected_device_id is None:
+        if self.state.connection.phase is ConnectionPhase.SEARCHING:
             self._set_connection(ConnectionPhase.STOPPED)
         return [item.to_document() for item in peripherals]
 
@@ -354,49 +359,65 @@ class BridgeController:
 
     async def refresh_providers(self, *, send_to_device: bool = True) -> None:
         async with self._refresh_lock:
-            config = self._active_config()
-            message_id = self._next_snapshot_id
+            task = self._provider_refresh_task
+            if task is None or task.done():
+                task = asyncio.create_task(self._refresh_provider_state())
+                self._provider_refresh_task = task
+                self._provider_refresh_send_requested = False
+            self._provider_refresh_send_requested |= send_to_device
+        try:
+            await asyncio.shield(task)
+        finally:
+            async with self._refresh_lock:
+                if self._provider_refresh_task is task and task.done():
+                    should_send = self._provider_refresh_send_requested
+                    self._provider_refresh_task = None
+                    self._provider_refresh_send_requested = False
+                else:
+                    should_send = False
+        if should_send and self._is_connected():
             try:
-                async with self._collector_session_factory(config) as session:
-                    collected = await session.collect(config, message_id=message_id)
-                snapshot = self._alerts.apply(self._provider_history.apply(collected))
-            except Exception as error:
-                self.state = replace(
-                    self.state,
-                    bridge=replace(
-                        self.state.bridge,
-                        last_error_code="providerRefreshFailed",
-                    ),
-                )
-                self._commit("providers.changed")
-                raise IpcCommandError(
-                    "providerRefreshFailed",
-                    "Provider usage could not be refreshed",
-                ) from error
-            self._next_snapshot_id = (message_id + 1) & 0xFFFF
-            self._latest_snapshot = snapshot
-            self._history.record_snapshot(snapshot)
-            providers = self._provider_summaries(snapshot)
-            provider_health = tuple(
-                (provider.identifier, provider.status) for provider in providers
-            )
-            refreshed_at = int(snapshot["generatedAtEpoch"])
+                await self._send_latest_snapshot()
+            except TransportError as error:
+                await self._unexpected_disconnect(self._transport_error_code(error))
+
+    async def _refresh_provider_state(self) -> None:
+        config = self._active_config()
+        message_id = self._next_snapshot_id
+        try:
+            async with self._collector_session_factory(config) as session:
+                collected = await session.collect(config, message_id=message_id)
+            snapshot = self._alerts.apply(self._provider_history.apply(collected))
+        except Exception as error:
             self.state = replace(
                 self.state,
-                providers=providers,
                 bridge=replace(
                     self.state.bridge,
-                    last_provider_refresh_epoch=refreshed_at,
-                    last_error_code=None,
-                    provider_health=provider_health,
+                    last_error_code="providerRefreshFailed",
                 ),
             )
             self._commit("providers.changed")
-            if send_to_device and self._is_connected():
-                try:
-                    await self._send_latest_snapshot()
-                except TransportError as error:
-                    await self._unexpected_disconnect(self._transport_error_code(error))
+            raise IpcCommandError(
+                "providerRefreshFailed",
+                "Provider usage could not be refreshed",
+            ) from error
+        self._next_snapshot_id = (message_id + 1) & 0xFFFF
+        self._latest_snapshot = snapshot
+        self._history.record_snapshot(snapshot)
+        providers = self._provider_summaries(snapshot)
+        provider_health = tuple((provider.identifier, provider.status) for provider in providers)
+        refreshed_at = int(snapshot["generatedAtEpoch"])
+        self.state = replace(
+            self.state,
+            providers=providers,
+            bridge=replace(
+                self.state.bridge,
+                last_provider_refresh_epoch=refreshed_at,
+                last_error_code=None,
+                provider_health=provider_health,
+            ),
+        )
+        self._commit("providers.changed")
 
     async def patch_settings(self, payload: dict[str, Any]) -> dict[str, object]:
         base_revision = payload.get("baseRevision")
@@ -704,7 +725,13 @@ class BridgeController:
             await self.update_providers(request.payload)
             return {"providers": [item.to_document() for item in self.state.providers]}
         if command == "history.query":
-            allowed = {"sinceEpoch", "providerId", "limit"}
+            allowed = {
+                "sinceEpoch",
+                "providerId",
+                "limit",
+                "bucketSeconds",
+                "currentCycle",
+            }
             if set(request.payload) - allowed:
                 raise IpcCommandError("invalidPayload", "History query is invalid")
             try:
@@ -712,6 +739,8 @@ class BridgeController:
                     since_epoch=request.payload.get("sinceEpoch", 0),
                     provider_id=request.payload.get("providerId"),
                     limit=request.payload.get("limit", 2_048),
+                    bucket_seconds=request.payload.get("bucketSeconds"),
+                    current_cycle=request.payload.get("currentCycle", False),
                 )
             except HistoryError as error:
                 raise IpcCommandError("invalidPayload", str(error)) from error
@@ -792,8 +821,7 @@ class BridgeController:
     def _settings_document(self) -> dict[str, object] | None:
         return None if self.state.settings is None else self.state.settings.to_document()
 
-    @staticmethod
-    def _provider_summaries(snapshot: dict[str, Any]) -> tuple[ProviderSummary, ...]:
+    def _provider_summaries(self, snapshot: dict[str, Any]) -> tuple[ProviderSummary, ...]:
         sampled_at = int(snapshot["generatedAtEpoch"])
         return tuple(
             ProviderSummary(
@@ -809,13 +837,19 @@ class BridgeController:
                     )
                     for window in provider["windows"]
                 ),
-                updated_at_epoch=sampled_at,
+                updated_at_epoch=self._provider_updated_at(provider, sampled_at),
                 error_code=(
                     None if provider["status"] in {"ok", "stale"} else "providerUnavailable"
                 ),
             )
             for provider in snapshot["providers"]
         )
+
+    def _provider_updated_at(self, provider: dict[str, Any], sampled_at: int) -> int:
+        if provider["status"] not in {"ok", "stale"}:
+            return sampled_at
+        cached_at = self._provider_history.updated_at_epoch(provider["id"])
+        return sampled_at if cached_at is None else cached_at
 
     @staticmethod
     def _parse_information(value: object) -> DeviceInformation:

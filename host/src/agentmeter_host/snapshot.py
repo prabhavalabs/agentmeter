@@ -5,7 +5,7 @@ from typing import Any
 
 from agentmeter_host.codexbar import CodexBarServer
 from agentmeter_host.config import HostConfig
-from agentmeter_host.normalization import normalize_dashboard_snapshot
+from agentmeter_host.normalization import normalize_provider_usages
 
 
 class DeviceSnapshotCollector:
@@ -32,12 +32,16 @@ class DeviceSnapshotCollector:
     async def collect(self, _config: HostConfig, *, message_id: int = 0) -> dict[str, Any]:
         if self._client is None:
             raise RuntimeError("device snapshot collector is not running")
-        dashboard = await self._client.fetch_snapshot()
-        return normalize_dashboard_snapshot(
-            dashboard,
+        usages = await self._client.fetch_provider_usages(self._config.provider_ids)
+        return normalize_provider_usages(
+            usages,
             provider_ids=self._config.provider_ids,
             message_id=message_id,
             display=self._config.display,
+            stale_after_seconds=max(
+                180,
+                min(3_600, self._config.poll_interval_seconds * 3),
+            ),
         )
 
 

@@ -15,7 +15,8 @@ source repository, or Xcode. The app never opens a competing Bluetooth connectio
 - Agent visibility and display order
 - Always-on mode, full-view rotation, rotation interval, brightness, dimming, and screen-off time
 - Firmware and protocol information, bounded history controls, and sanitized diagnostics
-- A local 24-hour usage trend, first-run setup, sleep/wake recovery, and optional notifications
+- Local usage trends for the last 24 hours, 7 days, 30 days, and the current usage cycle
+- First-run setup, sleep/wake recovery, and optional notifications
 
 Firmware installation and updates are intentionally outside the app. Unsupported measurements remain **Unavailable** rather than being estimated.
 
@@ -30,6 +31,23 @@ Choose **AgentMeter → Settings** to select:
 - **Dark** — always uses the dark interface
 
 The same preference applies to the main window, menu-bar panel, and settings window. Statuses pair colour with text and symbols.
+
+## Local usage history
+
+The Overview chart keeps usage history on the Mac and never uploads it. Choose the range that best
+matches what you want to inspect:
+
+- **24H** shows up to 24 hourly points.
+- **7D** shows up to seven daily points.
+- **30D** shows up to 30 daily points.
+- **Cycle** starts at the latest observed usage reset and adapts the number of points to the
+  available cycle history.
+
+Missing samples remain gaps rather than being presented as zero usage. Provider details separate
+the current session from the overall cycle and show the reset time for each window. Model-specific
+rows are included when the local provider source reports them. If a provider names a model window
+without reporting its percentage, AgentMeter displays **Not reported** instead of inventing a zero
+value.
 
 ## Install a release
 

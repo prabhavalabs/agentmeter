@@ -45,6 +45,11 @@ public struct AppNotice: Equatable, Identifiable, Sendable {
     }
 }
 
+private struct SettingsCommandResult: Decodable, Sendable {
+    let syncStatus: String
+    let settings: DeviceSettings?
+}
+
 @MainActor
 @Observable
 public final class AppModel {
@@ -52,9 +57,10 @@ public final class AppModel {
     public private(set) var discoveredDevices: [PeripheralSummary] = []
     public private(set) var activeOperations: Set<AppOperation> = []
     public private(set) var bridgeReachable = false
-    public private(set) var settingsSyncState: SettingsSyncState = .synced
+    public private(set) var settingsSyncState: SettingsSyncState = .waitingForDevice
     public private(set) var pendingSettingsPatch: DeviceSettingsPatch?
     public private(set) var historySamples: [UsageHistorySample] = []
+    public private(set) var historyRange: UsageHistoryRange = .last24Hours
     public private(set) var diagnostics: BridgeDiagnostics?
     public var notice: AppNotice?
 
@@ -162,10 +168,16 @@ public final class AppModel {
         settingsSyncState = .saving
         await withOperation(.settings) {
             do {
-                _ = try await bridge.perform(.patchSettings(patch))
-                apply(try await bridge.status())
+                let result = try await bridge.perform(.patchSettings(patch))
+                let confirmed = try result.decodePayload(SettingsCommandResult.self)
+                if let settings = confirmed.settings {
+                    applyConfirmedSettings(settings)
+                }
                 pendingSettingsPatch = nil
-                settingsSyncState = .synced
+                settingsSyncState = confirmed.syncStatus == "synced"
+                    && confirmed.settings != nil
+                    ? .synced
+                    : .waitingForDevice
             } catch let error as BridgeClientError {
                 if case let .remote(code, _, _) = error, code == "revisionConflict" {
                     settingsSyncState = .waitingForDevice
@@ -216,6 +228,26 @@ public final class AppModel {
     public func clearHistory() async {
         await perform(.diagnostics, command: .clearHistory)
         historySamples = []
+    }
+
+    public func loadHistory(
+        _ range: UsageHistoryRange,
+        now: Date = .now
+    ) async {
+        historyRange = range
+        let query = range.query(now: now)
+        do {
+            let result = try await bridge.perform(
+                .queryHistory(
+                    sinceEpoch: query.sinceEpoch,
+                    bucketSeconds: query.bucketSeconds,
+                    currentCycle: query.currentCycle
+                )
+            )
+            historySamples = try result.decodePayload(UsageHistoryResult.self).usage
+        } catch {
+            // Current status remains useful when optional history cannot be loaded.
+        }
     }
 
     public func refreshDiagnostics() async {
@@ -329,18 +361,37 @@ public final class AppModel {
         discoveredDevices = incoming.peripherals
         bridgeReachable = incoming.bridge.running
         if pendingSettingsPatch == nil {
-            settingsSyncState = .synced
+            updateSettingsSyncState()
         }
     }
 
-    private func loadSupplementalData() async {
-        let sinceEpoch = max(0, Int(Date().timeIntervalSince1970) - 86_400)
-        do {
-            let result = try await bridge.perform(.queryHistory(sinceEpoch: sinceEpoch))
-            historySamples = try result.decodePayload(UsageHistoryResult.self).usage
-        } catch {
-            // Current status remains useful when optional history cannot be loaded.
+    private func applyConfirmedSettings(_ settings: DeviceSettings) {
+        if let current = state.settings, settings.revision < current.revision {
+            return
         }
+        state = ControlState(
+            revision: state.revision,
+            connection: state.connection,
+            peripherals: state.peripherals,
+            information: state.information,
+            telemetry: state.telemetry,
+            settings: settings,
+            providers: state.providers,
+            bridge: state.bridge
+        )
+    }
+
+    private func updateSettingsSyncState() {
+        let connection = state.connection
+        settingsSyncState = connection.phase == .connected
+            && connection.managementAvailable == true
+            && state.settings != nil
+            ? .synced
+            : .waitingForDevice
+    }
+
+    private func loadSupplementalData() async {
+        await loadHistory(historyRange)
         await loadDiagnostics(showFailure: false)
     }
 

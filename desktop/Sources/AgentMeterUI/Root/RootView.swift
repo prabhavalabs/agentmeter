@@ -10,28 +10,13 @@ public struct RootView: View {
     public init() {}
 
     public var body: some View {
+        @Bindable var preferences = model.preferences
         NavigationSplitView {
-            Sidebar()
+            Sidebar(selection: $preferences.selectedSection)
         } detail: {
             destination
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(AgentMeterTheme.windowBackground)
-                .toolbar {
-                    ToolbarItemGroup(placement: .primaryAction) {
-                        StatusPill(
-                            model.state.connection.phase.displayName,
-                            symbol: model.state.connection.phase.symbolName,
-                            tint: model.state.connection.phase.tint
-                        )
-                        Button {
-                            Task { await model.refreshProviders() }
-                        } label: {
-                            Label("Refresh usage", systemImage: "arrow.clockwise")
-                        }
-                        .disabled(model.activeOperations.contains(.providerRefresh))
-                        .help("Refresh coding-agent usage")
-                    }
-                }
         }
         .frame(minWidth: 900, minHeight: 620)
         .task {
@@ -47,7 +32,7 @@ public struct RootView: View {
                 _ = await notifications.setEnabled(true)
             }
             await bridgeService.start()
-            await model.start()
+            await model.start(showFailure: bridgeService.state != .waitingForBridge)
             if model.bridgeReachable { bridgeService.confirmBridgeReady() }
         }
         .onChange(of: model.bridgeReachable) { _, reachable in

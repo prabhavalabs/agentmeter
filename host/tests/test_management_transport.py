@@ -103,9 +103,12 @@ class ManagedBackend:
         *,
         result_status: str = "ok",
         result_id_delta: int = 0,
+        drop_first_management_response: bool = False,
     ) -> None:
         self.result_status = result_status
         self.result_id_delta = result_id_delta
+        self.drop_first_management_response = drop_first_management_response
+        self.link_healthy = True
         self.connect_count = 0
         self.disconnect_count = 0
         self.snapshot_frames: list[bytes] = []
@@ -124,6 +127,8 @@ class ManagedBackend:
     async def connect(self, _identifier: str | None = None):
         self.connect_count += 1
         self.management_available = True
+        self.link_healthy = True
+        self.management_frames.clear()
         return None
 
     async def start_notify(self, notification) -> None:
@@ -144,10 +149,16 @@ class ManagedBackend:
 
     async def write_management(self, frame: bytes) -> None:
         self.operations.append("management")
+        if not self.link_healthy:
+            return
         self.management_frames.append(frame)
         await asyncio.sleep(0)
         total = int.from_bytes(frame[4:6], "little")
         if int.from_bytes(frame[6:8], "little") + len(frame[8:]) != total:
+            return
+        if self.drop_first_management_response:
+            self.drop_first_management_response = False
+            self.link_healthy = False
             return
         request_payload = b"".join(item[8:] for item in self.management_frames)
         request = json.loads(request_payload)
@@ -233,6 +244,27 @@ async def test_management_request_preserves_device_error_result() -> None:
 
     assert error.value.status == "revisionConflict"
     assert error.value.result["requestId"] == 19
+
+
+@pytest.mark.asyncio
+async def test_management_timeout_reconnects_before_the_next_request() -> None:
+    from agentmeter_host.transport.ble import BleTransport, TransportError
+
+    backend = ManagedBackend(drop_first_management_response=True)
+    transport = BleTransport(backend, management_timeout_seconds=0.01)
+    request = {
+        "schemaVersion": 1,
+        "requestId": 20,
+        "type": "device.get",
+        "payload": {},
+    }
+
+    with pytest.raises(TransportError, match="did not answer"):
+        await transport.request(request)
+
+    result = await transport.request(request)
+
+    assert result["requestId"] == 20
 
 
 @pytest.mark.asyncio

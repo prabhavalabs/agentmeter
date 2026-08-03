@@ -29,6 +29,7 @@ class ProviderHistory:
     def apply(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         result = copy.deepcopy(snapshot)
         generated_at = result["generatedAtEpoch"]
+        freshness_grace = result.get("staleAfterSeconds", 0)
         providers = result["providers"]
         for index, provider in enumerate(providers):
             provider_id = provider["id"]
@@ -42,9 +43,13 @@ class ProviderHistory:
                 self._last_good.pop(provider_id, None)
                 continue
             restored = copy.deepcopy(cached[1])
-            restored["status"] = "stale"
+            restored["status"] = "ok" if generated_at - cached[0] <= freshness_grace else "stale"
             providers[index] = restored
         return result
+
+    def updated_at_epoch(self, provider_id: str) -> int | None:
+        cached = self._last_good.get(provider_id)
+        return None if cached is None else cached[0]
 
 
 class BridgeRuntime:

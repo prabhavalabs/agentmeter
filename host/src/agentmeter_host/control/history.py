@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
@@ -212,16 +213,60 @@ class HistoryStore:
         since_epoch: int,
         provider_id: str | None = None,
         limit: int = 2_048,
+        bucket_seconds: int | None = None,
+        current_cycle: bool = False,
     ) -> list[dict[str, object]]:
         self._validate_epoch(since_epoch, "history boundary")
         if not 1 <= limit <= 10_000:
             raise HistoryError("history limit must be between 1 and 10000")
+        if bucket_seconds is not None and (
+            isinstance(bucket_seconds, bool)
+            or not isinstance(bucket_seconds, int)
+            or not _BUCKET_SECONDS <= bucket_seconds <= 86_400
+            or bucket_seconds % _BUCKET_SECONDS != 0
+        ):
+            raise HistoryError("history bucket must be a five-minute multiple up to one day")
+        if not isinstance(current_cycle, bool):
+            raise HistoryError("current cycle must be a boolean")
         parameters: list[object] = [since_epoch]
         where = "sampled_at >= ?"
         if provider_id is not None:
             self._validate_id(provider_id, "provider ID")
             where += " AND provider_id = ?"
             parameters.append(provider_id)
+
+        if current_cycle:
+            rows = self._connection.execute(
+                f"""
+                SELECT provider_id, window_kind, sampled_at, used_percent, reset_at
+                FROM usage_sample WHERE {where}
+                ORDER BY sampled_at ASC, provider_id ASC, window_kind ASC
+                """,  # noqa: S608 - only a fixed optional clause is interpolated
+                parameters,
+            ).fetchall()
+            return self._current_cycle_rows(rows, limit=limit)
+
+        if bucket_seconds is not None:
+            ranked_parameters = [since_epoch, bucket_seconds, *parameters, limit]
+            rows = self._connection.execute(
+                f"""
+                WITH ranked AS (
+                  SELECT provider_id, window_kind, sampled_at, used_percent, reset_at,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY provider_id, window_kind,
+                        ((sampled_at - ?) / ?)
+                      ORDER BY sampled_at DESC
+                    ) AS bucket_rank
+                  FROM usage_sample WHERE {where}
+                )
+                SELECT provider_id, window_kind, sampled_at, used_percent, reset_at
+                FROM ranked WHERE bucket_rank = 1
+                ORDER BY sampled_at ASC, provider_id ASC, window_kind ASC LIMIT ?
+                """,  # noqa: S608 - only a fixed optional clause is interpolated
+                ranked_parameters,
+            ).fetchall()
+            return self._usage_documents(rows)
+
         parameters.append(limit)
         rows = self._connection.execute(
             f"""
@@ -231,6 +276,10 @@ class HistoryStore:
             """,  # noqa: S608 - only a fixed optional clause is interpolated
             parameters,
         ).fetchall()
+        return self._usage_documents(rows)
+
+    @staticmethod
+    def _usage_documents(rows: list[tuple[Any, ...]]) -> list[dict[str, object]]:
         return [
             {
                 "providerId": row[0],
@@ -241,6 +290,56 @@ class HistoryStore:
             }
             for row in rows
         ]
+
+    @classmethod
+    def _current_cycle_rows(
+        cls,
+        rows: list[tuple[Any, ...]],
+        *,
+        limit: int,
+    ) -> list[dict[str, object]]:
+        cycles: dict[tuple[str, str], list[tuple[Any, ...]]] = defaultdict(list)
+        previous: dict[tuple[str, str], tuple[int | None, int | None]] = {}
+        for row in rows:
+            key = (row[0], row[1])
+            used_percent = row[3]
+            reset_at = row[4]
+            previous_percent, previous_reset = previous.get(key, (None, None))
+            reset_changed = (
+                previous_reset is not None and reset_at is not None and reset_at != previous_reset
+            )
+            clear_cycle = (
+                used_percent is not None
+                and previous_percent is not None
+                and used_percent < previous_percent
+                and (reset_changed or previous_percent - used_percent >= 5)
+            )
+            if clear_cycle:
+                cycles[key].clear()
+            cycles[key].append(row)
+            previous[key] = (used_percent, reset_at)
+
+        sampled: list[tuple[Any, ...]] = []
+        maximum_per_series = 30
+        for cycle in cycles.values():
+            if len(cycle) <= maximum_per_series:
+                sampled.extend(cycle)
+                continue
+            first_epoch = cycle[0][2]
+            span = max(1, cycle[-1][2] - first_epoch + 1)
+            bucket_seconds = max(
+                _BUCKET_SECONDS,
+                ((span + maximum_per_series - 1) // maximum_per_series + _BUCKET_SECONDS - 1)
+                // _BUCKET_SECONDS
+                * _BUCKET_SECONDS,
+            )
+            buckets: dict[int, tuple[Any, ...]] = {}
+            for row in cycle:
+                buckets[(row[2] - first_epoch) // bucket_seconds] = row
+            sampled.extend(list(buckets.values())[-maximum_per_series:])
+
+        sampled.sort(key=lambda row: (row[2], row[0], row[1]))
+        return cls._usage_documents(sampled[:limit])
 
     def prune(self, *, now_epoch: int) -> None:
         self._validate_epoch(now_epoch, "prune time")

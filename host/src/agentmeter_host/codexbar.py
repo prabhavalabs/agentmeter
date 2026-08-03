@@ -13,6 +13,8 @@ import httpx
 
 _CODEXBAR_REQUEST_TIMEOUT_SECONDS = 60
 _DASHBOARD_CLIENT_TIMEOUT_SECONDS = _CODEXBAR_REQUEST_TIMEOUT_SECONDS + 5
+_PROVIDER_CLIENT_TIMEOUT_SECONDS = 30
+_MAX_RESPONSE_BYTES = 65_536
 
 
 class CodexBarError(RuntimeError):
@@ -59,6 +61,16 @@ def _installed_claude_shim() -> str | None:
     return None
 
 
+def _installed_claude_command() -> str | None:
+    configured = os.environ.get("CLAUDE_CLI_PATH")
+    if configured is not None:
+        return configured
+    user_command = Path.home() / ".local" / "bin" / "claude"
+    if user_command.is_file() and os.access(user_command, os.X_OK):
+        return str(user_command)
+    return shutil.which("claude")
+
+
 class CodexBarClient:
     def __init__(
         self,
@@ -86,7 +98,7 @@ class CodexBarClient:
                 raise CodexBarError(
                     f"CodexBar rejected the dashboard request with HTTP {response.status_code}"
                 )
-            if len(response.content) > 65_536:
+            if len(response.content) > _MAX_RESPONSE_BYTES:
                 raise CodexBarError("CodexBar response was larger than 65536 bytes")
             try:
                 payload = response.json()
@@ -95,6 +107,50 @@ class CodexBarClient:
             if not isinstance(payload, dict):
                 raise CodexBarError("CodexBar did not return a valid JSON object")
             return payload
+
+    async def fetch_provider_usages(
+        self,
+        provider_ids: tuple[str, ...],
+    ) -> dict[str, dict[str, object] | None]:
+        async with httpx.AsyncClient(
+            base_url=self._base_url,
+            headers={"Authorization": f"Bearer {self._token}"},
+            timeout=_PROVIDER_CLIENT_TIMEOUT_SECONDS,
+            transport=self._transport,
+        ) as client:
+            responses = await asyncio.gather(
+                *(self._fetch_provider_usage(client, provider_id) for provider_id in provider_ids)
+            )
+        usages = dict(zip(provider_ids, responses, strict=True))
+        if not any(payload is not None for payload in usages.values()):
+            raise CodexBarError("CodexBar could not refresh any configured provider")
+        return usages
+
+    async def _fetch_provider_usage(
+        self,
+        client: httpx.AsyncClient,
+        provider_id: str,
+    ) -> dict[str, object] | None:
+        try:
+            response = await client.get("/usage", params={"provider": provider_id})
+        except httpx.HTTPError:
+            return None
+        if not response.is_success or len(response.content) > _MAX_RESPONSE_BYTES:
+            return None
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        if not isinstance(payload, list):
+            return None
+        return next(
+            (
+                item
+                for item in payload
+                if isinstance(item, dict) and item.get("provider") == provider_id
+            ),
+            None,
+        )
 
     async def is_healthy(self) -> bool:
         try:
@@ -147,9 +203,7 @@ class CodexBarServer:
             refresh_interval_seconds=self._refresh_interval_seconds,
             token=token,
             base_environment=os.environ,
-            claude_command=(
-                self._claude_command or os.environ.get("CLAUDE_CLI_PATH") or shutil.which("claude")
-            ),
+            claude_command=self._claude_command or _installed_claude_command(),
             claude_shim_command=self._claude_shim_command or _installed_claude_shim(),
         )
         client = CodexBarClient(port=port, token=token)

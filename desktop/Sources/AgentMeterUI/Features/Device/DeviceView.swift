@@ -13,6 +13,9 @@ public struct DeviceView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 connectionCard
+                if requiresManagementFirmware {
+                    managementFirmwareNotice
+                }
                 if let information = model.state.information {
                     informationSection(information)
                 }
@@ -63,8 +66,10 @@ public struct DeviceView: View {
                     Task { await model.scan() }
                 }
                 if model.state.connection.phase == .connected {
-                    Button("Identify", systemImage: "light.beacon.max") {
-                        Task { await model.identifyDevice() }
+                    if model.state.connection.managementAvailable == true {
+                        Button("Identify", systemImage: "light.beacon.max") {
+                            Task { await model.identifyDevice() }
+                        }
                     }
                     Button("Disconnect") { Task { await model.disconnect() } }
                 } else {
@@ -73,6 +78,7 @@ public struct DeviceView: View {
                 }
                 Menu {
                     Button("Refresh device state") { Task { await model.refreshDevice() } }
+                        .disabled(model.state.connection.managementAvailable != true)
                     Divider()
                     Button("Forget Device…", role: .destructive) { confirmingForget = true }
                 } label: {
@@ -84,6 +90,22 @@ public struct DeviceView: View {
         }
         .padding(20)
         .agentMeterCard(emphasized: true)
+    }
+
+    private var managementFirmwareNotice: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "externaldrive.badge.exclamationmark")
+                .font(.title2)
+                .foregroundStyle(AgentMeterTheme.warning)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Legacy device firmware detected").font(.headline)
+                Text("Bluetooth usage updates still work, but telemetry, display controls, Identify, and two-way settings need the current firmware. Connect the device to this Mac with a USB-C data cable for a one-time firmware install.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .agentMeterCard()
     }
 
     private func informationSection(_ information: DeviceInformation) -> some View {
@@ -153,14 +175,25 @@ public struct DeviceView: View {
                 }
             } else {
                 ContentUnavailableView(
-                    "Telemetry unavailable",
-                    systemImage: "waveform.path.ecg",
-                    description: Text("Connect a management-capable AgentMeter to view live device health.")
+                    requiresManagementFirmware ? "Firmware update required" : "Telemetry unavailable",
+                    systemImage: requiresManagementFirmware
+                        ? "externaldrive.badge.exclamationmark"
+                        : "waveform.path.ecg",
+                    description: Text(
+                        requiresManagementFirmware
+                            ? "The connected legacy firmware does not expose telemetry. Install the current firmware by USB-C to enable live power and health data."
+                            : "Connect an AgentMeter to view live device health."
+                    )
                 )
                 .frame(maxWidth: .infinity, minHeight: 180)
                 .agentMeterCard()
             }
         }
+    }
+
+    private var requiresManagementFirmware: Bool {
+        model.state.connection.phase == .connected
+            && model.state.connection.managementAvailable == false
     }
 
     private var scannerSheet: some View {

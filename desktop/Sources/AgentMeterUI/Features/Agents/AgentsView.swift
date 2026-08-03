@@ -16,8 +16,17 @@ public struct AgentsView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Refresh Usage", systemImage: "arrow.clockwise") {
+                    Button {
                         Task { await model.refreshProviders() }
+                    } label: {
+                        if model.activeOperations.contains(.providerRefresh) {
+                            HStack(spacing: 7) {
+                                ProgressView().controlSize(.small)
+                                Text("Refreshing…")
+                            }
+                        } else {
+                            Label("Refresh Usage", systemImage: "arrow.clockwise")
+                        }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(model.activeOperations.contains(.providerRefresh))
@@ -27,14 +36,20 @@ public struct AgentsView: View {
 
                 if model.state.settings == nil {
                     Label(
-                        "Connect a management-capable AgentMeter to change what is shown on the display.",
-                        systemImage: "display.trianglebadge.exclamationmark"
+                        requiresManagementFirmware
+                            ? "The connected device uses legacy firmware. Connect it by USB-C and install the current firmware once to enable Show controls and two-way sync."
+                            : "Connect an AgentMeter to change what is shown on the display.",
+                        systemImage: requiresManagementFirmware
+                            ? "externaldrive.badge.exclamationmark"
+                            : "display.trianglebadge.exclamationmark"
                     )
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(requiresManagementFirmware ? AgentMeterTheme.warning : .secondary)
                 }
 
-                if model.state.providers.contains(where: { $0.status == "unavailable" }) {
+                if model.state.providers.contains(where: {
+                    $0.status == "unavailable" || $0.status == "error"
+                }) {
                     providerSetupHelp
                 }
 
@@ -114,6 +129,7 @@ public struct AgentsView: View {
                         || isLastVisibleProvider(provider.id)
                 )
                 .accessibilityLabel("Show \(provider.name) on AgentMeter")
+                .help(showControlHelp)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -132,6 +148,8 @@ public struct AgentsView: View {
                 StatusPill("Stale", symbol: "clock.badge.exclamationmark", tint: AgentMeterTheme.warning)
             case "unavailable":
                 StatusPill("Unavailable", symbol: "exclamationmark.circle", tint: AgentMeterTheme.warning)
+            case "error":
+                StatusPill("Needs attention", symbol: "exclamationmark.triangle", tint: AgentMeterTheme.warning)
             default:
                 StatusPill("Not detected", symbol: "minus.circle", tint: AgentMeterTheme.secondaryText)
             }
@@ -239,6 +257,21 @@ public struct AgentsView: View {
         guard let settings = model.state.settings,
               settings.hiddenProviderIds.contains(id) == false else { return false }
         return providerCatalog.filter { settings.hiddenProviderIds.contains($0.id) == false }.count == 1
+    }
+
+    private var requiresManagementFirmware: Bool {
+        model.state.connection.phase == .connected
+            && model.state.connection.managementAvailable == false
+    }
+
+    private var showControlHelp: String {
+        if requiresManagementFirmware {
+            return "Install the current AgentMeter firmware by USB-C to enable two-way display settings."
+        }
+        if model.state.settings == nil {
+            return "Connect AgentMeter to change this setting."
+        }
+        return "Choose whether this agent appears on AgentMeter."
     }
 
     private func moveProvider(at index: Int, by delta: Int) {

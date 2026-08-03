@@ -17,19 +17,12 @@ public struct OnboardingView: View {
                     Capsule()
                         .fill(index <= step ? AgentMeterTheme.accent : Color.secondary.opacity(0.2))
                         .frame(width: index == step ? 34 : 10, height: 7)
-                        .animation(.snappy, value: step)
                 }
             }
             .padding(.top, 24)
+            .animation(.easeInOut(duration: 0.18), value: step)
 
-            TabView(selection: $step) {
-                bridgePage.tag(0)
-                bluetoothPage.tag(1)
-                devicePage.tag(2)
-                securityPage.tag(3)
-                providersPage.tag(4)
-            }
-            .tabViewStyle(.automatic)
+            currentPage
 
             Divider()
             HStack {
@@ -50,6 +43,17 @@ public struct OnboardingView: View {
         }
         .frame(width: 680, height: 560)
         .interactiveDismissDisabled()
+    }
+
+    @ViewBuilder
+    private var currentPage: some View {
+        switch step {
+        case 0: bridgePage
+        case 1: bluetoothPage
+        case 2: devicePage
+        case 3: securityPage
+        default: providersPage
+        }
     }
 
     private var bridgePage: some View {
@@ -80,7 +84,14 @@ public struct OnboardingView: View {
             message: "Scanning prompts macOS for Bluetooth permission when needed. AgentMeter communicates only with compatible displays."
         ) {
             statusRow("Bluetooth", value: model.state.connection.phase.displayName, good: model.state.connection.phase != .bluetoothUnavailable)
-            Button("Scan for AgentMeter") { Task { await model.scan() } }
+            operationButton(
+                title: "Scan for AgentMeter",
+                workingTitle: "Scanning…",
+                symbol: "dot.radiowaves.left.and.right",
+                operation: .scanning
+            ) {
+                await model.scan()
+            }
                 .disabled(model.activeOperations.contains(.scanning))
             if model.state.connection.phase == .bluetoothUnavailable {
                 Button("Open Bluetooth Settings") { openBluetoothSettings() }
@@ -99,7 +110,14 @@ public struct OnboardingView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                Button("Scan Again") { Task { await model.scan() } }
+                operationButton(
+                    title: "Scan Again",
+                    workingTitle: "Scanning…",
+                    symbol: "arrow.clockwise",
+                    operation: .scanning
+                ) {
+                    await model.scan()
+                }
             } else {
                 ForEach(model.discoveredDevices.prefix(4)) { peripheral in
                     Button {
@@ -152,8 +170,36 @@ public struct OnboardingView: View {
                 value: model.state.providers.isEmpty ? "Not loaded" : "\(model.state.providers.count) available",
                 good: model.state.providers.isEmpty == false
             )
-            Button("Refresh Usage") { Task { await model.refreshProviders() } }
+            operationButton(
+                title: "Refresh Usage",
+                workingTitle: "Refreshing…",
+                symbol: "arrow.clockwise",
+                operation: .providerRefresh
+            ) {
+                await model.refreshProviders()
+            }
                 .disabled(model.activeOperations.contains(.providerRefresh))
+        }
+    }
+
+    private func operationButton(
+        title: String,
+        workingTitle: String,
+        symbol: String,
+        operation: AppOperation,
+        action: @escaping @MainActor () async -> Void
+    ) -> some View {
+        Button {
+            Task { await action() }
+        } label: {
+            if model.activeOperations.contains(operation) {
+                HStack(spacing: 7) {
+                    ProgressView().controlSize(.small)
+                    Text(workingTitle)
+                }
+            } else {
+                Label(title, systemImage: symbol)
+            }
         }
     }
 

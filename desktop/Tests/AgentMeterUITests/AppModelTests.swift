@@ -47,8 +47,22 @@ import Testing
 }
 
 @MainActor
-@Test func settingsRemainConfirmedUntilBridgeRefreshCompletes() async {
-    let bridge = FakeBridgeAPI(state: makeState(revision: 7, phase: .connected))
+@Test func settingsPatchAppliesOnlyTheConfirmedSettingsResult() async throws {
+    let initial = makeState(revision: 7, phase: .connected)
+    let confirmed = DeviceSettings(
+        revision: 4,
+        alwaysOn: true,
+        fullView: false,
+        rotationSeconds: 6,
+        brightnessPercent: 80,
+        dimAfterSeconds: 60,
+        screenOffAfterSeconds: 300,
+        alertThresholds: [70, 90],
+        soundEnabled: false,
+        hiddenProviderIds: ["gemini"],
+        providerOrder: ["codex", "claude", "gemini", "cursor"]
+    )
+    let bridge = ConfirmingSettingsBridge(initial: initial, confirmed: confirmed)
     let model = AppModel(bridge: bridge, preferences: makePreferences())
     await model.start()
     var patch = DeviceSettingsPatch(baseRevision: 3)
@@ -58,7 +72,28 @@ import Testing
 
     #expect(model.settingsSyncState == .synced)
     #expect(model.pendingSettingsPatch == nil)
-    #expect(model.state.settings?.alwaysOn == false)
+    #expect(model.state.revision == 7)
+    #expect(model.state.connection == initial.connection)
+    #expect(model.state.settings == confirmed)
+    await model.stop()
+}
+
+@MainActor
+@Test func legacyConnectedDeviceNeverReportsSettingsAsSynced() async {
+    let bridge = FakeBridgeAPI(
+        state: makeState(
+            revision: 7,
+            phase: .connected,
+            managementAvailable: false,
+            includesSettings: false
+        )
+    )
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+
+    await model.start()
+
+    #expect(model.settingsSyncState == .waitingForDevice)
+    #expect(model.state.settings == nil)
     await model.stop()
 }
 
@@ -95,6 +130,20 @@ import Testing
 }
 
 @MainActor
+@Test func changingHistoryRangeReloadsTheSelectedAggregation() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    await model.start()
+
+    await model.loadHistory(.last7Days, now: now)
+
+    #expect(model.historyRange == .last7Days)
+    #expect(await bridge.commandTypes().filter { $0 == "history.query" }.count == 2)
+    await model.stop()
+}
+
+@MainActor
 private func makePreferences() -> AppPreferences {
     let name = "AgentMeterModelTests.\(UUID().uuidString)"
     return AppPreferences(defaults: UserDefaults(suiteName: name)!)
@@ -103,7 +152,9 @@ private func makePreferences() -> AppPreferences {
 private func makeState(
     revision: UInt64,
     phase: ConnectionPhase,
-    peripherals: [PeripheralSummary] = []
+    peripherals: [PeripheralSummary] = [],
+    managementAvailable: Bool? = true,
+    includesSettings: Bool = true
 ) -> ControlState {
     ControlState(
         revision: revision,
@@ -112,22 +163,24 @@ private func makeState(
             selectedDeviceId: "device-1",
             selectedDeviceName: "AgentMeter-A1B2",
             rssi: -42,
-            managementAvailable: true
+            managementAvailable: managementAvailable
         ),
         peripherals: peripherals,
-        settings: DeviceSettings(
-            revision: 3,
-            alwaysOn: false,
-            fullView: false,
-            rotationSeconds: 5,
-            brightnessPercent: 80,
-            dimAfterSeconds: 60,
-            screenOffAfterSeconds: 300,
-            alertThresholds: [70, 90],
-            soundEnabled: false,
-            hiddenProviderIds: ["gemini"],
-            providerOrder: ["codex", "claude", "gemini", "cursor"]
-        ),
+        settings: includesSettings
+            ? DeviceSettings(
+                revision: 3,
+                alwaysOn: false,
+                fullView: false,
+                rotationSeconds: 5,
+                brightnessPercent: 80,
+                dimAfterSeconds: 60,
+                screenOffAfterSeconds: 300,
+                alertThresholds: [70, 90],
+                soundEnabled: false,
+                hiddenProviderIds: ["gemini"],
+                providerOrder: ["codex", "claude", "gemini", "cursor"]
+            )
+            : nil,
         bridge: BridgeStatus(version: "0.1.0", running: true)
     )
 }
@@ -136,4 +189,48 @@ private func allowEventsToDrain() async {
     for _ in 0..<10 {
         await Task.yield()
     }
+}
+
+private actor ConfirmingSettingsBridge: BridgeAPI {
+    private let initial: ControlState
+    private let confirmed: DeviceSettings
+
+    init(initial: ControlState, confirmed: DeviceSettings) {
+        self.initial = initial
+        self.confirmed = confirmed
+    }
+
+    nonisolated func events() -> AsyncThrowingStream<BridgeEvent, Error> {
+        AsyncThrowingStream { _ in }
+    }
+
+    func connect() async throws {}
+
+    func status() async throws -> ControlState {
+        initial
+    }
+
+    func scan() async throws -> [PeripheralSummary] {
+        initial.peripherals
+    }
+
+    func perform(_ command: BridgeCommand) async throws -> BridgeResult {
+        let payload: JSONValue
+        switch command {
+        case .patchSettings:
+            let settingsData = try JSONEncoder().encode(confirmed)
+            let settings = try JSONDecoder().decode(JSONValue.self, from: settingsData)
+            payload = .object([
+                "syncStatus": .string("synced"),
+                "settings": settings,
+            ])
+        case .queryHistory:
+            payload = .object(["usage": .array([])])
+        default:
+            payload = .object([:])
+        }
+        return BridgeResult(id: "settings-test", type: "settings.result", payload: payload)
+    }
+
+    func close() async {}
 }

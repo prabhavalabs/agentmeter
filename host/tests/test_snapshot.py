@@ -1,5 +1,5 @@
 import pytest
-from helpers import dashboard_snapshot
+from helpers import provider_usage
 
 
 @pytest.mark.asyncio
@@ -15,8 +15,10 @@ async def test_collect_device_snapshot_connects_config_to_normalizer() -> None:
     )
 
     class FakeClient:
-        async def fetch_snapshot(self) -> dict[str, object]:
-            return dashboard_snapshot()
+        async def fetch_provider_usages(
+            self, provider_ids: tuple[str, ...]
+        ) -> dict[str, dict[str, object] | None]:
+            return {provider_id: provider_usage(provider_id) for provider_id in provider_ids}
 
     class FakeServer:
         async def __aenter__(self) -> FakeClient:
@@ -36,4 +38,5 @@ async def test_collect_device_snapshot_connects_config_to_normalizer() -> None:
     assert observed_refresh_intervals == [60]
     assert snapshot["messageId"] == 0
     assert [provider["id"] for provider in snapshot["providers"]] == ["codex", "claude"]
+    assert all(len(provider["windows"]) == 2 for provider in snapshot["providers"])
     assert snapshot["display"]["brightnessPercent"] == 55

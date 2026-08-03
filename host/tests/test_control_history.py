@@ -64,6 +64,50 @@ def test_history_records_only_normalized_snapshot_fields(tmp_path) -> None:
     history.close()
 
 
+def test_history_query_returns_last_sample_in_each_requested_bucket(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "session", 3_610, 11, 9_000)
+    history.record_usage("claude", "session", 3_900, 12, 9_000)
+    history.record_usage("claude", "session", 7_250, 18, 9_000)
+
+    assert history.query_usage(since_epoch=3_600, bucket_seconds=3_600) == [
+        {
+            "providerId": "claude",
+            "windowKind": "session",
+            "sampledAtEpoch": 3_900,
+            "usedPercent": 12,
+            "resetAtEpoch": 9_000,
+        },
+        {
+            "providerId": "claude",
+            "windowKind": "session",
+            "sampledAtEpoch": 7_250,
+            "usedPercent": 18,
+            "resetAtEpoch": 9_000,
+        },
+    ]
+    history.close()
+
+
+def test_history_current_cycle_starts_after_latest_observed_reset(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    for sampled_at, percent in (
+        (1_000, 70),
+        (1_300, 82),
+        (1_600, 4),
+        (1_900, 9),
+    ):
+        history.record_usage("claude", "session", sampled_at, percent, 5_000)
+
+    rows = history.query_usage(since_epoch=0, current_cycle=True)
+
+    assert [(row["sampledAtEpoch"], row["usedPercent"]) for row in rows] == [
+        (1_600, 4),
+        (1_900, 9),
+    ]
+    history.close()
+
+
 def test_history_bounds_values_and_clear_removes_every_table(tmp_path) -> None:
     history = HistoryStore(tmp_path / "history.sqlite3")
     with pytest.raises(HistoryError, match="used percent"):
