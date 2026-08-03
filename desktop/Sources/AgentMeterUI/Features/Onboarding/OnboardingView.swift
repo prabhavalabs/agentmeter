@@ -63,6 +63,12 @@ public struct OnboardingView: View {
             message: "The private background bridge reads local agent usage and maintains the single Bluetooth connection to your display."
         ) {
             statusRow("Background bridge", value: bridgeService.state.title, good: bridgeService.state.isUsable)
+            if bridgeService.isCommunityBuild {
+                Text("This community build keeps its bridge running while AgentMeter remains open.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
             if let detail = bridgeService.state.detail {
                 Text(detail)
                     .font(.caption)

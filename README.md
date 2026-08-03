@@ -51,9 +51,10 @@ No separate Arduino, screen, Bluetooth module, breadboard, jumper wires, microSD
 
 ## Quick start
 
-For a release build, the only prerequisites are macOS 14 or later, a Bluetooth-capable Mac, and a
-recent CodexBar installation. The signed application includes its own bridge runtime; Python and
-the source repository are needed only for development.
+For a release build, the only prerequisites are macOS 14 or later, a Bluetooth-capable Apple-silicon
+Mac, and a recent CodexBar installation. The application includes its own bridge runtime; Python
+and the source repository are needed only for development. The current community DMG is ad-hoc
+signed rather than Apple-notarized, so its first launch requires the documented manual approval.
 
 ```bash
 git clone https://github.com/prabhavalabs/agentmeter.git
@@ -100,7 +101,7 @@ open /Applications/AgentMeter.app
 On first launch, the app registers its bundled bridge and walks through Bluetooth, device, and
 provider setup. An older repository-installed bridge is migrated automatically after the bundled
 bridge is ready. See the [macOS companion guide](docs/macos-app.md) for screens, synthetic-data
-development, packaging, and release signing.
+development, community installation, packaging, and release signing.
 
 The first uncached collection or Bluetooth pairing may take up to two minutes. Later updates reuse the bond and connection. Detailed instructions and troubleshooting are in [Setup](docs/setup.md) and [Host bridge](docs/host.md).
 

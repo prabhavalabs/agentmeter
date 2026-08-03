@@ -1,9 +1,9 @@
 # macOS companion app
 
 AgentMeter includes a native SwiftUI companion for macOS 14 or later. It keeps one small menu-bar
-status item available while the main window is closed and controls one bundled background bridge
-over a private Unix socket. The signed release is self-contained and does not require Python, the
-source repository, or Xcode. The app never opens a competing Bluetooth connection.
+status item available while the main window is closed and controls one bundled bridge over a
+private Unix socket. Release builds are self-contained and do not require Python, the source
+repository, or Xcode. The app never opens a competing Bluetooth connection.
 
 ![Agent visibility in light mode](assets/screenshots/macos-agents-light.png)
 
@@ -51,7 +51,26 @@ value.
 
 ## Install a release
 
-Move the signed and notarized app to `/Applications`, then open it:
+The public community DMG is ad-hoc signed and is not notarized by Apple. That means macOS cannot
+identify Prabhava Labs as a verified developer even though the release checksum and code structure
+can be verified. Download both the DMG and its `.sha256` file from the same GitHub release, then
+verify it before installation:
+
+```bash
+shasum -a 256 -c AgentMeter-0.1.0-macOS-arm64-community.dmg.sha256
+```
+
+Open the DMG, drag AgentMeter to **Applications**, then Control-click AgentMeter and choose
+**Open**. Confirm **Open** in the security dialog. Use this exception only for a release downloaded
+from the project's official GitHub repository with a matching checksum.
+
+The community build runs its bundled bridge while AgentMeter is open. Closing the main window
+keeps the menu-bar app and bridge active; choosing **Quit AgentMeter** stops both. A future
+Developer ID build can instead register the bridge as an independently managed login item. To
+start the community build automatically, add AgentMeter under **System Settings → General → Login
+Items**; the app provides a shortcut to that page.
+
+For a Developer ID signed and notarized build, move the app to `/Applications` and open it normally:
 
 ```bash
 ditto AgentMeter.app /Applications/AgentMeter.app
@@ -113,8 +132,18 @@ CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 ```
 
 Developer ID credentials, notarization submission, and stapling are release-owner operations. An
-ad-hoc signature is sufficient for synthetic-data interface development, but it cannot authorize
-the managed background bridge and is not suitable for public distribution.
+ad-hoc package is produced as an explicitly labelled community build. It runs the bridge as a child
+of the menu-bar application instead of attempting to authorize the managed background service.
+
+Build and verify the community DMG without an Apple Developer account:
+
+```bash
+make desktop-community-dmg
+```
+
+This writes an architecture-labelled DMG and matching SHA-256 file under `desktop/dist`. The
+verification step checks the checksum, disk image, ad-hoc code signatures, bundle version,
+distribution mode, bundled bridge version, and expected Gatekeeper rejection.
 
 After packaging with a Developer ID Application identity, notarize and create the release archive:
 

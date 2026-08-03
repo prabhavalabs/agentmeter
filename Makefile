@@ -2,7 +2,7 @@ PYTHON ?= python3.11
 VENV ?= .venv
 PIO ?= $(VENV)/bin/pio
 
-.PHONY: setup lint test host-test desktop-test desktop-build desktop-app firmware-test firmware clean
+.PHONY: setup lint test host-test desktop-test desktop-build desktop-app desktop-community-dmg firmware-test firmware clean
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -26,6 +26,11 @@ desktop-build:
 
 desktop-app:
 	desktop/scripts/package-app.sh
+
+desktop-community-dmg:
+	CODE_SIGN_IDENTITY=- desktop/scripts/package-app.sh
+	desktop/scripts/create-community-dmg.sh
+	desktop/scripts/verify-community-release.sh
 
 firmware-test:
 	$(PIO) test -d firmware -e native
