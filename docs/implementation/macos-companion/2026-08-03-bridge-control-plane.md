@@ -208,8 +208,7 @@ GATT writes through one lock.
 
 ```python
 def test_fragment_management_request_uses_type_02_and_2048_limit() -> None:
-    frames = fragment_management_payload(b'{"schemaVersion":1}', message_id=17,
-                                         max_write_size=64)
+    frames = fragment_management_payload(b'{"schemaVersion":1}', message_id=17, max_write_size=64)
 
     assert frames[0][0:2] == bytes((1, 0x02))
     assert int.from_bytes(frames[0][2:4], "little") == 17
@@ -438,8 +437,12 @@ fixtures through `desktop-ipc-v1.schema.json` in `test_schema.py`.
 @pytest.mark.asyncio
 async def test_ipc_socket_is_private_and_streams_state_events(tmp_path) -> None:
     api = RecordingControlApi()
-    server = IpcServer(tmp_path / "run" / "bridge.sock", api=api,
-                       current_uid=lambda: 501, peer_uid=lambda _socket: 501)
+    server = IpcServer(
+        tmp_path / "run" / "bridge.sock",
+        api=api,
+        current_uid=lambda: 501,
+        peer_uid=lambda _socket: 501,
+    )
     await server.start()
     reader, writer = await asyncio.open_unix_connection(server.path)
     writer.write(b'{"schemaVersion":1,"id":"1","type":"events.subscribe","payload":{}}\n')
@@ -544,9 +547,7 @@ git commit -m "feat(host): add private desktop IPC"
 ```python
 @pytest.mark.asyncio
 async def test_controller_connects_syncs_and_publishes_confirmed_state() -> None:
-    transport = FakeManagedTransport(
-        device_state=device_state_fixture(settings_revision=8)
-    )
+    transport = FakeManagedTransport(device_state=device_state_fixture(settings_revision=8))
     controller = make_controller(transport=transport)
 
     await controller.connect("peripheral-1")
