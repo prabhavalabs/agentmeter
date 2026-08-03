@@ -1,0 +1,18 @@
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "AgentMeterDesktop",
+    platforms: [.macOS(.v14)],
+    products: [
+        .library(name: "AgentMeterCore", targets: ["AgentMeterCore"]),
+    ],
+    targets: [
+        .target(name: "AgentMeterCore"),
+        .testTarget(
+            name: "AgentMeterCoreTests",
+            dependencies: ["AgentMeterCore"],
+            resources: [.copy("Fixtures")]
+        ),
+    ]
+)

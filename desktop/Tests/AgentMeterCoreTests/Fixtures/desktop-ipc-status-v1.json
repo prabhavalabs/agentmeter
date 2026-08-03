@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "id": "request-1",
+  "type": "status.result",
+  "status": "ok",
+  "payload": {
+    "revision": 12,
+    "connection": {
+      "phase": "connected",
+      "selectedDeviceId": "device-1",
+      "selectedDeviceName": "AgentMeter-A1B2",
+      "rssi": -42,
+      "managementAvailable": true,
+      "nextRetryEpoch": null,
+      "errorCode": null
+    },
+    "peripherals": [],
+    "information": {
+      "model": "waveshare-amoled-216",
+      "name": "AgentMeter-A1B2",
+      "firmwareVersion": "0.1.0",
+      "hardwareRevision": "1",
+      "snapshotSchemaVersion": 1,
+      "managementSchemaVersion": 1,
+      "capabilities": {
+        "settings": true,
+        "identify": true,
+        "restart": true,
+        "forget": true,
+        "brightness": true,
+        "battery": true,
+        "vbusVoltage": true,
+        "inputCurrent": false
+      }
+    },
+    "telemetry": {
+      "powerSource": "usb",
+      "usbPresent": true,
+      "batteryPresent": false,
+      "charging": null,
+      "batteryPercent": null,
+      "batteryVoltageMv": null,
+      "vbusVoltageMv": 5012,
+      "inputCurrentMa": null,
+      "uptimeSeconds": 3600,
+      "freeHeapBytes": 183520,
+      "minimumFreeHeapBytes": 172408,
+      "displayOn": true,
+      "displayDimmed": false,
+      "brightnessPercent": 55,
+      "boardTemperatureC": null
+    },
+    "settings": {
+      "revision": 8,
+      "alwaysOn": false,
+      "fullView": false,
+      "rotationSeconds": 3,
+      "brightnessPercent": 55,
+      "dimAfterSeconds": 300,
+      "screenOffAfterSeconds": 1800,
+      "alertThresholds": [75, 90],
+      "soundEnabled": false,
+      "hiddenProviderIds": ["gemini"],
+      "providerOrder": ["codex", "claude", "cursor"]
+    },
+    "providers": [
+      {
+        "id": "codex",
+        "name": "Codex",
+        "status": "ok",
+        "windows": [
+          {
+            "kind": "session",
+            "label": "Session",
+            "usedPercent": 28,
+            "resetAtEpoch": 1785614400
+          }
+        ],
+        "updatedAtEpoch": 1785607200,
+        "errorCode": null
+      }
+    ],
+    "bridge": {
+      "version": "0.1.0",
+      "running": true,
+      "lastProviderRefreshEpoch": 1785607200,
+      "lastDeviceSyncEpoch": 1785607201,
+      "lastErrorCode": null,
+      "providerHealth": { "codex": "ok" }
+    }
+  }
+}
