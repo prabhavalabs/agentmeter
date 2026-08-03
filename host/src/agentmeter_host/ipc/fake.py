@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agentmeter_host import __version__
 from agentmeter_host.control.events import ControlEvent, EventBroker
 from agentmeter_host.ipc.protocol import IpcCommandError, IpcRequest
 from agentmeter_host.ipc.server import IpcServer
@@ -29,6 +30,7 @@ class FakeControlApi:
         self.scenario = scenario
         self.events = EventBroker()
         self.state = self._load("desktop-ipc-status-v1.json")["payload"]
+        self.state["bridge"]["version"] = __version__
         self.settings_result = self._load("desktop-ipc-settings-v1.json")["payload"]
         self._apply_scenario()
 
@@ -67,7 +69,7 @@ class FakeControlApi:
         command = request.type
         if command == "hello":
             return {
-                "bridgeVersion": "0.1.0",
+                "bridgeVersion": __version__,
                 "ipcSchemaVersion": 1,
                 "capabilities": ["fakeServer"],
                 "scenario": self.scenario,
@@ -127,7 +129,7 @@ class FakeControlApi:
             return {"usage": []}
         if command == "diagnostics.get":
             return {
-                "bridgeVersion": "0.1.0",
+                "bridgeVersion": __version__,
                 "ipcSchemaVersion": 1,
                 "phase": self.state["connection"]["phase"],
                 "managementAvailable": self.state["connection"]["managementAvailable"],

@@ -57,7 +57,7 @@ can be verified. Download both the DMG and its `.sha256` file from the same GitH
 verify it before installation:
 
 ```bash
-shasum -a 256 -c AgentMeter-0.1.0-macOS-arm64-community.dmg.sha256
+shasum -a 256 -c AgentMeter-0.1.1-macOS-arm64-community.dmg.sha256
 ```
 
 Open the DMG, drag AgentMeter to **Applications**, then Control-click AgentMeter and choose

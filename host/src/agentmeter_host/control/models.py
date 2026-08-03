@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
+from agentmeter_host import __version__
+
 
 class ConnectionPhase(StrEnum):
     STOPPED = "stopped"
@@ -199,7 +201,7 @@ class ProviderSummary:
 
 @dataclass(frozen=True, slots=True)
 class BridgeStatus:
-    version: str = "0.1.0"
+    version: str = __version__
     running: bool = False
     last_provider_refresh_epoch: int | None = None
     last_device_sync_epoch: int | None = None

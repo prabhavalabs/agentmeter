@@ -81,7 +81,7 @@ public struct ControlState: Codable, Equatable, Sendable {
     public static let empty = ControlState(
         revision: 0,
         connection: ConnectionState(phase: .stopped),
-        bridge: BridgeStatus(version: "0.1.0", running: false)
+        bridge: BridgeStatus(version: "Unavailable", running: false)
     )
 }
 

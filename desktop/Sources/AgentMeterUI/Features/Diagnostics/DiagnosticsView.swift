@@ -168,7 +168,11 @@ public struct DiagnosticsView: View {
 
     private var softwareRows: [(String, String)] {
         [
-            ("App", "0.1.0"),
+            (
+                "App",
+                Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                    ?? "Development"
+            ),
             ("Bridge", model.state.bridge.version),
             ("Firmware", model.state.information?.firmwareVersion ?? "Unavailable"),
             ("IPC schema", model.diagnostics.map { String($0.ipcSchemaVersion) } ?? "1"),

@@ -10,7 +10,7 @@ ICONSET=${PACKAGE_WORK}/AppIcon.iconset
 ICON_SOURCE=${DESKTOP_ROOT}/Resources/AppIcon-1024.png
 SIGNING_IDENTITY=${CODE_SIGN_IDENTITY:--}
 BRIDGE_PYTHON=${AGENTMETER_PACKAGE_PYTHON:-${DESKTOP_ROOT:h}/.venv/bin/python}
-APP_VERSION=${AGENTMETER_APP_VERSION:-0.1.0}
+APP_VERSION=${AGENTMETER_APP_VERSION:-0.1.1}
 APP_BUILD=${AGENTMETER_APP_BUILD:-1}
 if [[ "${SIGNING_IDENTITY}" == "-" ]]; then
   DISTRIBUTION_MODE=${AGENTMETER_DISTRIBUTION_MODE:-community}
@@ -19,6 +19,14 @@ else
 fi
 if [[ "${DISTRIBUTION_MODE}" != "community" && "${DISTRIBUTION_MODE}" != "managed" ]]; then
   echo "AGENTMETER_DISTRIBUTION_MODE must be 'community' or 'managed'." >&2
+  exit 1
+fi
+if [[ ! "${APP_VERSION}" =~ "^[0-9]+\.[0-9]+\.[0-9]+$" ]]; then
+  echo "AGENTMETER_APP_VERSION must use numeric major.minor.patch format." >&2
+  exit 1
+fi
+if [[ ! "${APP_BUILD}" =~ "^[1-9][0-9]*$" ]]; then
+  echo "AGENTMETER_APP_BUILD must be a positive integer." >&2
   exit 1
 fi
 
@@ -35,6 +43,9 @@ swift build --package-path "${DESKTOP_ROOT}" --configuration release
 
 rm -rf "${PACKAGE_WORK}"
 mkdir -p "${ICONSET}"
+VERSION_HOOK=${PACKAGE_WORK}/agentmeter-version.py
+print -r -- "import agentmeter_host
+agentmeter_host.__version__ = \"${APP_VERSION}\"" > "${VERSION_HOOK}"
 sips -z 16 16 "${ICON_SOURCE}" --out "${ICONSET}/icon_16x16.png" >/dev/null
 sips -z 32 32 "${ICON_SOURCE}" --out "${ICONSET}/icon_16x16@2x.png" >/dev/null
 sips -z 32 32 "${ICON_SOURCE}" --out "${ICONSET}/icon_32x32.png" >/dev/null
@@ -59,6 +70,7 @@ fi
   --distpath "${PACKAGE_WORK}/bridge-dist" \
   --workpath "${PACKAGE_WORK}/bridge-build" \
   --specpath "${PACKAGE_WORK}" \
+  --runtime-hook "${VERSION_HOOK}" \
   --noupx \
   --exclude-module _pytest \
   --exclude-module pytest \

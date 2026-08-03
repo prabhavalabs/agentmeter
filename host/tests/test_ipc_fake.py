@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from agentmeter_host import __version__
 from agentmeter_host.ipc.fake import SCENARIOS, FakeControlApi, run_fake_server
 from agentmeter_host.ipc.protocol import IpcCommandError, IpcRequest
 
@@ -21,6 +22,12 @@ def test_fake_scenarios_are_deterministic_and_private(scenario: str) -> None:
 def test_fake_server_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="unknown fake-server scenario"):
         FakeControlApi("unknown")
+
+
+def test_fake_server_reports_the_current_bridge_version() -> None:
+    api = FakeControlApi("connected-usb")
+
+    assert api.state["bridge"]["version"] == __version__
 
 
 @pytest.mark.asyncio
