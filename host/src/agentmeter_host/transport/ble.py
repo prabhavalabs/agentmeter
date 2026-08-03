@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from bleak import BleakClient, BleakScanner
+from bleak.exc import BleakBluetoothNotAvailableError, BleakBluetoothNotAvailableReason
 
 from agentmeter_host.control.models import PeripheralSummary
 from agentmeter_host.transport.management import (
@@ -43,9 +44,16 @@ _ACK_STATUS_MESSAGES = {
 class TransportError(RuntimeError):
     """A snapshot could not be delivered to the display."""
 
-    def __init__(self, message: str, *, retryable: bool) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool,
+        code: str = "bluetoothError",
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +110,24 @@ class BleakBackend:
                 return_adv=True,
                 service_uuids=[SERVICE_UUID],
             )
+        except BleakBluetoothNotAvailableError as error:
+            denied = {
+                BleakBluetoothNotAvailableReason.DENIED_BY_USER,
+                BleakBluetoothNotAvailableReason.DENIED_BY_SYSTEM,
+                BleakBluetoothNotAvailableReason.DENIED_BY_UNKNOWN,
+            }
+            code = (
+                "bluetoothPermissionDenied"
+                if error.reason in denied
+                else "bluetoothPoweredOff"
+                if error.reason is BleakBluetoothNotAvailableReason.POWERED_OFF
+                else "bluetoothUnavailable"
+            )
+            raise TransportError(
+                "Bluetooth is not available for AgentMeter",
+                retryable=True,
+                code=code,
+            ) from error
         except Exception as error:
             raise TransportError(
                 "Could not scan for AgentMeter displays", retryable=True
@@ -153,6 +179,7 @@ class BleakBackend:
                 raise TransportError(
                     f"No AgentMeter display named {self._name_prefix!r} was discovered",
                     retryable=True,
+                    code="deviceNotFound",
                 )
             device = self._discovered[selected.identifier][0]
             client = self._client_factory(device, disconnected_callback=self._disconnected)
@@ -244,7 +271,9 @@ class BleakBackend:
             raise TransportError("AgentMeter Bluetooth display is not connected", retryable=True)
         return self._client
 
-    def _disconnected(self, _client: object) -> None:
+    def _disconnected(self, client: object) -> None:
+        if client is not self._client:
+            return
         self._client = None
         self.management_available = False
         if self._disconnect_callback is not None:
@@ -516,6 +545,7 @@ class BleTransport:
             self._ack.set_exception(error)
         if self._management_result is not None and not self._management_result.done():
             self._management_result.set_exception(error)
+        self._enqueue_device_event({"type": "transport.disconnected", "payload": {}})
 
     async def close(self) -> None:
         self._closed = True

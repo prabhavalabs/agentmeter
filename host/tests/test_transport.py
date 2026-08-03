@@ -262,6 +262,28 @@ async def test_bleak_backend_reports_missing_display_as_retryable() -> None:
 
 
 @pytest.mark.asyncio
+async def test_bleak_backend_maps_bluetooth_permission_without_private_details() -> None:
+    from agentmeter_host.transport.ble import BleakBackend, TransportError
+    from bleak.exc import BleakBluetoothNotAvailableError, BleakBluetoothNotAvailableReason
+
+    class DeniedScanner:
+        @staticmethod
+        async def discover(**_kwargs):
+            raise BleakBluetoothNotAvailableError(
+                "OS-specific private detail",
+                BleakBluetoothNotAvailableReason.DENIED_BY_USER,
+            )
+
+    backend = BleakBackend(scanner=DeniedScanner)
+
+    with pytest.raises(TransportError) as error:
+        await backend.scan()
+
+    assert error.value.code == "bluetoothPermissionDenied"
+    assert "private detail" not in str(error.value)
+
+
+@pytest.mark.asyncio
 async def test_scan_returns_sorted_agentmeter_peripherals_without_connecting() -> None:
     from agentmeter_host.transport.ble import BleakBackend
 

@@ -28,6 +28,14 @@ _PATCH_FIELDS = frozenset(
 )
 
 
+def _is_valid_threshold(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and 1 <= value <= 100
+
+
+def _is_valid_provider_id(value: str) -> bool:
+    return _PROVIDER_ID_PATTERN.fullmatch(value) is not None
+
+
 class ControlSettingsError(ValueError):
     """The private host control-state file is invalid or unavailable."""
 
@@ -38,16 +46,65 @@ class PendingSettingsPatch:
     values: dict[str, Any]
 
     def __post_init__(self) -> None:
-        if isinstance(self.base_revision, bool) or not 0 <= self.base_revision <= 0xFFFFFFFF:
+        if (
+            isinstance(self.base_revision, bool)
+            or not isinstance(self.base_revision, int)
+            or not 0 <= self.base_revision <= 0xFFFFFFFF
+        ):
             raise ControlSettingsError("pending patch base revision is invalid")
-        if not self.values or not set(self.values).issubset(_PATCH_FIELDS):
+        if (
+            not isinstance(self.values, dict)
+            or not self.values
+            or not set(self.values).issubset(_PATCH_FIELDS)
+        ):
             raise ControlSettingsError("pending patch contains invalid settings")
+        self._validate_values()
         try:
-            encoded = json.dumps(self.values, separators=(",", ":"))
+            encoded = json.dumps(self.values, separators=(",", ":"), allow_nan=False)
         except (TypeError, ValueError) as error:
             raise ControlSettingsError("pending patch must be JSON serializable") from error
         if len(encoded.encode()) > 2_048:
             raise ControlSettingsError("pending patch exceeds 2048 bytes")
+
+    def _validate_values(self) -> None:
+        for key in ("alwaysOn", "fullView", "soundEnabled"):
+            if key in self.values and not isinstance(self.values[key], bool):
+                raise ControlSettingsError(f"{key} must be a boolean")
+        limits = {
+            "rotationSeconds": (3, 60),
+            "brightnessPercent": (1, 100),
+            "dimAfterSeconds": (30, 3_600),
+            "screenOffAfterSeconds": (60, 86_400),
+        }
+        for key, (minimum, maximum) in limits.items():
+            value = self.values.get(key)
+            if key in self.values and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not minimum <= value <= maximum
+            ):
+                raise ControlSettingsError(f"{key} is outside its supported range")
+        if "alertThresholds" in self.values:
+            thresholds = self.values["alertThresholds"]
+            if (
+                not isinstance(thresholds, list)
+                or not 1 <= len(thresholds) <= 3
+                or not all(_is_valid_threshold(value) for value in thresholds)
+                or thresholds != sorted(set(thresholds))
+            ):
+                raise ControlSettingsError("alertThresholds is invalid")
+        for key in ("hiddenProviderIds", "providerOrder"):
+            if key not in self.values:
+                continue
+            provider_ids = self.values[key]
+            if (
+                not isinstance(provider_ids, list)
+                or len(provider_ids) > 8
+                or not all(isinstance(value, str) for value in provider_ids)
+                or len(set(provider_ids)) != len(provider_ids)
+                or not all(_is_valid_provider_id(value) for value in provider_ids)
+            ):
+                raise ControlSettingsError(f"{key} is invalid")
 
     def to_document(self) -> dict[str, object]:
         return {"baseRevision": self.base_revision, "values": self.values}
