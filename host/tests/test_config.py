@@ -107,3 +107,12 @@ def test_load_config_reports_missing_file(tmp_path) -> None:
 
     with pytest.raises(ConfigError, match=f"could not load configuration {config_path}"):
         load_config(config_path)
+
+
+def test_control_plane_paths_share_application_support(monkeypatch, tmp_path) -> None:
+    import agentmeter_host.config as config
+
+    monkeypatch.setattr(config, "user_data_path", lambda *_args: tmp_path / "AgentMeter")
+
+    assert config.default_control_settings_path() == tmp_path / "AgentMeter/control-state-v1.json"
+    assert config.default_history_path() == tmp_path / "AgentMeter/history.sqlite3"

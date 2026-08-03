@@ -5,11 +5,25 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from platformdirs import user_data_path
+
 from agentmeter_host.normalization import DisplayPreferences
 
 
 class ConfigError(ValueError):
     """AgentMeter configuration is missing or invalid."""
+
+
+def application_support_path() -> Path:
+    return user_data_path("AgentMeter", "Prabhava Labs")
+
+
+def default_control_settings_path() -> Path:
+    return application_support_path() / "control-state-v1.json"
+
+
+def default_history_path() -> Path:
+    return application_support_path() / "history.sqlite3"
 
 
 @dataclass(frozen=True)
