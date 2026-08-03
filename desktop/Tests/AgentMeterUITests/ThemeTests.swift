@@ -22,3 +22,11 @@ import Testing
     #expect(Set(heights).count == 1)
     #expect(heights.allSatisfy { $0 >= 260 })
 }
+
+@Test func menuNavigationLabelsAreDistinctAndCompact() {
+    let titles = NavigationSection.allCases.map(\.menuTitle)
+
+    #expect(Set(titles).count == NavigationSection.allCases.count)
+    #expect(titles.allSatisfy { $0.isEmpty == false })
+    #expect(titles.allSatisfy { $0.count <= 24 })
+}
