@@ -26,6 +26,7 @@ agentmeter doctor
 agentmeter snapshot --pretty
 agentmeter send
 agentmeter run
+agentmeter ipc-path
 agentmeter service install --source .
 agentmeter service status
 agentmeter service uninstall
@@ -34,7 +35,8 @@ agentmeter service uninstall
 - `doctor` checks Python, required libraries, CodexBar, and configuration.
 - `snapshot` collects and prints one privacy-filtered model without contacting the display.
 - `send` collects, sends, waits for ACK, and exits.
-- `run` repeats collection and delivery until interrupted.
+- `run` starts the observable bridge, owns the Bluetooth connection, and serves the native app.
+- `ipc-path` prints the private Unix socket used by the native app.
 - `service` installs or manages the isolated macOS launch-at-login bridge.
 
 A multi-provider snapshot can take about a minute. The configured poll interval begins after each completed attempt, so provider refresh time can still add to the interval between device updates. Countdown rendering and full-view rotation continue locally on the ESP32 while the host is idle.
@@ -43,13 +45,19 @@ A multi-provider snapshot can take about a minute. The configured poll interval 
 
 The bridge scans for the AgentMeter service and the configured device-name prefix, connects, subscribes to status notifications, and uses the largest safe write size reported by macOS. A message is successful only when its matching ACK reports status zero.
 
-Transient scan, connection, write, and ACK-timeout errors are retried. The continuous bridge reports the error and continues polling rather than exiting. After one successful connection it keeps the link open for later updates.
+Transient scan, connection, write, ACK-timeout, and unexpected-disconnect errors use a bounded reconnect delay. Bluetooth-off and permission-denied states have separate stable codes. After one successful connection, the bridge keeps the link open for snapshots, device telemetry, and settings commands. Legacy firmware without management characteristics continues receiving snapshots and is labeled explicitly as management unavailable.
+
+## Desktop control plane
+
+The continuous bridge exposes newline-delimited IPC schema version 1 on the path printed by `agentmeter ipc-path`. The runtime directory is mode `0700`, the socket is mode `0600`, and the server verifies the peer user before decoding a request. It never opens a TCP port.
+
+The native app receives bounded state events instead of polling. Device discovery, connect/disconnect, identify, settings, provider refresh, history, diagnostics, sleep/wake, and bridge restart all pass through this socket. The app does not open a second Bluetooth connection or start another CodexBar collector.
 
 ## Alerts
 
 The bridge tracks the highest crossed threshold for each provider/window pair during its process lifetime. It emits one short event at a time, prioritizing the highest simultaneous crossing. Staying above a threshold does not repeat an alert; falling below it arms that threshold again.
 
-Restarting the bridge clears this in-memory history and may show one current high-usage alert again. No usage history database is created.
+Restarting the bridge clears threshold-crossing memory and may show one current high-usage alert again. The bridge keeps a separate, bounded 30-day SQLite trend history with one sample per provider/window/five-minute bucket. It stores percentages and reset times only and can be cleared from the desktop app.
 
 ## Background installation
 
@@ -57,6 +65,8 @@ Restarting the bridge clears this in-memory history and may show one current hig
 
 - Runtime: `~/Library/Application Support/AgentMeter/venv`
 - Logs: `~/Library/Application Support/AgentMeter/logs`
+- Control state: `~/Library/Application Support/AgentMeter/control-state-v1.json`
+- Bounded history: `~/Library/Application Support/AgentMeter/history.sqlite3`
 - LaunchAgent: `~/Library/LaunchAgents/com.prabhavalabs.agentmeter.plist`
 - Configuration: `~/.config/AgentMeter/config.toml`
 
@@ -78,5 +88,5 @@ AgentMeter suppresses CodexBar child output because provider tools can include p
 - **Unexpected Claude plugin processes:** reinstall the background bridge from the current AgentMeter source. AgentMeter's Claude probe must use safe mode and must not start user hooks, plugins, or MCP servers. Existing plugin daemons started by an interactive Claude session are outside AgentMeter and may remain as a single healthy instance.
 - **No display discovered:** confirm Bluetooth is enabled and the screen shows its `AgentMeter-XXXX` waiting state. Hold the top button for five seconds if an old bond must be cleared.
 - **First send times out:** approve the macOS Bluetooth prompt, wait for pairing to finish, and retry once.
-- **Background bridge appears idle:** run `agentmeter service status`, then inspect `bridge-error.log`. An uncached collection can take about a minute before BLE activity begins.
+- **Background bridge appears idle:** run `agentmeter service status`. It reports launchd state and desktop-socket reachability separately. Then inspect `bridge-error.log`; an uncached collection can take about a minute before BLE activity begins.
 - **USB serial failure:** stop the background service, confirm the exact ESP32 port with `pio device list`, and ensure no serial monitor owns it.

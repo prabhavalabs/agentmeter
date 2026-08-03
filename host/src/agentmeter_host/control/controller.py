@@ -141,6 +141,7 @@ class BridgeController:
         self._sleeping = False
         self._closed = False
         self.restart_requested = False
+        self.restart_event = asyncio.Event()
         self._diagnostic_events: deque[dict[str, object]] = deque(maxlen=50)
         self.state = ControlState(
             connection=ConnectionState(
@@ -713,6 +714,7 @@ class BridgeController:
         if command == "bridge.restart":
             self._require_empty(request)
             self.restart_requested = True
+            self.restart_event.set()
             return {"accepted": True}
         if command == "system.sleep":
             self._require_empty(request)
@@ -744,6 +746,7 @@ class BridgeController:
             return
         self._closed = True
         await self._transport.close()
+        self._history.close()
 
     def _is_connected(self) -> bool:
         connection = self.state.connection

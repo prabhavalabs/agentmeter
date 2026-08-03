@@ -83,13 +83,35 @@ def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
 
     calls = []
 
-    async def fake_run_bridge(config, *, once, on_error):
-        calls.append((config.provider_ids, once, on_error is not None))
+    async def fake_run_application(config, *, ipc_path, stop_event):
+        calls.append((config.provider_ids, ipc_path, stop_event.is_set()))
 
-    monkeypatch.setattr(cli, "run_bridge", fake_run_bridge, raising=False)
+    monkeypatch.setattr(cli, "run_desktop_application", fake_run_application, raising=False)
 
-    assert main(["run", "--config", str(ROOT / "config.example.toml")]) == 0
-    assert calls == [(("codex", "claude", "gemini", "cursor"), False, True)]
+    ipc_path = Path("/tmp/agentmeter-test.sock")
+    assert (
+        main(
+            [
+                "run",
+                "--config",
+                str(ROOT / "config.example.toml"),
+                "--ipc-path",
+                str(ipc_path),
+            ]
+        )
+        == 0
+    )
+    assert calls == [(("codex", "claude", "gemini", "cursor"), ipc_path, False)]
+
+
+def test_ipc_path_command_prints_runtime_socket(monkeypatch, tmp_path, capsys) -> None:
+    import agentmeter_host.cli as cli
+
+    expected = tmp_path / "bridge.sock"
+    monkeypatch.setattr(cli, "default_ipc_path", lambda: expected)
+
+    assert main(["ipc-path"]) == 0
+    assert capsys.readouterr().out.strip() == str(expected)
 
 
 def test_service_install_uses_requested_source(monkeypatch, tmp_path, capsys) -> None:
@@ -134,13 +156,19 @@ def test_service_status_reports_loaded_launch_agent(monkeypatch, tmp_path, capsy
                     lambda _home: type(
                         "Paths",
                         (),
-                        {"stderr_log": tmp_path / "bridge-error.log"},
+                        {
+                            "stderr_log": tmp_path / "bridge-error.log",
+                            "ipc_socket": tmp_path / "bridge.sock",
+                        },
                     )()
                 )
             },
         ),
         raising=False,
     )
+    monkeypatch.setattr(cli, "service_ipc_is_reachable", lambda _path: True)
 
     assert main(["service", "status"]) == 0
-    assert "AgentMeter background bridge: running" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "AgentMeter background bridge: running" in output
+    assert "Desktop connection: ready" in output

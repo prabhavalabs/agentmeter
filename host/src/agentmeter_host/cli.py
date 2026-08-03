@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import shutil
+import signal
 import sys
 from collections.abc import Sequence
 from importlib.util import find_spec
@@ -12,8 +13,11 @@ from pathlib import Path
 from platformdirs import user_config_path
 
 from agentmeter_host import __version__
+from agentmeter_host.application import run_desktop_application
 from agentmeter_host.codexbar import CodexBarError
 from agentmeter_host.config import ConfigError, load_config
+from agentmeter_host.ipc.fake import SCENARIOS, run_fake_server
+from agentmeter_host.ipc.server import default_ipc_path
 from agentmeter_host.normalization import NormalizationError
 from agentmeter_host.protocol import DeviceProtocolError, encode_device_snapshot
 from agentmeter_host.runtime import run_bridge
@@ -21,6 +25,7 @@ from agentmeter_host.service import (
     ServiceError,
     ServicePaths,
     install_service,
+    service_ipc_is_reachable,
     service_is_loaded,
     uninstall_service,
 )
@@ -61,6 +66,25 @@ def build_parser() -> argparse.ArgumentParser:
             default=default_config_path(),
             help="Path to the AgentMeter TOML configuration",
         )
+        if command == "run":
+            bridge_parser.add_argument(
+                "--ipc-path",
+                type=Path,
+                default=default_ipc_path(),
+                help="Private Unix socket used by the desktop application",
+            )
+    subparsers.add_parser("ipc-path", help="Print the desktop bridge socket path")
+    fake_parser = subparsers.add_parser(
+        "fake-server",
+        help="Run a deterministic bridge for desktop interface development",
+    )
+    fake_parser.add_argument("--scenario", choices=SCENARIOS, required=True)
+    fake_parser.add_argument(
+        "--ipc-path",
+        type=Path,
+        default=default_ipc_path(),
+        help="Private Unix socket used by the desktop application",
+    )
     service_parser = subparsers.add_parser(
         "service", help="Install or manage the macOS background bridge"
     )
@@ -127,14 +151,34 @@ def run_snapshot(config_path: Path, *, pretty: bool) -> int:
     return 0
 
 
-def run_bridge_command(config_path: Path, *, once: bool) -> int:
+def run_bridge_command(
+    config_path: Path,
+    *,
+    once: bool,
+    ipc_path: Path | None = None,
+) -> int:
     try:
         config = load_config(config_path)
 
         def report(error: Exception) -> None:
             print(f"AgentMeter: {error}", file=sys.stderr)
 
-        asyncio.run(run_bridge(config, once=once, on_error=report))
+        if once:
+            asyncio.run(run_bridge(config, once=True, on_error=report))
+        else:
+
+            async def run_application() -> None:
+                stop_event = asyncio.Event()
+                loop = asyncio.get_running_loop()
+                for active_signal in (signal.SIGINT, signal.SIGTERM):
+                    loop.add_signal_handler(active_signal, stop_event.set)
+                await run_desktop_application(
+                    config,
+                    ipc_path=ipc_path,
+                    stop_event=stop_event,
+                )
+
+            asyncio.run(run_application())
     except (
         ConfigError,
         CodexBarError,
@@ -142,6 +186,25 @@ def run_bridge_command(config_path: Path, *, once: bool) -> int:
         DeviceProtocolError,
         TransportError,
     ) as error:
+        print(f"AgentMeter: {error}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 0
+    return 0
+
+
+def run_fake_server_command(scenario: str, ipc_path: Path) -> int:
+    try:
+
+        async def execute() -> None:
+            stop_event = asyncio.Event()
+            loop = asyncio.get_running_loop()
+            for active_signal in (signal.SIGINT, signal.SIGTERM):
+                loop.add_signal_handler(active_signal, stop_event.set)
+            await run_fake_server(scenario, ipc_path, stop_event)
+
+        asyncio.run(execute())
+    except (OSError, ValueError) as error:
         print(f"AgentMeter: {error}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
@@ -165,9 +228,12 @@ def run_service_command(action: str, *, source: Path | None = None) -> int:
             return 0
         paths = ServicePaths.for_home(Path.home())
         loaded = service_is_loaded()
+        reachable = service_ipc_is_reachable(paths.ipc_socket)
         print(f"AgentMeter background bridge: {'running' if loaded else 'stopped'}")
+        print(f"Desktop connection: {'ready' if reachable else 'unavailable'}")
+        print(f"IPC socket: {paths.ipc_socket}")
         print(f"Error log: {paths.stderr_log}")
-        return 0 if loaded else 1
+        return 0 if loaded and reachable else 1
     except ServiceError as error:
         print(f"AgentMeter: {error}", file=sys.stderr)
         return 1
@@ -184,7 +250,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "send":
         return run_bridge_command(args.config, once=True)
     if args.command == "run":
-        return run_bridge_command(args.config, once=False)
+        return run_bridge_command(args.config, once=False, ipc_path=args.ipc_path)
+    if args.command == "ipc-path":
+        print(default_ipc_path())
+        return 0
+    if args.command == "fake-server":
+        return run_fake_server_command(args.scenario, args.ipc_path)
     if args.command == "service":
         return run_service_command(
             args.service_action,

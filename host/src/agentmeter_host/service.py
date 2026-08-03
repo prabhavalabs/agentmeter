@@ -3,11 +3,14 @@ from __future__ import annotations
 import os
 import plistlib
 import shutil
+import socket
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from agentmeter_host.ipc.server import default_ipc_path
 
 LABEL = "com.prabhavalabs.agentmeter"
 
@@ -24,6 +27,7 @@ class ServicePaths:
     config: Path
     stdout_log: Path
     stderr_log: Path
+    ipc_socket: Path
 
     @classmethod
     def for_home(cls, home: Path) -> ServicePaths:
@@ -36,6 +40,7 @@ class ServicePaths:
             config=home / ".config/AgentMeter/config.toml",
             stdout_log=logs / "bridge.log",
             stderr_log=logs / "bridge-error.log",
+            ipc_socket=default_ipc_path(),
         )
 
 
@@ -47,6 +52,8 @@ def launch_agent_document(paths: ServicePaths) -> dict[str, Any]:
             "run",
             "--config",
             str(paths.config),
+            "--ipc-path",
+            str(paths.ipc_socket),
         ],
         "WorkingDirectory": str(paths.application_dir),
         "EnvironmentVariables": {
@@ -81,6 +88,7 @@ def install_service(source_root: Path, *, home: Path | None = None) -> ServicePa
         shutil.copyfile(source_root / "config.example.toml", paths.config)
 
     try:
+        rotate_service_logs(paths)
         subprocess.run(
             [sys.executable, "-m", "venv", str(paths.application_dir / "venv")],
             check=True,
@@ -132,6 +140,41 @@ def service_is_loaded(*, home: Path | None = None) -> bool:
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
+
+
+def service_ipc_is_reachable(path: Path, *, timeout_seconds: float = 0.2) -> bool:
+    client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    client.settimeout(timeout_seconds)
+    try:
+        client.connect(str(path))
+    except OSError:
+        return False
+    finally:
+        client.close()
+    return True
+
+
+def rotate_service_logs(
+    paths: ServicePaths,
+    *,
+    maximum_bytes: int = 1_000_000,
+    backups: int = 3,
+) -> None:
+    if maximum_bytes < 1 or backups < 1:
+        raise ValueError("log rotation bounds must be positive")
+    for log in (paths.stdout_log, paths.stderr_log):
+        try:
+            if log.stat().st_size <= maximum_bytes:
+                continue
+        except FileNotFoundError:
+            continue
+        oldest = log.with_name(f"{log.name}.{backups}")
+        oldest.unlink(missing_ok=True)
+        for index in range(backups - 1, 0, -1):
+            source = log.with_name(f"{log.name}.{index}")
+            if source.exists():
+                source.replace(log.with_name(f"{log.name}.{index + 1}"))
+        log.replace(log.with_name(f"{log.name}.1"))
 
 
 def uninstall_service(*, home: Path | None = None) -> ServicePaths:

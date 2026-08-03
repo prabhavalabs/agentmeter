@@ -3,6 +3,7 @@
 ## Working areas
 
 - `host/` contains the Python bridge, transports, alert engine, service manager, and tests.
+- `desktop/` contains the native Swift package and macOS application.
 - `firmware/` contains the PlatformIO application, fixed-size model, protocol, UI, and board support.
 - `schemas/` defines the shared JSON contract.
 - `fixtures/` contains safe synthetic messages used by both sides.
@@ -28,9 +29,14 @@ Useful manual commands are:
 .venv/bin/agentmeter snapshot --pretty
 .venv/bin/agentmeter send
 .venv/bin/agentmeter run
+.venv/bin/agentmeter ipc-path
+.venv/bin/agentmeter fake-server --scenario connected-usb \
+  --ipc-path /tmp/agentmeter-development.sock
 ```
 
 Do not run an interactive bridge and the background service at the same time; they would compete for one BLE connection.
+
+The fake server supports `connected-usb`, `disconnected`, `pairing`, `provider-unavailable`, `legacy`, and `settings-conflict`. It reads only synthetic checked-in fixtures and does not import provider collectors or Bluetooth code. Use it for SwiftUI work without an attached device or signed-in coding-agent accounts.
 
 ## Firmware workflow
 
@@ -66,6 +72,8 @@ Any device-message change must update:
 3. Host validation or normalization tests
 4. Firmware parser tests
 5. `docs/protocol.md`
+
+Desktop IPC changes must also update `schemas/desktop-ipc-v1.schema.json`, every affected `desktop-ipc-*.json` fixture, Python protocol tests, and Swift decoding tests.
 
 Breaking changes require a new `schemaVersion`. Never add raw CodexBar responses as fixtures. Synthetic data should explicitly prove that identity, billing, status, and error fields are removed.
 

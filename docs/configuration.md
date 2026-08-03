@@ -2,6 +2,8 @@
 
 AgentMeter reads `~/.config/AgentMeter/config.toml` by default. Run `agentmeter doctor` to print the exact path. Local configuration files are excluded from version control.
 
+The TOML file is the readable source-install baseline. On first desktop-control launch, AgentMeter seeds a private `control-state-v1.json` overlay in Application Support. Later provider, interval, selected-device, and reconnect changes are written atomically to that overlay with mode `0600`. A corrupt overlay is reported and never silently replaced.
+
 ## General settings
 
 ```toml
@@ -14,7 +16,7 @@ providers = ["codex", "claude", "gemini", "cursor"]
 - `providers` sets the available provider set and order and accepts one to eight unique IDs using lowercase letters, numbers, `_`, or `-`.
 - A configured provider missing from CodexBar appears as unavailable instead of being silently removed.
 
-Use the display's gear menu to hide an available provider from Home without editing this file or restarting the bridge. This separation keeps the host responsible for collection and the display responsible for presentation.
+Use the display's gear menu or the macOS app to hide and order available providers without editing this file or restarting the bridge. This separation keeps the host responsible for collection and the display responsible for presentation. The ESP32 remains authoritative for display settings and confirms each revision before the app shows it as synced.
 
 ### Cursor
 
