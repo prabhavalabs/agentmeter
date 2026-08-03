@@ -43,6 +43,22 @@ No separate Arduino, screen, Bluetooth module, breadboard, jumper wires, microSD
 
 The board uses a two-pin **MX1.25** battery connector. Connector shape does not guarantee correct polarity, and common JST-PH 2.0 batteries do not fit. Use the manufacturer's battery bundle if portable operation is required. Never connect a battery before checking voltage, connector, and polarity against the board documentation.
 
+## Power telemetry
+
+The AXP2101 reports USB presence and VBUS voltage. Battery charging, voltage,
+and percentage are read only when the PMIC confirms that a battery is
+connected. The normal USB-only build therefore reports:
+
+- power source: USB;
+- battery: not installed;
+- charging and battery measurements: unavailable;
+- input current: unavailable.
+
+The board API exposes a configurable VBUS current limit, but that value is not
+a consumption measurement and AgentMeter does not present it as one. A future
+hardware revision may add measured current only if its power-management API
+provides a reliable sensor value.
+
 ## Software libraries
 
 The firmware scaffold pins these components in `firmware/platformio.ini`:

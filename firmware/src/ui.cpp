@@ -14,7 +14,6 @@
 #include "boards/waveshare_amoled_216/board.h"
 #include "provider_visuals.h"
 #include "settings_model.h"
-#include "settings_store.h"
 #include "ui_format.h"
 #include "ui_layout.h"
 
@@ -45,6 +44,7 @@ struct MetricWidgets {
 
 DashboardSnapshot model{};
 DashboardPreferences preferences{};
+SettingsChangedCallback settings_changed_callback = nullptr;
 bool has_model = false;
 uint32_t model_received_at_ms = 0;
 ConnectionState connection_state = ConnectionState::Waiting;
@@ -71,6 +71,7 @@ uint32_t last_pixel_shift_ms = 0;
 uint8_t pixel_shift_index = 0;
 bool dimmed = false;
 bool screen_off = false;
+bool settings_render_pending = false;
 
 lv_color_t color(uint32_t value) { return lv_color_hex(value); }
 
@@ -211,7 +212,7 @@ bool wake_for_input() {
   }
   screen_off = false;
   dimmed = false;
-  board_set_brightness(static_cast<uint8_t>(model.display.brightness_percent * 255 / 100));
+  board_set_brightness_percent(preferences.brightness_percent);
   return true;
 }
 
@@ -239,10 +240,10 @@ void refresh_metric(const MetricWidgets& widgets, int64_t now_epoch) {
   lv_bar_set_value(widgets.bar, std::max<int16_t>(0, window.used_percent),
                    LV_ANIM_OFF);
   uint32_t bar_color = provider_accent(provider);
-  if (window.used_percent >=
-      model.display.alert_thresholds[model.display.alert_threshold_count - 1]) {
+  if (window.used_percent >= preferences.alert_thresholds[
+                                 preferences.alert_threshold_count - 1]) {
     bar_color = kRed;
-  } else if (window.used_percent >= model.display.alert_thresholds[0]) {
+  } else if (window.used_percent >= preferences.alert_thresholds[0]) {
     bar_color = kAmber;
   }
   lv_obj_set_style_bg_color(widgets.bar, color(bar_color), LV_PART_INDICATOR);
@@ -319,10 +320,13 @@ void render_detail();
 void render_settings();
 void show_toast(const char* message, uint32_t background);
 
-void persist_preferences() {
-  if (!save_dashboard_preferences(preferences)) {
-    show_toast("Settings could not be saved", 0x642633);
+void submit_settings(const DeviceSettings& candidate) {
+  if (settings_changed_callback == nullptr) {
+    show_toast("Settings are temporarily unavailable", 0x642633);
+    settings_render_pending = true;
+    return;
   }
+  settings_changed_callback(candidate, millis());
 }
 
 uint8_t first_visible_provider() {
@@ -629,12 +633,10 @@ void provider_visibility_changed(lv_event_t* event) {
     show_toast("Keep at least one agent visible", 0x594617);
     return;
   }
-  set_provider_visible(preferences, model.providers[provider_index].id.data(),
+  DeviceSettings candidate = preferences;
+  set_provider_visible(candidate, model.providers[provider_index].id.data(),
                        visible);
-  persist_preferences();
-  if (!visible && selected_provider == provider_index) {
-    selected_provider = first_visible_provider();
-  }
+  submit_settings(candidate);
 }
 
 void always_on_changed(lv_event_t* event) {
@@ -643,14 +645,14 @@ void always_on_changed(lv_event_t* event) {
     return;
   }
   lv_obj_t* control = static_cast<lv_obj_t*>(lv_event_get_target(event));
-  preferences.always_on = lv_obj_has_state(control, LV_STATE_CHECKED);
-  persist_preferences();
+  DeviceSettings candidate = preferences;
+  candidate.always_on = lv_obj_has_state(control, LV_STATE_CHECKED);
+  submit_settings(candidate);
   last_activity_ms = millis();
-  if (preferences.always_on) {
+  if (candidate.always_on) {
     screen_off = false;
     dimmed = false;
-    board_set_brightness(
-        static_cast<uint8_t>(model.display.brightness_percent * 255 / 100));
+    board_set_brightness_percent(candidate.brightness_percent);
   }
 }
 
@@ -660,9 +662,10 @@ void full_view_changed(lv_event_t* event) {
     return;
   }
   lv_obj_t* control = static_cast<lv_obj_t*>(lv_event_get_target(event));
-  preferences.full_view = lv_obj_has_state(control, LV_STATE_CHECKED);
+  DeviceSettings candidate = preferences;
+  candidate.full_view = lv_obj_has_state(control, LV_STATE_CHECKED);
   last_rotation_ms = millis();
-  persist_preferences();
+  submit_settings(candidate);
 }
 
 void rotation_interval_changed(lv_event_t* event) {
@@ -675,12 +678,13 @@ void rotation_interval_changed(lv_event_t* event) {
   if (next < kMinimumRotationSeconds || next > kMaximumRotationSeconds) {
     return;
   }
-  set_rotation_seconds(preferences, static_cast<uint8_t>(next));
+  DeviceSettings candidate = preferences;
+  set_rotation_seconds(candidate, static_cast<uint8_t>(next));
   last_rotation_ms = millis();
-  persist_preferences();
+  submit_settings(candidate);
   if (rotation_value_label != nullptr) {
     lv_label_set_text_fmt(rotation_value_label, "%u sec",
-                          preferences.rotation_seconds);
+                          candidate.rotation_seconds);
   }
 }
 
@@ -845,16 +849,20 @@ void show_event(const DisplayEvent& event) {
   }
   show_toast(message, event.level == EventLevel::Critical ? 0x642633
                                                           : 0x594617);
-  if (model.display.sound_enabled) {
+  if (preferences.sound_enabled) {
     board_play_tone(event.level == EventLevel::Critical ? 1100 : 880, 120);
   }
 }
 
 }  // namespace
 
-void ui_begin(const char* device_name) {
+void ui_begin(const char* device_name, const DeviceSettings& initial_settings,
+              SettingsChangedCallback changed_callback) {
   std::snprintf(advertised_name, sizeof(advertised_name), "%s", device_name);
-  load_dashboard_preferences(preferences);
+  preferences = validate_device_settings(initial_settings, nullptr)
+                    ? initial_settings
+                    : DeviceSettings{};
+  settings_changed_callback = changed_callback;
   lv_obj_t* screen = lv_screen_active();
   lv_obj_set_style_bg_color(screen, color(kBackground), 0);
   lv_obj_set_style_text_color(screen, color(kText), 0);
@@ -910,6 +918,28 @@ void ui_begin(const char* device_name) {
   render_waiting();
 }
 
+void ui_apply_settings(const DeviceSettings& settings) {
+  if (!validate_device_settings(settings, has_model ? &model : nullptr) ||
+      device_settings_equal(settings, preferences)) {
+    return;
+  }
+  preferences = settings;
+  if (selected_provider >= model.provider_count ||
+      (has_model &&
+       !is_provider_visible(preferences,
+                            model.providers[selected_provider].id.data()))) {
+    selected_provider = first_visible_provider();
+  }
+  last_activity_ms = millis();
+  last_rotation_ms = last_activity_ms;
+  if (preferences.always_on || !screen_off) {
+    screen_off = false;
+    dimmed = false;
+    board_set_brightness_percent(preferences.brightness_percent);
+  }
+  settings_render_pending = true;
+}
+
 void ui_set_model(const DashboardSnapshot& snapshot, uint32_t received_at_ms) {
   const bool first_model = !has_model;
   model = snapshot;
@@ -924,8 +954,7 @@ void ui_set_model(const DashboardSnapshot& snapshot, uint32_t received_at_ms) {
     selected_provider = first_visible_provider();
   }
   if (first_model || preferences.always_on) {
-    board_set_brightness(
-        static_cast<uint8_t>(model.display.brightness_percent * 255 / 100));
+    board_set_brightness_percent(preferences.brightness_percent);
     dimmed = false;
     screen_off = false;
     if (first_model) {
@@ -952,6 +981,14 @@ void ui_set_connection(ConnectionState state) {
 }
 
 void ui_tick(uint32_t now_ms) {
+  if (settings_render_pending && has_model) {
+    settings_render_pending = false;
+    if (view_mode == ViewMode::Settings) {
+      render_settings();
+    } else {
+      render_dashboard_home();
+    }
+  }
   if (has_model && is_stale(model, model_received_at_ms, now_ms)) {
     ui_set_connection(ConnectionState::Stale);
   }
@@ -984,14 +1021,17 @@ void ui_tick(uint32_t now_ms) {
   }
 
   if (!preferences.always_on && !screen_off &&
-      now_ms - last_activity_ms >= model.display.screen_off_after_seconds * 1000U) {
+      now_ms - last_activity_ms >=
+          preferences.screen_off_after_seconds * 1000U) {
     screen_off = true;
     board_set_brightness(0);
   } else if (!preferences.always_on && !screen_off && !dimmed &&
-             now_ms - last_activity_ms >= model.display.dim_after_seconds * 1000U) {
+             now_ms - last_activity_ms >=
+                 preferences.dim_after_seconds * 1000U) {
     dimmed = true;
     const uint8_t dim_level = static_cast<uint8_t>(
-        std::max<int>(8, model.display.brightness_percent * 255 / 100 * 15 / 100));
+        std::max<int>(8,
+                      preferences.brightness_percent * 255 / 100 * 15 / 100));
     board_set_brightness(dim_level);
   }
 
@@ -1040,5 +1080,14 @@ void ui_show_pairing_cleared() {
   wake_for_input();
   show_toast("Pairing cleared - ready to reconnect", 0x3B285F);
 }
+
+void ui_identify() {
+  wake_for_input();
+  show_toast("This is your AgentMeter", 0x244C47);
+}
+
+bool ui_display_is_on() { return !screen_off; }
+
+bool ui_display_is_dimmed() { return dimmed; }
 
 }  // namespace agentmeter
