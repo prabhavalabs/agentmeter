@@ -27,7 +27,7 @@ constexpr int8_t kTouchInterrupt = 11;
 constexpr int8_t kTouchReset = 40;
 constexpr int8_t kUserButton = 18;
 
-constexpr uint8_t kInitialBrightness = 150;
+constexpr uint8_t kInitialBrightnessPercent = 55;
 constexpr uint16_t kDrawBufferLines = 40;
 constexpr size_t kDrawBufferBytes =
     static_cast<size_t>(kDisplayWidth) * kDrawBufferLines * sizeof(uint16_t);
@@ -46,6 +46,7 @@ uint8_t* draw_buffer_2 = nullptr;
 
 bool display_ready = false;
 bool touch_ready = false;
+bool pmu_ready = false;
 volatile bool touch_pending = false;
 uint32_t flush_count = 0;
 uint64_t flush_time_us = 0;
@@ -116,11 +117,12 @@ bool board_init() {
   Wire.begin(kI2cData, kI2cClock);
   Wire.setClock(400000);
 
-  const bool power_ready = power_manager.begin(
+  pmu_ready = power_manager.begin(
       Wire, AXP2101_SLAVE_ADDRESS, kI2cData, kI2cClock);
-  if (power_ready) {
+  if (pmu_ready) {
     power_manager.enableBattDetection();
     power_manager.enableBattVoltageMeasure();
+    power_manager.enableVbusVoltageMeasure();
     Serial.printf("PMU: AXP2101 online, USB=%s, battery=%s\n",
                   power_manager.isVbusGood() ? "yes" : "no",
                   power_manager.isBatteryConnect() ? "yes" : "no");
@@ -153,7 +155,7 @@ bool board_init() {
   display_ready = true;
   display_bus.writeC8D8(0x36, 0xA0);
   display_panel.fillScreen(RGB565_BLACK);
-  display_panel.setBrightness(kInitialBrightness);
+  board_set_brightness_percent(kInitialBrightnessPercent);
   Serial.println("Display: CO5300 online at 480x480");
 
   if (!psramFound()) {
@@ -248,6 +250,38 @@ void board_set_brightness(uint8_t brightness) {
   if (display_ready) {
     display_panel.setBrightness(brightness);
   }
+}
+
+void board_set_brightness_percent(uint8_t brightness_percent) {
+  const uint8_t clamped =
+      static_cast<uint8_t>(constrain(brightness_percent, 1, 100));
+  board_set_brightness(
+      static_cast<uint8_t>((static_cast<uint16_t>(clamped) * 255U) / 100U));
+}
+
+BoardTelemetry board_read_telemetry() {
+  BoardTelemetry telemetry{};
+  telemetry.pmu_available = pmu_ready;
+  if (!pmu_ready) {
+    return telemetry;
+  }
+
+  telemetry.usb_present = power_manager.isVbusGood();
+  telemetry.battery_present = power_manager.isBatteryConnect();
+  telemetry.vbus_voltage_available = true;
+  telemetry.vbus_voltage_mv = power_manager.getVbusVoltage();
+  if (telemetry.battery_present) {
+    telemetry.charging_available = true;
+    telemetry.charging = power_manager.isCharging();
+    telemetry.battery_voltage_available = true;
+    telemetry.battery_voltage_mv = power_manager.getBattVoltage();
+    const int battery_percent = power_manager.getBatteryPercent();
+    if (battery_percent >= 0 && battery_percent <= 100) {
+      telemetry.battery_percent_available = true;
+      telemetry.battery_percent = static_cast<uint8_t>(battery_percent);
+    }
+  }
+  return telemetry;
 }
 
 bool board_button_pressed() { return digitalRead(kUserButton) == LOW; }

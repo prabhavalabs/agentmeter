@@ -138,6 +138,65 @@ void test_management_result_preserves_request_correlation_and_status() {
   TEST_ASSERT_TRUE(document["payload"].is<JsonObject>());
 }
 
+void test_device_state_encodes_usb_without_fabricating_battery() {
+  agentmeter::DeviceState state{};
+  std::strcpy(state.information.model.data(), "waveshare-amoled-216");
+  std::strcpy(state.information.name.data(), "AgentMeter");
+  std::strcpy(state.information.firmware_version.data(), "0.1.0");
+  std::strcpy(state.information.hardware_revision.data(), "1");
+  state.telemetry.power_source = agentmeter::PowerSource::Usb;
+  state.telemetry.usb_present = true;
+  state.telemetry.battery_present = false;
+  state.telemetry.has_vbus_voltage = true;
+  state.telemetry.vbus_voltage_mv = 5012;
+  std::array<uint8_t, agentmeter::kMaximumManagementBytes> output{};
+
+  const size_t length = agentmeter::encode_device_state_event(
+      state, output.data(), output.size());
+  JsonDocument document;
+  TEST_ASSERT_FALSE(deserializeJson(document, output.data(), length));
+  TEST_ASSERT_EQUAL_STRING("usb",
+                           document["payload"]["telemetry"]["powerSource"]);
+  TEST_ASSERT_FALSE(
+      document["payload"]["telemetry"]["batteryPresent"].as<bool>());
+  TEST_ASSERT_TRUE(
+      document["payload"]["telemetry"]["batteryPercent"].isNull());
+  TEST_ASSERT_TRUE(
+      document["payload"]["telemetry"]["inputCurrentMa"].isNull());
+  TEST_ASSERT_EQUAL_UINT16(
+      5012, document["payload"]["telemetry"]["vbusVoltageMv"].as<uint16_t>());
+}
+
+void test_device_state_encodes_available_battery_measurements() {
+  agentmeter::DeviceState state{};
+  std::strcpy(state.information.model.data(), "waveshare-amoled-216");
+  std::strcpy(state.information.name.data(), "AgentMeter");
+  std::strcpy(state.information.firmware_version.data(), "0.1.0");
+  std::strcpy(state.information.hardware_revision.data(), "1");
+  state.telemetry.power_source = agentmeter::PowerSource::Battery;
+  state.telemetry.battery_present = true;
+  state.telemetry.has_charging = true;
+  state.telemetry.charging = false;
+  state.telemetry.has_battery_voltage = true;
+  state.telemetry.battery_voltage_mv = 4018;
+  state.telemetry.has_battery_percent = true;
+  state.telemetry.battery_percent = 72;
+  std::array<uint8_t, agentmeter::kMaximumManagementBytes> output{};
+
+  const size_t length = agentmeter::encode_device_state_event(
+      state, output.data(), output.size());
+  JsonDocument document;
+  TEST_ASSERT_FALSE(deserializeJson(document, output.data(), length));
+  TEST_ASSERT_EQUAL_STRING(
+      "battery", document["payload"]["telemetry"]["powerSource"]);
+  TEST_ASSERT_EQUAL_UINT8(
+      72, document["payload"]["telemetry"]["batteryPercent"].as<uint8_t>());
+  TEST_ASSERT_EQUAL_UINT16(
+      4018,
+      document["payload"]["telemetry"]["batteryVoltageMv"].as<uint16_t>());
+  TEST_ASSERT_FALSE(document["payload"]["telemetry"]["charging"].as<bool>());
+}
+
 std::vector<uint8_t> management_frame(uint16_t message_id, uint16_t total,
                                       uint16_t offset, const uint8_t* payload,
                                       size_t length) {
@@ -209,6 +268,8 @@ void run_management_protocol_tests() {
   RUN_TEST(test_parser_reports_schema_command_and_size_errors);
   RUN_TEST(test_parser_rejects_missing_request_id_and_bad_provider_id);
   RUN_TEST(test_management_result_preserves_request_correlation_and_status);
+  RUN_TEST(test_device_state_encodes_usb_without_fabricating_battery);
+  RUN_TEST(test_device_state_encodes_available_battery_measurements);
   RUN_TEST(test_management_reassembler_returns_correlated_payload);
   RUN_TEST(test_management_reassembler_rejects_out_of_order_fragment);
 }
