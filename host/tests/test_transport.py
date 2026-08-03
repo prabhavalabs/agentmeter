@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
+from agentmeter_host.control.models import PeripheralSummary
 
 
 def test_fragment_payload_respects_ble_write_size_and_offsets() -> None:
@@ -258,6 +259,44 @@ async def test_bleak_backend_reports_missing_display_as_retryable() -> None:
         await backend.connect()
 
     assert error.value.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_scan_returns_sorted_agentmeter_peripherals_without_connecting() -> None:
+    from agentmeter_host.transport.ble import BleakBackend
+
+    class Scanner:
+        @staticmethod
+        async def discover(**_kwargs):
+            return {
+                "other": (
+                    SimpleNamespace(name="Keyboard", address="other"),
+                    SimpleNamespace(local_name="Keyboard", rssi=-20),
+                ),
+                "b": (
+                    SimpleNamespace(name="AgentMeter-BBBB", address="b"),
+                    SimpleNamespace(local_name="AgentMeter-BBBB", rssi=-70),
+                ),
+                "a": (
+                    SimpleNamespace(name="AgentMeter-AAAA", address="a"),
+                    SimpleNamespace(local_name="AgentMeter-AAAA", rssi=-40),
+                ),
+            }
+
+    created_clients = []
+    backend = BleakBackend(
+        scanner=Scanner,
+        client_factory=lambda *args, **kwargs: created_clients.append((args, kwargs)),
+        clock=lambda: 1_785_607_200,
+    )
+
+    devices = await backend.scan()
+
+    assert devices == (
+        PeripheralSummary("a", "AgentMeter-AAAA", -40, 1_785_607_200),
+        PeripheralSummary("b", "AgentMeter-BBBB", -70, 1_785_607_200),
+    )
+    assert created_clients == []
 
 
 class RecordingSerialPort:
