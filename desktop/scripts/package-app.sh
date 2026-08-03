@@ -32,7 +32,11 @@ cp "${DESKTOP_ROOT}/.build/release/AgentMeter" "${APP_BUNDLE}/Contents/MacOS/Age
 cp "${DESKTOP_ROOT}/Resources/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
 cp "${PACKAGE_WORK}/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 
-codesign --force --options runtime --timestamp=none --sign "${SIGNING_IDENTITY}" "${APP_BUNDLE}"
+if [[ "${SIGNING_IDENTITY}" == "-" ]]; then
+  codesign --force --options runtime --timestamp=none --sign - "${APP_BUNDLE}"
+else
+  codesign --force --options runtime --timestamp --sign "${SIGNING_IDENTITY}" "${APP_BUNDLE}"
+fi
 codesign --verify --deep --strict --verbose=2 "${APP_BUNDLE}"
 plutil -lint "${APP_BUNDLE}/Contents/Info.plist"
 
