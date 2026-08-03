@@ -44,6 +44,15 @@ public enum BridgeServiceState: Equatable, Sendable {
     }
 }
 
+public enum BridgeDistributionMode: Equatable, Sendable {
+    case managed
+    case community
+
+    public static func resolve(plistValue: String?) -> BridgeDistributionMode {
+        plistValue == "community" ? .community : .managed
+    }
+}
+
 @MainActor
 @Observable
 public final class BridgeServiceController {
@@ -54,12 +63,19 @@ public final class BridgeServiceController {
     public private(set) var isUpdating = false
     public private(set) var hasBundledBridge: Bool
 
+    public var isCommunityBuild: Bool {
+        distributionMode == .community
+    }
+
     private let service: SMAppService
     private let bundle: Bundle
     private let fileManager: FileManager
     private let externalMode: Bool
     private let defaults: UserDefaults
+    private let distributionMode: BridgeDistributionMode
+    private let ipcPath: String
     private var hasStarted = false
+    private var communityProcess: Process?
     private let logger = Logger(
         subsystem: "com.prabhavalabs.agentmeter.desktop",
         category: "BridgeService"
@@ -69,12 +85,24 @@ public final class BridgeServiceController {
         bundle: Bundle = .main,
         fileManager: FileManager = .default,
         defaults: UserDefaults = .standard,
-        externalMode: Bool = false
+        externalMode: Bool = false,
+        distributionMode: BridgeDistributionMode? = nil,
+        ipcPath: String? = nil
     ) {
         self.bundle = bundle
         self.fileManager = fileManager
         self.externalMode = externalMode
         self.defaults = defaults
+        self.distributionMode = distributionMode ?? BridgeDistributionMode.resolve(
+            plistValue: bundle.object(forInfoDictionaryKey: "AgentMeterDistributionMode") as? String
+        )
+        self.ipcPath = ipcPath ?? URL(
+            fileURLWithPath: NSTemporaryDirectory(),
+            isDirectory: true
+        )
+        .appendingPathComponent("agentmeter-\(getuid())", isDirectory: true)
+        .appendingPathComponent("bridge.sock", isDirectory: false)
+        .path
         service = SMAppService.agent(plistName: Self.plistName)
         hasBundledBridge = bundle.resourceURL?
             .appendingPathComponent("AgentMeterBridge/AgentMeterBridge")
@@ -106,7 +134,16 @@ public final class BridgeServiceController {
         defer { isUpdating = false }
         do {
             state = .preparing
-            try prepareConfiguration()
+            let configuration = try prepareConfiguration()
+            if distributionMode == .community {
+                if service.status != .notRegistered, service.status != .notFound {
+                    try? await service.unregister()
+                }
+                stopLegacyServiceIfPresent()
+                try startCommunityBridge(configuration: configuration)
+                state = .waitingForBridge
+                return
+            }
             state = .registering
             var shouldRegister = service.status == .notRegistered || service.status == .notFound
             if service.status == .enabled,
@@ -156,6 +193,16 @@ public final class BridgeServiceController {
         guard externalMode == false, hasBundledBridge else { return }
         isUpdating = true
         defer { isUpdating = false }
+        if distributionMode == .community {
+            let process = communityProcess
+            communityProcess = nil
+            if process?.isRunning == true {
+                process?.terminate()
+            }
+            state = .idle
+            hasStarted = false
+            return
+        }
         do {
             if service.status != .notRegistered {
                 try await service.unregister()
@@ -175,7 +222,7 @@ public final class BridgeServiceController {
         NSWorkspace.shared.open(url)
     }
 
-    private func prepareConfiguration() throws {
+    private func prepareConfiguration() throws -> URL {
         let support = try fileManager.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
@@ -188,18 +235,53 @@ public final class BridgeServiceController {
             attributes: [.posixPermissions: 0o700]
         )
         let destination = support.appendingPathComponent("config.toml")
-        guard fileManager.fileExists(atPath: destination.path) == false else { return }
+        guard fileManager.fileExists(atPath: destination.path) == false else {
+            return destination
+        }
 
         let legacy = fileManager.homeDirectoryForCurrentUser
             .appendingPathComponent(".config/AgentMeter/config.toml")
         if fileManager.fileExists(atPath: legacy.path) {
             try fileManager.copyItem(at: legacy, to: destination)
-            return
+            return destination
         }
         guard let template = bundle.url(forResource: "config.example", withExtension: "toml") else {
             throw CocoaError(.fileNoSuchFile)
         }
         try fileManager.copyItem(at: template, to: destination)
+        return destination
+    }
+
+    private func startCommunityBridge(configuration: URL) throws {
+        if communityProcess?.isRunning == true { return }
+        guard let executable = bundle.resourceURL?
+            .appendingPathComponent("AgentMeterBridge/AgentMeterBridge") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = [
+            "run",
+            "--config", configuration.path,
+            "--ipc-path", ipcPath,
+        ]
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        environment["PYTHONUNBUFFERED"] = "1"
+        process.environment = environment
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        process.terminationHandler = { [weak self, weak process] _ in
+            Task { @MainActor in
+                guard let self, let process, self.communityProcess === process else { return }
+                self.communityProcess = nil
+                self.hasStarted = false
+                self.state = .failed("The bundled bridge stopped unexpectedly.")
+            }
+        }
+        try process.run()
+        communityProcess = process
     }
 
     private func settledStatus() async -> SMAppService.Status {

@@ -24,17 +24,30 @@ public struct AppSettingsView: View {
             }
 
             Section("Startup") {
-                Toggle("Launch AgentMeter at login", isOn: launchAtLoginBinding)
-                    .disabled(launchAtLogin.isUpdating)
-                Text("Keeps the menu-bar status and device synchronization available after you sign in.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let error = launchAtLogin.errorMessage {
-                    Label(error, systemImage: "exclamationmark.triangle")
+                if bridgeService.isCommunityBuild {
+                    LabeledContent("Launch at login", value: "Configure in macOS")
+                    Text("Add AgentMeter under General → Login Items to start this community build automatically.")
                         .font(.caption)
-                        .foregroundStyle(AgentMeterTheme.warning)
+                        .foregroundStyle(.secondary)
+                    Button("Open Login Items") { bridgeService.openLoginItemsSettings() }
+                } else {
+                    Toggle("Launch AgentMeter at login", isOn: launchAtLoginBinding)
+                        .disabled(launchAtLogin.isUpdating)
+                    Text("Keeps the menu-bar status and device synchronization available after you sign in.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let error = launchAtLogin.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(AgentMeterTheme.warning)
+                    }
                 }
                 LabeledContent("Background bridge", value: bridgeService.state.title)
+                if bridgeService.isCommunityBuild {
+                    Text("Community builds keep the bundled bridge running while AgentMeter is open.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if case let .failed(message) = bridgeService.state {
                     Label(message, systemImage: "exclamationmark.triangle")
                         .font(.caption)

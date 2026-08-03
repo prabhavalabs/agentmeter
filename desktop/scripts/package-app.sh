@@ -12,6 +12,15 @@ SIGNING_IDENTITY=${CODE_SIGN_IDENTITY:--}
 BRIDGE_PYTHON=${AGENTMETER_PACKAGE_PYTHON:-${DESKTOP_ROOT:h}/.venv/bin/python}
 APP_VERSION=${AGENTMETER_APP_VERSION:-0.1.0}
 APP_BUILD=${AGENTMETER_APP_BUILD:-1}
+if [[ "${SIGNING_IDENTITY}" == "-" ]]; then
+  DISTRIBUTION_MODE=${AGENTMETER_DISTRIBUTION_MODE:-community}
+else
+  DISTRIBUTION_MODE=${AGENTMETER_DISTRIBUTION_MODE:-managed}
+fi
+if [[ "${DISTRIBUTION_MODE}" != "community" && "${DISTRIBUTION_MODE}" != "managed" ]]; then
+  echo "AGENTMETER_DISTRIBUTION_MODE must be 'community' or 'managed'." >&2
+  exit 1
+fi
 
 if [[ ! -x "${BRIDGE_PYTHON}" ]]; then
   echo "AgentMeter packaging requires ${BRIDGE_PYTHON}. Run 'make setup' first." >&2
@@ -51,6 +60,12 @@ fi
   --workpath "${PACKAGE_WORK}/bridge-build" \
   --specpath "${PACKAGE_WORK}" \
   --noupx \
+  --exclude-module _pytest \
+  --exclude-module pytest \
+  --exclude-module click \
+  --exclude-module colorama \
+  --exclude-module chardet \
+  --exclude-module pygments \
   "${PYINSTALLER_SIGNING[@]}" \
   "${DESKTOP_ROOT}/bridge_entry.py"
 
@@ -66,8 +81,13 @@ cp "${DESKTOP_ROOT}/Resources/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
   "${APP_BUNDLE}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${APP_BUILD}" \
   "${APP_BUNDLE}/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :AgentMeterDistributionMode string ${DISTRIBUTION_MODE}" \
+  "${APP_BUNDLE}/Contents/Info.plist"
 cp "${PACKAGE_WORK}/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 cp "${DESKTOP_ROOT:h}/config.example.toml" "${APP_BUNDLE}/Contents/Resources/config.example.toml"
+cp "${DESKTOP_ROOT:h}/LICENSE" "${APP_BUNDLE}/Contents/Resources/LICENSE.txt"
+cp "${DESKTOP_ROOT:h}/THIRD_PARTY_NOTICES.md" \
+  "${APP_BUNDLE}/Contents/Resources/THIRD_PARTY_NOTICES.md"
 cp \
   "${DESKTOP_ROOT:h}/fixtures/desktop-ipc-status-v1.json" \
   "${DESKTOP_ROOT:h}/fixtures/desktop-ipc-settings-v1.json" \

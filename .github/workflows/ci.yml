@@ -33,6 +33,11 @@ jobs:
       - name: Build application bundle
         run: desktop/scripts/package-app.sh
 
+      - name: Build and verify community disk image
+        run: |
+          desktop/scripts/create-community-dmg.sh
+          desktop/scripts/verify-community-release.sh
+
       - name: Test bundled bridge contract
         run: |
           runtime="$RUNNER_TEMP/agentmeter-bundled"

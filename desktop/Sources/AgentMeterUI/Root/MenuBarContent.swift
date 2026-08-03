@@ -53,8 +53,14 @@ public struct MenuBarContent: View {
                 Button("Reconnect") { Task { await model.reconnect() } }
             }
             Button("Refresh Usage") { Task { await model.refreshProviders() } }
-            Toggle("Launch at Login", isOn: launchAtLoginBinding)
-                .disabled(launchAtLogin.isUpdating)
+            if bridgeService.isCommunityBuild {
+                Button("Configure Launch at Login…") {
+                    bridgeService.openLoginItemsSettings()
+                }
+            } else {
+                Toggle("Launch at Login", isOn: launchAtLoginBinding)
+                    .disabled(launchAtLogin.isUpdating)
+            }
             Divider()
             SettingsLink { Text("Settings…") }
             Button("Quit AgentMeter") {
