@@ -5,6 +5,7 @@ let package = Package(
     name: "AgentMeterDesktop",
     platforms: [.macOS(.v14)],
     products: [
+        .executable(name: "AgentMeter", targets: ["AgentMeterApp"]),
         .library(name: "AgentMeterCore", targets: ["AgentMeterCore"]),
         .library(name: "AgentMeterIPC", targets: ["AgentMeterIPC"]),
         .library(name: "AgentMeterUI", targets: ["AgentMeterUI"]),
@@ -15,6 +16,10 @@ let package = Package(
         .target(
             name: "AgentMeterUI",
             dependencies: ["AgentMeterCore", "AgentMeterIPC"]
+        ),
+        .executableTarget(
+            name: "AgentMeterApp",
+            dependencies: ["AgentMeterCore", "AgentMeterIPC", "AgentMeterUI"]
         ),
         .testTarget(
             name: "AgentMeterCoreTests",

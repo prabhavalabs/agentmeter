@@ -178,6 +178,14 @@ public actor UnixBridgeClient: BridgeAPI {
         decoder = JsonLineDecoder()
         if terminateEvents {
             eventContinuation.finish(throwing: error)
+        } else {
+            eventContinuation.yield(
+                BridgeEvent(
+                    id: "transport-\(UUID().uuidString.lowercased())",
+                    type: "transport.disconnected",
+                    payload: .object([:])
+                )
+            )
         }
     }
 }

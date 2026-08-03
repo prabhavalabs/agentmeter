@@ -60,6 +60,7 @@ public final class AppModel {
 
     @ObservationIgnored private let bridge: any BridgeAPI
     @ObservationIgnored private var eventTask: Task<Void, Never>?
+    @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     @ObservationIgnored private var hasStarted = false
 
     public init(bridge: any BridgeAPI, preferences: AppPreferences) {
@@ -74,7 +75,7 @@ public final class AppModel {
 
     public var isBusy: Bool { !activeOperations.isEmpty }
 
-    public func start() async {
+    public func start(showFailure: Bool = true) async {
         guard !hasStarted else { return }
         hasStarted = true
         await withOperation(.startup) {
@@ -86,7 +87,10 @@ public final class AppModel {
             } catch {
                 bridgeReachable = false
                 hasStarted = false
-                present(error, title: "Bridge unavailable")
+                if showFailure {
+                    present(error, title: "Bridge unavailable")
+                }
+                scheduleReconnect()
             }
         }
     }
@@ -94,6 +98,8 @@ public final class AppModel {
     public func stop() async {
         eventTask?.cancel()
         eventTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
         hasStarted = false
         bridgeReachable = false
         await bridge.close()
@@ -102,6 +108,8 @@ public final class AppModel {
     public func reconnect() async {
         eventTask?.cancel()
         eventTask = nil
+        reconnectTask?.cancel()
+        reconnectTask = nil
         hasStarted = false
         await start()
         guard bridgeReachable else { return }
@@ -185,6 +193,13 @@ public final class AppModel {
         await patchSettings(patch)
     }
 
+    public func setProviderOrder(_ providerIds: [String]) async {
+        guard let settings = state.settings else { return }
+        var patch = DeviceSettingsPatch(baseRevision: settings.revision)
+        patch.providerOrder = providerIds
+        await patchSettings(patch)
+    }
+
     public func updateProviderCollection(ids: [String], pollIntervalSeconds: Int) async {
         await perform(
             .providerRefresh,
@@ -239,8 +254,14 @@ public final class AppModel {
             do {
                 for try await event in stream {
                     guard Task.isCancelled == false else { return }
-                    guard event.type == "state.changed" else { continue }
                     guard let self else { return }
+                    if event.type == "transport.disconnected" {
+                        self.bridgeReachable = false
+                        self.hasStarted = false
+                        self.scheduleReconnect()
+                        continue
+                    }
+                    guard event.type == "state.changed" else { continue }
                     let incoming = try event.decodePayload(ControlState.self)
                     guard incoming.revision > self.state.revision else { continue }
                     self.apply(incoming)
@@ -252,6 +273,24 @@ public final class AppModel {
                 self?.bridgeReachable = false
                 self?.hasStarted = false
                 self?.present(error, title: "Bridge disconnected")
+                self?.scheduleReconnect()
+            }
+        }
+    }
+
+    private func scheduleReconnect() {
+        guard reconnectTask == nil else { return }
+        reconnectTask = Task { [weak self] in
+            var delaySeconds = 2
+            while Task.isCancelled == false {
+                try? await Task.sleep(for: .seconds(delaySeconds))
+                guard Task.isCancelled == false, let self else { return }
+                await self.start(showFailure: false)
+                if self.bridgeReachable {
+                    self.reconnectTask = nil
+                    return
+                }
+                delaySeconds = min(delaySeconds * 2, 30)
             }
         }
     }
