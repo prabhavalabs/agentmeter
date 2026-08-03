@@ -7,10 +7,15 @@ let package = Package(
     products: [
         .library(name: "AgentMeterCore", targets: ["AgentMeterCore"]),
         .library(name: "AgentMeterIPC", targets: ["AgentMeterIPC"]),
+        .library(name: "AgentMeterUI", targets: ["AgentMeterUI"]),
     ],
     targets: [
         .target(name: "AgentMeterCore"),
         .target(name: "AgentMeterIPC", dependencies: ["AgentMeterCore"]),
+        .target(
+            name: "AgentMeterUI",
+            dependencies: ["AgentMeterCore", "AgentMeterIPC"]
+        ),
         .testTarget(
             name: "AgentMeterCoreTests",
             dependencies: ["AgentMeterCore"],
@@ -19,6 +24,10 @@ let package = Package(
         .testTarget(
             name: "AgentMeterIPCTests",
             dependencies: ["AgentMeterIPC"]
+        ),
+        .testTarget(
+            name: "AgentMeterUITests",
+            dependencies: ["AgentMeterCore", "AgentMeterIPC", "AgentMeterUI"]
         ),
     ]
 )
