@@ -260,7 +260,7 @@ public struct MenuBarContent: View {
 
     private func openMainWindow(section: NavigationSection) {
         model.selectedSection = section
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        ApplicationPresentationController.shared.windowWillOpen()
         openWindow(id: "main")
     }
 
