@@ -61,6 +61,14 @@ After reboot, the screen shows **Waiting for desktop** and an advertised name su
 
 ## Pair and test once
 
+The native companion discovers only devices advertising the versioned AgentMeter management
+service. Keep the display awake and nearby, then choose **Device → Find Device**. Compatible units
+appear with their unique suffix rather than the generic `AgentMeter` configuration name.
+
+![AgentMeter macOS Bluetooth discovery sheet while scanning for compatible displays](assets/screenshots/macos-device-discovery.png)
+
+For a command-line first test, run:
+
 ```bash
 .venv/bin/agentmeter send
 ```

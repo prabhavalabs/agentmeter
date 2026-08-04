@@ -17,11 +17,26 @@ Codex uses green interlocking arcs, Claude an orange starburst, Gemini a blue sp
 
 The header pairs a pulsing status dot with `LIVE` while the bridge is connected. Tap the gear beside it to open Settings.
 
+![AgentMeter physical display showing the responsive three-provider overview](assets/photos/agentmeter-desk-hero.jpg)
+
 ## Provider detail
 
 Tap a provider to see up to three quota windows at once. Every row keeps its own percentage, progress bar, and reset countdown. Tap the back control to return to the overview.
 
 The top physical button provides the same overview/detail toggle when touch is inconvenient. Detail opens on the first configured provider when entered with the button.
+
+<table>
+  <tr>
+    <td width="33%"><img src="assets/photos/device-codex-detail.jpg" alt="Codex detail view on the physical AgentMeter"></td>
+    <td width="33%"><img src="assets/photos/device-claude-detail.jpg" alt="Claude detail view on the physical AgentMeter"></td>
+    <td width="33%"><img src="assets/photos/device-cursor-detail.jpg" alt="Cursor detail view on the physical AgentMeter"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Codex</strong></td>
+    <td align="center"><strong>Claude</strong></td>
+    <td align="center"><strong>Cursor</strong></td>
+  </tr>
+</table>
 
 ## Settings
 
@@ -33,6 +48,8 @@ Settings are stored in the ESP32's nonvolatile storage and survive ordinary firm
 - **Rotation interval:** choose 3–60 seconds per agent with the minus and plus controls.
 
 With full-view rotation enabled, a compact loop badge shows the active interval. A short physical-button press advances immediately to the next visible agent. The gear remains available from every dashboard view.
+
+![AgentMeter touchscreen settings showing individual provider visibility](assets/photos/device-agent-settings.jpg)
 
 ## Connection and data states
 

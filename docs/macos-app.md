@@ -5,7 +5,7 @@ status item available while the main window is closed and controls one bundled b
 private Unix socket. Release builds are self-contained and do not require Python, the source
 repository, or Xcode. The app never opens a competing Bluetooth connection.
 
-![Agent visibility in light mode](assets/screenshots/macos-agents-light.png)
+![AgentMeter macOS Overview with a connected display and local usage history](assets/screenshots/macos-overview-connected.png)
 
 ## What the app manages
 
@@ -20,6 +20,27 @@ repository, or Xcode. The app never opens a competing Bluetooth connection.
 
 Firmware installation and updates are intentionally outside the app. Unsupported measurements remain **Unavailable** rather than being estimated.
 
+## Main-window tour
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/macos-device-health.png" alt="Device page showing Bluetooth connection and ESP32 telemetry"></td>
+    <td width="50%"><img src="assets/screenshots/macos-agent-visibility.png" alt="Coding Agents page showing collection health and display visibility"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Device</strong><br>Discover, reconnect, identify, forget, and inspect supported telemetry</td>
+    <td align="center"><strong>Agents</strong><br>Review collection health and choose what appears on the display</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/macos-display-settings.png" alt="Display page with synchronized device settings and a live preview"></td>
+    <td width="50%"><img src="assets/screenshots/macos-diagnostics.png" alt="Diagnostics page showing bridge, device, and provider health"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Display</strong><br>Control brightness, sleep, rotation, alerts, and preview the layout</td>
+    <td align="center"><strong>Diagnostics</strong><br>Inspect sanitized health data and recent operational events</td>
+  </tr>
+</table>
+
 ## Window and appearance
 
 The default window is 1120 × 760 points with a 900 × 620 point content minimum. It can be resized freely above that minimum and supports the normal macOS full-screen control. Adaptive grids reflow before labels or controls are compressed, and long pages scroll.
@@ -31,6 +52,27 @@ Choose **AgentMeter → Settings** to select:
 - **Dark** — always uses the dark interface
 
 The same preference applies to the main window, menu-bar panel, and settings window. Statuses pair colour with text and symbols.
+
+## Menu-bar panel
+
+The menu-bar panel remains available while the main window is closed. It shows the bridge and
+device state, current agent percentages, navigation shortcuts, connection controls, login-item
+status, preferences, and the explicit quit action. Clicking an agent expands its current session,
+overall cycle, and model-specific windows when those values are reported.
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/screenshots/macos-menu-bar.png" alt="AgentMeter menu-bar panel in its compact live-usage state"></td>
+    <td width="50%"><img src="assets/screenshots/macos-menu-bar-codex-detail.png" alt="AgentMeter menu-bar panel with Codex details expanded"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Compact panel</strong></td>
+    <td align="center"><strong>Expanded provider</strong></td>
+  </tr>
+</table>
+
+Closing the main window hides its Dock icon; it does not stop collection or Bluetooth. Choose
+**Quit AgentMeter** in this panel to stop both the app and its bundled bridge intentionally.
 
 ## Local usage history
 
@@ -57,7 +99,7 @@ can be verified. Download both the DMG and its `.sha256` file from the same GitH
 verify it before installation:
 
 ```bash
-shasum -a 256 -c AgentMeter-0.1.1-macOS-arm64-community.dmg.sha256
+shasum -a 256 -c AgentMeter-0.1.2-macOS-arm64-community.dmg.sha256
 ```
 
 Open the DMG, drag AgentMeter to **Applications**, then Control-click AgentMeter and choose

@@ -18,6 +18,12 @@ Required specification:
 
 Choose the **ESP32-S3** 2.16-inch variant. Similar ESP32-C6 and 1.54-, 1.75-, 1.8-, and 2.06-inch products require different firmware.
 
+![Completed AgentMeter prototype powered over USB-C and showing three live provider cards](assets/photos/agentmeter-desk-hero.jpg)
+
+The integrated enclosure, display, touch controller, buttons, USB interface, power management, and
+Bluetooth radio are all part of the supported unit. The USB-C lead in the photo is enough for
+flashing, diagnostics, and permanent desk power.
+
 ## Bill of materials
 
 ### Required

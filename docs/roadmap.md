@@ -6,6 +6,7 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 
 - Public project structure, MIT license, contribution templates, and CI
 - Architecture, hardware, setup, configuration, protocol, UI, and development guides
+- Photographed project tour and current macOS, menu-bar, device, and touchscreen captures
 - Versioned device schema and privacy-safe fixtures
 - Host, protocol, and native firmware tests
 
@@ -17,7 +18,8 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 
 ## Host data source — complete
 
-- Persistent supervised CodexBar loopback server with a fresh bearer token per process
+- Bounded supervised CodexBar loopback server with a fresh bearer token per process and no
+  provider helpers retained between collection cycles
 - Per-provider last-good caching for transient Claude and other provider failures
 - Dashboard schema validation and allowlist normalization
 - Live Codex, Claude, Gemini, and Cursor acceptance
@@ -58,7 +60,7 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 ## First public hardware release
 
 - Publish signed source archives and prebuilt firmware binaries
-- Add photographs and an enclosure or stand guide
+- Add a reproducible enclosure or stand guide
 - Complete an independent clean-Mac setup test from the documentation
 - Decide whether to enable the board's ES8311 audio path for optional sounds
 
@@ -66,7 +68,7 @@ AgentMeter has a working end-to-end macOS and Waveshare hardware prototype. Rema
 
 - Linux and Windows host packages
 - Additional display boards and enclosure files
-- Historical sparklines and privacy-preserving local trend storage
+- Exportable privacy-preserving local trend summaries
 - Native desktop notifications
 - Multiple paired displays
 - Secure over-the-air firmware updates

@@ -120,6 +120,24 @@ Keep important states readable without relying on color alone. Test one-, two-, 
 
 AMOLED changes must preserve dimming, screen-off, and pixel shifting. Avoid large static bright areas.
 
+## Documentation and screenshots
+
+Keep contributor-facing explanations in `docs/` and link the canonical guide rather than copying
+commands into several files. When behavior changes, update its user guide in the same pull request.
+
+Store photographed hardware under `docs/assets/photos/` and application captures under
+`docs/assets/screenshots/`. Before adding an image:
+
+1. Crop it to the behavior or hardware being explained.
+2. Remove location, camera, account, repository, notification, and other private metadata or content.
+3. Resize it to a practical web dimension and optimize it without making interface text unreadable.
+4. Give it a stable, descriptive, lowercase filename rather than a timestamp or camera sequence.
+5. Add meaningful alternative text that describes the information shown.
+6. Prefer one strong image over several near-duplicates.
+
+The current project photos are bounded JPEG copies with location metadata removed. Keep original
+full-resolution media outside the repository.
+
 ## Pull requests
 
 Keep changes focused and explain their effect on users or contributors. Hardware changes should state the exact board revision, serial port type, firmware build result, and physical acceptance performed. Inspect logs before attaching them and never publish credentials or personal provider data.

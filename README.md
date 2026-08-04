@@ -10,7 +10,17 @@ It pairs a 480×480 AMOLED touchscreen with a lightweight macOS bridge. Provider
 
 The first hardware version is working end to end with Codex, Claude, Gemini, and Cursor data supplied by CodexBar. Bluetooth delivery, acknowledgement, reconnection, USB fallback, the dashboard UI, alerts, and launch-at-login installation are implemented. A native macOS companion adds menu-bar status, device connection management, live telemetry, and complete display controls in polished light and dark themes.
 
-![AgentMeter macOS companion in dark mode](docs/assets/screenshots/macos-overview-dark.png)
+<p align="center">
+  <img src="docs/assets/photos/agentmeter-desk-hero.jpg" width="900" alt="AgentMeter ESP32 desk display showing live coding-agent quota cards">
+</p>
+
+<p align="center">
+  <a href="docs/project-tour.md"><strong>Explore the visual project tour</strong></a>
+  ·
+  <a href="docs/setup.md">Build your own</a>
+  ·
+  <a href="docs/architecture.md">Understand the architecture</a>
+</p>
 
 ## What it shows
 
@@ -22,6 +32,8 @@ The first hardware version is working end to end with Codex, Claude, Gemini, and
 - Touch-driven provider details, recognizable agent marks, and a physical-button fallback
 - On-device agent visibility, always-on, full-view rotation, and rotation interval settings
 - Configurable brightness, dimming, screen-off, and AMOLED pixel shifting
+
+![AgentMeter macOS companion showing a connected device, local usage history, and provider cards](docs/assets/screenshots/macos-overview-connected.png)
 
 ## Architecture
 
@@ -114,7 +126,7 @@ agentmeter/
 ├── desktop/        Native SwiftUI menu-bar app, tests, icon, and packaging
 ├── schemas/        Versioned device data contract
 ├── fixtures/       Safe synthetic payloads
-├── docs/           Build, setup, architecture, and protocol guides
+├── docs/           Visual tour, build, setup, architecture, and protocol guides
 └── config.example.toml
 ```
 
