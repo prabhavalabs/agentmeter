@@ -7,83 +7,89 @@ public struct MenuBarContent: View {
     @Environment(LaunchAtLoginController.self) private var launchAtLogin
     @Environment(BridgeServiceController.self) private var bridgeService
     @Environment(\.openWindow) private var openWindow
+    @State private var providerExpansion = MenuProviderExpansion()
 
     public init() {}
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            deviceHeader
+        MenuBarPanelViewport {
+            VStack(alignment: .leading, spacing: 10) {
+                deviceHeader
 
-            if model.state.providers.isEmpty == false {
-                menuSection("Live usage") {
-                    VStack(spacing: 0) {
-                        ForEach(Array(model.state.providers.prefix(4).enumerated()), id: \.element.id) {
-                            index, provider in
-                            providerRow(provider)
-                            if index < min(model.state.providers.count, 4) - 1 {
-                                menuDivider
+                if model.state.providers.isEmpty == false {
+                    menuSection("Live usage") {
+                        VStack(spacing: 0) {
+                            ForEach(Array(model.state.providers.enumerated()), id: \.element.id) {
+                                index, provider in
+                                providerRow(provider)
+                                if providerExpansion.contains(provider.id) {
+                                    menuDivider
+                                    MenuBarProviderDetailsView(provider: provider)
+                                }
+                                if index < model.state.providers.count - 1 {
+                                    menuDivider
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            menuSection("Open AgentMeter") {
-                VStack(spacing: 0) {
-                    navigationRow(.overview)
-                    menuDivider
-                    navigationRow(.device)
-                    menuDivider
-                    navigationRow(.agents)
-                    menuDivider
-                    navigationRow(.display)
-                }
-            }
-
-            menuSection("Controls") {
-                VStack(spacing: 0) {
-                    connectionRow
-                    menuDivider
-                    refreshRow
-                    menuDivider
-                    launchAtLoginRow
-                }
-            }
-
-            VStack(spacing: 0) {
-                SettingsLink {
-                    MenuBarRowLabel(
-                        title: "Preferences",
-                        symbol: "gearshape",
-                        tint: AgentMeterTheme.accent,
-                        trailingSymbol: "chevron.right"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                menuDivider
-
-                Button {
-                    Task {
-                        await model.stop()
-                        await bridgeService.stop()
-                        NSApplication.shared.terminate(nil)
+                menuSection("Open AgentMeter") {
+                    VStack(spacing: 0) {
+                        navigationRow(.overview)
+                        menuDivider
+                        navigationRow(.device)
+                        menuDivider
+                        navigationRow(.agents)
+                        menuDivider
+                        navigationRow(.display)
                     }
-                } label: {
-                    MenuBarRowLabel(
-                        title: "Quit AgentMeter",
-                        symbol: "xmark",
-                        tint: AgentMeterTheme.critical,
-                        isDestructive: true
-                    )
                 }
-                .buttonStyle(.plain)
-                .keyboardShortcut("q")
+
+                menuSection("Controls") {
+                    VStack(spacing: 0) {
+                        connectionRow
+                        menuDivider
+                        refreshRow
+                        menuDivider
+                        launchAtLoginRow
+                    }
+                }
+
+                VStack(spacing: 0) {
+                    SettingsLink {
+                        MenuBarRowLabel(
+                            title: "Preferences",
+                            symbol: "gearshape",
+                            tint: AgentMeterTheme.accent,
+                            trailingSymbol: "chevron.right"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    menuDivider
+
+                    Button {
+                        Task {
+                            await model.stop()
+                            await bridgeService.stop()
+                            NSApplication.shared.terminate(nil)
+                        }
+                    } label: {
+                        MenuBarRowLabel(
+                            title: "Quit AgentMeter",
+                            symbol: "xmark",
+                            tint: AgentMeterTheme.critical,
+                            isDestructive: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("q")
+                }
+                .menuBarGroup()
             }
-            .menuBarGroup()
+            .padding(10)
         }
-        .padding(10)
-        .frame(width: 320)
         .task {
             await bridgeService.start()
             await model.start()
@@ -136,19 +142,38 @@ public struct MenuBarContent: View {
     }
 
     private func providerRow(_ provider: ProviderSummary) -> some View {
-        HStack(spacing: 10) {
-            ProviderMark(providerId: provider.id, name: provider.name, size: 30)
-            Text(provider.name)
-                .font(.body.weight(.medium))
-                .lineLimit(1)
-            Spacer(minLength: 12)
-            Text(UsageFormatting.percentage(provider.windows.first?.usedPercent))
-                .font(.body.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
+        let isExpanded = providerExpansion.contains(provider.id)
+        return Button {
+            withAnimation(.snappy(duration: 0.2)) {
+                providerExpansion.toggle(provider.id)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                ProviderMark(providerId: provider.id, name: provider.name, size: 30)
+                Text(provider.name)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(UsageFormatting.percentage(provider.windows.first?.usedPercent))
+                    .font(.body.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.tertiary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: 10)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 38)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10)
-        .frame(height: 38)
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityLabel(provider.name)
+        .accessibilityValue(
+            "\(UsageFormatting.percentage(provider.windows.first?.usedPercent)), "
+                + (isExpanded ? "expanded" : "collapsed")
+        )
+        .accessibilityHint(isExpanded ? "Collapse usage details" : "Expand usage details")
     }
 
     private func navigationRow(_ section: NavigationSection) -> some View {

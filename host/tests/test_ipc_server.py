@@ -149,3 +149,26 @@ async def test_ipc_server_refuses_to_replace_a_regular_file(socket_path) -> None
         await server.start()
 
     assert path.read_text() == "keep me"
+
+
+@pytest.mark.asyncio
+async def test_second_ipc_server_cannot_replace_a_running_bridge(socket_path) -> None:
+    first = IpcServer(socket_path, api=RecordingControlApi())
+    second = IpcServer(socket_path, api=RecordingControlApi())
+    await first.start()
+
+    try:
+        with pytest.raises(OSError, match="already running"):
+            await second.start()
+
+        reader, writer = await asyncio.open_unix_connection(first.path)
+        writer.write(b'{"schemaVersion":1,"id":"1","type":"status.get","payload":{}}\n')
+        await writer.drain()
+        response = json.loads(await reader.readline())
+
+        assert response["status"] == "ok"
+        writer.close()
+        await writer.wait_closed()
+    finally:
+        await second.close()
+        await first.close()

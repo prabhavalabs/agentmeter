@@ -222,6 +222,19 @@ public final class BridgeServiceController {
         NSWorkspace.shared.open(url)
     }
 
+    public nonisolated static func communityBridgeArguments(
+        configurationPath: String,
+        ipcPath: String,
+        parentPID: pid_t
+    ) -> [String] {
+        [
+            "run",
+            "--config", configurationPath,
+            "--ipc-path", ipcPath,
+            "--parent-pid", String(parentPID),
+        ]
+    }
+
     private func prepareConfiguration() throws -> URL {
         let support = try fileManager.url(
             for: .applicationSupportDirectory,
@@ -261,11 +274,11 @@ public final class BridgeServiceController {
 
         let process = Process()
         process.executableURL = executable
-        process.arguments = [
-            "run",
-            "--config", configuration.path,
-            "--ipc-path", ipcPath,
-        ]
+        process.arguments = Self.communityBridgeArguments(
+            configurationPath: configuration.path,
+            ipcPath: ipcPath,
+            parentPID: getpid()
+        )
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
         environment["PYTHONUNBUFFERED"] = "1"

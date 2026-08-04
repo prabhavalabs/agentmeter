@@ -2,6 +2,62 @@ import AgentMeterCore
 import AppKit
 import SwiftUI
 
+public struct DeviceScannerPresentation: Equatable, Sendable {
+    public let isScanning: Bool
+    public let hasDevices: Bool
+
+    public init(isScanning: Bool, hasDevices: Bool) {
+        self.isScanning = isScanning
+        self.hasDevices = hasDevices
+    }
+
+    public var emptyTitle: String {
+        isScanning ? "Searching nearby" : "No AgentMeters found"
+    }
+
+    public var emptyDescription: String {
+        isScanning
+            ? "Keep the AgentMeter powered and close to this Mac."
+            : "Make sure the display is powered on and not connected to another Mac, then scan again."
+    }
+
+    public var scanButtonTitle: String {
+        isScanning ? "Scanning…" : "Scan Again"
+    }
+
+    public var showsScanProgress: Bool { isScanning }
+}
+
+private struct DeviceScannerEmptyState: View {
+    let presentation: DeviceScannerPresentation
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "dot.radiowaves.left.and.right")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(AgentMeterTheme.accent)
+                .frame(width: 48, height: 48)
+                .background(
+                    AgentMeterTheme.accent.opacity(0.1),
+                    in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+                )
+
+            VStack(spacing: 6) {
+                Text(presentation.emptyTitle)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(presentation.emptyDescription)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: 460)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
 public struct DeviceView: View {
     @Environment(AppModel.self) private var model
     @State private var showingScanner = false
@@ -197,17 +253,31 @@ public struct DeviceView: View {
     }
 
     private var scannerSheet: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                VStack(alignment: .leading) {
+        let presentation = DeviceScannerPresentation(
+            isScanning: model.activeOperations.contains(.scanning),
+            hasDevices: model.discoveredDevices.isEmpty == false
+        )
+        return VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 20) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("Nearby AgentMeters").font(.title2.bold())
                     Text("Only compatible Bluetooth devices are shown.")
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                if model.activeOperations.contains(.scanning) { ProgressView() }
-                Button("Scan Again") { Task { await model.scan() } }
+                Button { Task { await model.scan() } } label: {
+                    HStack(spacing: 8) {
+                        if presentation.showsScanProgress {
+                            ProgressView()
+                                .controlSize(.mini)
+                        }
+                        Text(presentation.scanButtonTitle)
+                    }
+                    .frame(width: 108)
+                }
+                .disabled(presentation.isScanning)
             }
+            Divider()
             if model.state.connection.phase == .bluetoothUnavailable {
                 ContentUnavailableView {
                     Label("Bluetooth unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
@@ -216,12 +286,9 @@ public struct DeviceView: View {
                 } actions: {
                     Button("Open Bluetooth Settings") { openBluetoothSettings() }
                 }
-            } else if model.discoveredDevices.isEmpty {
-                ContentUnavailableView(
-                    "Searching nearby",
-                    systemImage: "dot.radiowaves.left.and.right",
-                    description: Text("Keep the AgentMeter powered and close to this Mac.")
-                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if presentation.hasDevices == false {
+                DeviceScannerEmptyState(presentation: presentation)
             } else {
                 List(model.discoveredDevices) { peripheral in
                     HStack {
@@ -244,11 +311,24 @@ public struct DeviceView: View {
                     }
                     .padding(.vertical, 6)
                 }
+                .listStyle(.inset)
             }
-            HStack { Spacer(); Button("Done") { showingScanner = false } }
+            Divider()
+            HStack {
+                Spacer()
+                Button("Done") { showingScanner = false }
+                    .keyboardShortcut(.cancelAction)
+            }
         }
         .padding(24)
-        .frame(minWidth: 560, minHeight: 390)
+        .frame(
+            minWidth: 620,
+            idealWidth: 660,
+            maxWidth: 680,
+            minHeight: 420,
+            idealHeight: 440,
+            maxHeight: 480
+        )
     }
 
     private func signalDescription(_ rssi: Int) -> String {

@@ -73,6 +73,11 @@ def build_parser() -> argparse.ArgumentParser:
                 default=default_ipc_path(),
                 help="Private Unix socket used by the desktop application",
             )
+            bridge_parser.add_argument(
+                "--parent-pid",
+                type=int,
+                help="Stop the bridge when this owning desktop process exits",
+            )
     subparsers.add_parser("ipc-path", help="Print the desktop bridge socket path")
     fake_parser = subparsers.add_parser(
         "fake-server",
@@ -156,6 +161,7 @@ def run_bridge_command(
     *,
     once: bool,
     ipc_path: Path | None = None,
+    parent_pid: int | None = None,
 ) -> int:
     try:
         config = load_config(config_path)
@@ -176,6 +182,7 @@ def run_bridge_command(
                     config,
                     ipc_path=ipc_path,
                     stop_event=stop_event,
+                    parent_pid=parent_pid,
                 )
 
             asyncio.run(run_application())
@@ -183,6 +190,7 @@ def run_bridge_command(
         ConfigError,
         CodexBarError,
         NormalizationError,
+        OSError,
         DeviceProtocolError,
         TransportError,
     ) as error:
@@ -250,7 +258,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "send":
         return run_bridge_command(args.config, once=True)
     if args.command == "run":
-        return run_bridge_command(args.config, once=False, ipc_path=args.ipc_path)
+        return run_bridge_command(
+            args.config,
+            once=False,
+            ipc_path=args.ipc_path,
+            parent_pid=args.parent_pid,
+        )
     if args.command == "ipc-path":
         print(default_ipc_path())
         return 0

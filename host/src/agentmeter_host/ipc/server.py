@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import errno
+import fcntl
 import os
 import socket
 import stat
@@ -171,6 +173,7 @@ class IpcServer:
         self._sessions: set[asyncio.Task[None]] = set()
         self._maximum_clients = 8
         self._socket_identity: tuple[int, int] | None = None
+        self._lock_descriptor: int | None = None
 
     async def start(self) -> None:
         if self._server is not None:
@@ -179,19 +182,29 @@ class IpcServer:
             raise ValueError("IPC socket path must not exceed 100 bytes")
         uid = self._current_uid()
         self._prepare_parent(uid)
-        if self.path.exists() or self.path.is_symlink():
-            existing = self.path.lstat()
-            if existing.st_uid != uid or not stat.S_ISSOCK(existing.st_mode):
-                raise PermissionError(f"refusing to replace unsafe IPC path {self.path}")
-            self.path.unlink()
-        self._server = await asyncio.start_unix_server(
-            self._accept,
-            path=self.path,
-            limit=MAXIMUM_IPC_LINE_BYTES + 1,
-        )
-        os.chmod(self.path, 0o600)
-        metadata = self.path.lstat()
-        self._socket_identity = (metadata.st_dev, metadata.st_ino)
+        self._acquire_single_instance_lock(uid)
+        try:
+            if self.path.exists() or self.path.is_symlink():
+                existing = self.path.lstat()
+                if existing.st_uid != uid or not stat.S_ISSOCK(existing.st_mode):
+                    raise PermissionError(f"refusing to replace unsafe IPC path {self.path}")
+                if await self._has_active_listener():
+                    raise OSError(
+                        errno.EADDRINUSE,
+                        f"AgentMeter bridge is already running at {self.path}",
+                    )
+                self.path.unlink()
+            self._server = await asyncio.start_unix_server(
+                self._accept,
+                path=self.path,
+                limit=MAXIMUM_IPC_LINE_BYTES + 1,
+            )
+            os.chmod(self.path, 0o600)
+            metadata = self.path.lstat()
+            self._socket_identity = (metadata.st_dev, metadata.st_ino)
+        except BaseException:
+            self._release_single_instance_lock()
+            raise
 
     def _prepare_parent(self, uid: int) -> None:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -199,6 +212,49 @@ class IpcServer:
         if metadata.st_uid != uid or not stat.S_ISDIR(metadata.st_mode):
             raise PermissionError(f"unsafe IPC directory {self.path.parent}")
         os.chmod(self.path.parent, 0o700)
+
+    def _acquire_single_instance_lock(self, uid: int) -> None:
+        lock_path = self.path.with_name(f"{self.path.name}.lock")
+        flags = os.O_CREAT | os.O_RDWR
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(lock_path, flags, 0o600)
+        try:
+            metadata = os.fstat(descriptor)
+            if metadata.st_uid != uid or not stat.S_ISREG(metadata.st_mode):
+                raise PermissionError(f"unsafe IPC lock {lock_path}")
+            os.fchmod(descriptor, 0o600)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as error:
+                raise OSError(
+                    errno.EADDRINUSE,
+                    f"AgentMeter bridge is already running at {self.path}",
+                ) from error
+        except BaseException:
+            os.close(descriptor)
+            raise
+        self._lock_descriptor = descriptor
+
+    async def _has_active_listener(self) -> bool:
+        try:
+            _reader, writer = await asyncio.wait_for(
+                asyncio.open_unix_connection(self.path),
+                timeout=0.25,
+            )
+        except (TimeoutError, OSError):
+            return False
+        writer.close()
+        await writer.wait_closed()
+        return True
+
+    def _release_single_instance_lock(self) -> None:
+        descriptor = self._lock_descriptor
+        self._lock_descriptor = None
+        if descriptor is None:
+            return
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
     async def _accept(
         self,
@@ -238,6 +294,7 @@ class IpcServer:
             metadata = self.path.lstat()
         except FileNotFoundError:
             self._socket_identity = None
+            self._release_single_instance_lock()
             return
         identity = (metadata.st_dev, metadata.st_ino)
         if (
@@ -247,3 +304,4 @@ class IpcServer:
         ):
             self.path.unlink()
         self._socket_identity = None
+        self._release_single_instance_lock()

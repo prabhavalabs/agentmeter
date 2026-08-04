@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from agentmeter_host.application import BridgeApplication
+from agentmeter_host.application import BridgeApplication, run_desktop_application
 
 
 class RecordingController:
@@ -79,3 +79,30 @@ async def test_application_cleans_controller_after_ipc_startup_failure() -> None
     assert controller.run_count == 0
     assert server.close_count == 1
     assert controller.close_count == 1
+
+
+@pytest.mark.asyncio
+async def test_community_bridge_stops_when_its_parent_application_exits() -> None:
+    class RecordingApplication:
+        def __init__(self) -> None:
+            self.started = asyncio.Event()
+            self.stopped = False
+
+        async def run(self, stop_event: asyncio.Event) -> None:
+            self.started.set()
+            await stop_event.wait()
+            self.stopped = True
+
+    application = RecordingApplication()
+    parent_pids = iter((2468, 1))
+
+    await run_desktop_application(
+        object(),
+        parent_pid=2468,
+        parent_pid_provider=lambda: next(parent_pids, 1),
+        parent_check_interval_seconds=0,
+        application_factory=lambda *_args, **_kwargs: application,
+    )
+
+    assert application.started.is_set()
+    assert application.stopped is True
