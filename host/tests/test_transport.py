@@ -336,10 +336,14 @@ async def test_bleak_backend_reports_missing_display_as_retryable() -> None:
         client_factory=lambda *_args, **_kwargs: None,
     )
 
-    with pytest.raises(TransportError, match="No AgentMeter display") as error:
+    with pytest.raises(
+        TransportError,
+        match="No compatible AgentMeter display was discovered",
+    ) as error:
         await backend.connect()
 
     assert error.value.retryable is True
+    assert error.value.code == "deviceNotFound"
 
 
 @pytest.mark.asyncio

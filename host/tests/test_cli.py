@@ -83,8 +83,8 @@ def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
 
     calls = []
 
-    async def fake_run_application(config, *, ipc_path, stop_event):
-        calls.append((config.provider_ids, ipc_path, stop_event.is_set()))
+    async def fake_run_application(config, *, ipc_path, stop_event, parent_pid):
+        calls.append((config.provider_ids, ipc_path, stop_event.is_set(), parent_pid))
 
     monkeypatch.setattr(cli, "run_desktop_application", fake_run_application, raising=False)
 
@@ -97,11 +97,28 @@ def test_run_command_starts_continuous_bridge(monkeypatch) -> None:
                 str(ROOT / "config.example.toml"),
                 "--ipc-path",
                 str(ipc_path),
+                "--parent-pid",
+                "2468",
             ]
         )
         == 0
     )
-    assert calls == [(("codex", "claude", "gemini", "cursor"), ipc_path, False)]
+    assert calls == [(("codex", "claude", "gemini", "cursor"), ipc_path, False, 2468)]
+
+
+def test_run_command_reports_when_another_bridge_owns_the_socket(
+    monkeypatch,
+    capsys,
+) -> None:
+    import agentmeter_host.cli as cli
+
+    async def fake_run_application(*_args, **_kwargs):
+        raise OSError("AgentMeter bridge is already running")
+
+    monkeypatch.setattr(cli, "run_desktop_application", fake_run_application, raising=False)
+
+    assert main(["run", "--config", str(ROOT / "config.example.toml")]) == 1
+    assert "AgentMeter bridge is already running" in capsys.readouterr().err
 
 
 def test_ipc_path_command_prints_runtime_socket(monkeypatch, tmp_path, capsys) -> None:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -106,7 +108,44 @@ async def run_desktop_application(
     *,
     ipc_path: Path | None = None,
     stop_event: asyncio.Event | None = None,
+    parent_pid: int | None = None,
+    parent_pid_provider: Callable[[], int] = os.getppid,
+    parent_check_interval_seconds: float = 1,
     application_factory: Callable[..., BridgeApplication] = build_application,
 ) -> None:
     application = application_factory(config, ipc_path=ipc_path)
-    await application.run(stop_event or asyncio.Event())
+    active_stop = stop_event or asyncio.Event()
+    parent_monitor: asyncio.Task[None] | None = None
+    if parent_pid is not None:
+        parent_monitor = asyncio.create_task(
+            _stop_when_parent_exits(
+                active_stop,
+                expected_parent_pid=parent_pid,
+                parent_pid_provider=parent_pid_provider,
+                check_interval_seconds=parent_check_interval_seconds,
+            )
+        )
+    try:
+        await application.run(active_stop)
+    finally:
+        if parent_monitor is not None:
+            parent_monitor.cancel()
+            await asyncio.gather(parent_monitor, return_exceptions=True)
+
+
+async def _stop_when_parent_exits(
+    stop_event: asyncio.Event,
+    *,
+    expected_parent_pid: int,
+    parent_pid_provider: Callable[[], int],
+    check_interval_seconds: float,
+) -> None:
+    while not stop_event.is_set():
+        if parent_pid_provider() != expected_parent_pid:
+            stop_event.set()
+            return
+        with suppress(TimeoutError):
+            await asyncio.wait_for(
+                stop_event.wait(),
+                timeout=check_interval_seconds,
+            )

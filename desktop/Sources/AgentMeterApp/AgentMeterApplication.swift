@@ -86,11 +86,11 @@ struct AgentMeterApplication: App {
 @MainActor
 private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApplication.shared.setActivationPolicy(.regular)
-        NSApplication.shared.activate(ignoringOtherApps: true)
+        ApplicationPresentationController.shared.windowWillOpen()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        false
+        ApplicationPresentationController.shared.lastWindowDidClose()
+        return false
     }
 }

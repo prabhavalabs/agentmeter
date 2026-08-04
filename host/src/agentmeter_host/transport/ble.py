@@ -204,7 +204,7 @@ class BleakBackend:
                 )
             if selected is None:
                 raise TransportError(
-                    f"No AgentMeter display named {self._name_prefix!r} was discovered",
+                    "No compatible AgentMeter display was discovered",
                     retryable=True,
                     code="deviceNotFound",
                 )
