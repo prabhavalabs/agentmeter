@@ -72,7 +72,7 @@ public enum AgentMeterRoute: Equatable, Sendable {
         return components.url!
     }
 
-    private static func isValidProviderID(_ providerID: String) -> Bool {
+    public static func isValidProviderID(_ providerID: String) -> Bool {
         guard (1...23).contains(providerID.utf8.count) else { return false }
         return providerID.utf8.allSatisfy { byte in
             (UInt8(ascii: "a")...UInt8(ascii: "z")).contains(byte)

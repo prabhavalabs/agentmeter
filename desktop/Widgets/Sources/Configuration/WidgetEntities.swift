@@ -53,9 +53,14 @@ struct ProviderEntityQuery: EntityQuery {
 
     private func allEntities() -> [ProviderEntity] {
         guard let snapshot = try? loader() else { return [] }
-        var seen = Set<String>()
-        return snapshot.providers.compactMap { provider in
-            guard seen.insert(provider.id).inserted else { return nil }
+        let validProviders = snapshot.providers.filter {
+            AgentMeterRoute.isValidProviderID($0.id)
+        }
+        let identityCounts = validProviders.reduce(into: [String: Int]()) {
+            $0[$1.id, default: 0] += 1
+        }
+        return validProviders.compactMap { provider in
+            guard identityCounts[provider.id] == 1 else { return nil }
             return ProviderEntity(id: provider.id, name: provider.name)
         }
     }
@@ -93,18 +98,24 @@ struct WindowEntityQuery: EntityQuery {
 
     private func allEntities() -> [WindowEntity] {
         guard let snapshot = try? loader() else { return [] }
-        var seen = Set<String>()
-        return snapshot.providers.flatMap { provider in
-            provider.windows.compactMap { window in
+        let candidates = snapshot.providers.flatMap { provider -> [WindowEntity] in
+            guard AgentMeterRoute.isValidProviderID(provider.id) else { return [] }
+            return provider.windows.compactMap { window in
+                guard window.kind.isEmpty == false, window.kind.contains(":") == false else {
+                    return nil
+                }
                 let entity = WindowEntity(
                     providerID: provider.id,
                     windowKind: window.kind,
                     label: window.label
                 )
-                guard seen.insert(entity.id).inserted else { return nil }
                 return entity
             }
         }
+        let identityCounts = candidates.reduce(into: [String: Int]()) {
+            $0[$1.id, default: 0] += 1
+        }
+        return candidates.filter { identityCounts[$0.id] == 1 }
     }
 }
 

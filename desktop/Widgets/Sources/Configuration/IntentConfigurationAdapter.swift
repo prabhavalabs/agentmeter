@@ -13,6 +13,7 @@ enum IntentConfigurationAdapter {
             historyRange: intent.historyRange,
             heatScope: intent.heatScope,
             trendWindow: intent.trendWindow,
+            trendFocusWindowKind: nil,
             layout: intent.layout,
             density: intent.density,
             theme: intent.theme,
@@ -37,6 +38,9 @@ enum IntentConfigurationAdapter {
             historyRange: intent.historyRange,
             heatScope: intent.heatScope,
             trendWindow: intent.trendWindow,
+            trendFocusWindowKind: intent.trendWindow == .focus
+                ? matchingWindowKind(intent.specificTrendWindow, providerID: providerID)
+                : nil,
             layout: intent.layout,
             density: intent.density,
             theme: intent.theme,
@@ -67,6 +71,7 @@ enum IntentConfigurationAdapter {
         historyRange: IntentHistoryRangeOption,
         heatScope: IntentHeatScopeOption,
         trendWindow: IntentTrendWindowOption,
+        trendFocusWindowKind: String?,
         layout: IntentLayoutOption,
         density: IntentDensityOption,
         theme: IntentThemeOption,
@@ -93,6 +98,7 @@ enum IntentConfigurationAdapter {
             historyPeriod: historyRange.renderValue,
             heatMapScope: heatScope.renderValue,
             trendWindow: trendWindow.renderValue,
+            trendFocusWindowKind: trendFocusWindowKind,
             layout: layout.renderValue,
             density: density.renderValue,
             theme: theme.renderValue,

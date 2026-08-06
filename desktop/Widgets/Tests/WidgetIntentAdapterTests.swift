@@ -22,7 +22,7 @@ import Testing
 }
 
 @Test func focusMappingPreservesProviderWindowsAndPresentationChoices() {
-    var intent = FocusWidgetIntent()
+    let intent = FocusWidgetIntent()
     intent.provider = ProviderEntity(id: "codex", name: "Codex")
     intent.outerWindow = WindowEntity(providerID: "codex", windowKind: "weekly", label: "Weekly")
     intent.innerWindow = WindowEntity(providerID: "codex", windowKind: "session", label: "Session")
@@ -62,7 +62,7 @@ import Testing
 }
 
 @Test func focusMappingRejectsWindowsFromAnotherProvider() {
-    var intent = FocusWidgetIntent()
+    let intent = FocusWidgetIntent()
     intent.provider = ProviderEntity(id: "codex", name: "Codex")
     intent.outerWindow = WindowEntity(providerID: "claude", windowKind: "weekly", label: "Weekly")
     intent.innerWindow = WindowEntity(providerID: "codex", windowKind: "session", label: "Session")
@@ -73,8 +73,35 @@ import Testing
     #expect(configuration.innerWindowKind == "session")
 }
 
+@Test func focusSpecificTrendWindowMapsOnlyForTheSelectedProvider() {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "codex", name: "Codex")
+    intent.trendWindow = .focus
+    intent.specificTrendWindow = WindowEntity(
+        providerID: "codex",
+        windowKind: "weekly",
+        label: "Weekly"
+    )
+
+    let matching = IntentConfigurationAdapter.focus(intent)
+
+    #expect(matching.trendWindow == .focus)
+    #expect(matching.trendFocusWindowKind == "weekly")
+
+    intent.specificTrendWindow = WindowEntity(
+        providerID: "claude",
+        windowKind: "monthly",
+        label: "Monthly"
+    )
+
+    let mismatched = IntentConfigurationAdapter.focus(intent)
+
+    #expect(mismatched.trendWindow == .focus)
+    #expect(mismatched.trendFocusWindowKind == nil)
+}
+
 @Test func dashboardAllHistoryAndTapOptionsMapWithoutConflation() {
-    var intent = DashboardWidgetIntent()
+    let intent = DashboardWidgetIntent()
     intent.providers = [
         ProviderEntity(id: "claude", name: "Claude"),
         ProviderEntity(id: "codex", name: "Codex"),
@@ -112,6 +139,21 @@ import Testing
     #expect(suggested.map(\.id) == ["claude:monthly", "claude:session"])
     #expect(suggested.map(\.label) == ["Monthly", "Session"])
     #expect(resolved.map(\.id) == ["codex:weekly", "claude:monthly"])
+}
+
+@Test func entityQueriesOmitAmbiguousCompositeIDsAndKeepValidSiblingOrder() async throws {
+    let providers = ProviderEntityQuery(loader: { ambiguousEntitySnapshot() })
+    let windows = WindowEntityQuery(loader: { ambiguousEntitySnapshot() }, selectedProviderID: "a")
+
+    let suggestedProviders = try await providers.suggestedEntities()
+    let suggestedWindows = try await windows.suggestedEntities()
+    let resolvedAmbiguousID = try await windows.entities(
+        for: ["a:b:c", "beta:monthly", "a:weekly"]
+    )
+
+    #expect(suggestedProviders.map(\.id) == ["a", "beta"])
+    #expect(suggestedWindows.map(\.id) == ["a:weekly"])
+    #expect(resolvedAmbiguousID.map(\.id) == ["a:weekly", "beta:monthly"])
 }
 
 @Test func entityQueriesFailClosedWhenTheSnapshotLoaderIsMissingOrThrows() async throws {
@@ -153,6 +195,68 @@ private func entitySnapshot() -> WidgetSnapshot {
                 windows: [
                     WidgetWindowSnapshot(kind: "monthly", label: "Monthly", usedPercent: 11, resetAtEpoch: nil),
                     WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: nil, resetAtEpoch: nil),
+                ],
+                history: []
+            ),
+        ]
+    )
+}
+
+private func ambiguousEntitySnapshot() -> WidgetSnapshot {
+    WidgetSnapshot(
+        generatedAtEpoch: 1_000,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: nil,
+        providers: [
+            WidgetProviderSnapshot(
+                id: "a",
+                name: "A",
+                status: "ok",
+                updatedAtEpoch: nil,
+                windows: [
+                    WidgetWindowSnapshot(kind: "b:c", label: "Ambiguous One", usedPercent: nil, resetAtEpoch: nil),
+                    WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: nil, resetAtEpoch: nil),
+                ],
+                history: []
+            ),
+            WidgetProviderSnapshot(
+                id: "a:b",
+                name: "Ambiguous Two",
+                status: "ok",
+                updatedAtEpoch: nil,
+                windows: [
+                    WidgetWindowSnapshot(kind: "c", label: "Ambiguous Two", usedPercent: nil, resetAtEpoch: nil),
+                ],
+                history: []
+            ),
+            WidgetProviderSnapshot(
+                id: "",
+                name: "Empty",
+                status: "ok",
+                updatedAtEpoch: nil,
+                windows: [
+                    WidgetWindowSnapshot(kind: "daily", label: "Daily", usedPercent: nil, resetAtEpoch: nil),
+                ],
+                history: []
+            ),
+            WidgetProviderSnapshot(
+                id: "Codex",
+                name: "Not Normalized",
+                status: "ok",
+                updatedAtEpoch: nil,
+                windows: [
+                    WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: nil, resetAtEpoch: nil),
+                ],
+                history: []
+            ),
+            WidgetProviderSnapshot(
+                id: "beta",
+                name: "Beta",
+                status: "ok",
+                updatedAtEpoch: nil,
+                windows: [
+                    WidgetWindowSnapshot(kind: "", label: "Empty Kind", usedPercent: nil, resetAtEpoch: nil),
+                    WidgetWindowSnapshot(kind: "monthly", label: "Monthly", usedPercent: nil, resetAtEpoch: nil),
                 ],
                 history: []
             ),

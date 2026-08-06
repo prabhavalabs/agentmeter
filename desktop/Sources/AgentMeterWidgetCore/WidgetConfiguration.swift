@@ -100,6 +100,7 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
     public let historyPeriod: WidgetHistoryPeriod
     public let heatMapScope: WidgetHeatMapScope
     public let trendWindow: WidgetTrendWindow
+    public let trendFocusWindowKind: String?
     public let layout: WidgetLayoutPreset
     public let density: WidgetDensity
     public let theme: WidgetTheme
@@ -119,6 +120,7 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
         historyPeriod: WidgetHistoryPeriod,
         heatMapScope: WidgetHeatMapScope,
         trendWindow: WidgetTrendWindow = .outer,
+        trendFocusWindowKind: String? = nil,
         layout: WidgetLayoutPreset,
         density: WidgetDensity,
         theme: WidgetTheme,
@@ -137,6 +139,7 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
         self.historyPeriod = historyPeriod
         self.heatMapScope = heatMapScope
         self.trendWindow = trendWindow
+        self.trendFocusWindowKind = trendFocusWindowKind
         self.layout = layout
         self.density = density
         self.theme = theme

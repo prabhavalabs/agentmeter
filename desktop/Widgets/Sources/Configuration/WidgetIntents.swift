@@ -160,6 +160,8 @@ struct FocusWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Provider") var provider: ProviderEntity?
     @Parameter(title: "Outer Window", optionsProvider: WindowEntityQuery()) var outerWindow: WindowEntity?
     @Parameter(title: "Inner Window", optionsProvider: WindowEntityQuery()) var innerWindow: WindowEntity?
+    @Parameter(title: "Specific Trend Window", optionsProvider: WindowEntityQuery())
+    var specificTrendWindow: WindowEntity?
     @Parameter(title: "Percentage", default: .used) var percentage: IntentPercentageOption
     @Parameter(title: "History", default: .heatMap) var historyStyle: IntentHistoryStyleOption
     @Parameter(title: "History Range", default: .days30) var historyRange: IntentHistoryRangeOption
@@ -178,6 +180,7 @@ struct FocusWidgetIntent: WidgetConfigurationIntent {
         Summary("Focus: \(\.$provider), \(\.$percentage), \(\.$historyStyle)") {
             \.$outerWindow
             \.$innerWindow
+            \.$specificTrendWindow
             \.$historyRange
             \.$heatScope
             \.$trendWindow
