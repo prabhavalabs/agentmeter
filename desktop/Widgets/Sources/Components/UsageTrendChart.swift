@@ -26,8 +26,14 @@ struct UsageTrendChart: View {
                 chart
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(accessibilitySummary))
+        .accessibilityRepresentation {
+            VStack(alignment: .leading) {
+                Text(accessibilitySummary)
+                ForEach(Array(projection.trendPoints.enumerated()), id: \.offset) { _, point in
+                    Text(WidgetHistoryAccessibility.trendDay(point))
+                }
+            }
+        }
     }
 
     private var chart: some View {

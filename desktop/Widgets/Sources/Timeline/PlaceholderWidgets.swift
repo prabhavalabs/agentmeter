@@ -15,21 +15,27 @@ struct FictionalUsageEntry: TimelineEntry {
 
 private struct FictionalFocusProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> FictionalUsageEntry {
-        entry(family: context.family)
+        entry(configuration: FocusWidgetIntent(), family: context.family)
     }
 
     func snapshot(for configuration: FocusWidgetIntent, in context: Context) async -> FictionalUsageEntry {
-        entry(family: context.family)
+        entry(configuration: configuration, family: context.family)
     }
 
     func timeline(for configuration: FocusWidgetIntent, in context: Context) async -> Timeline<FictionalUsageEntry> {
-        Timeline(entries: [entry(family: context.family)], policy: .never)
+        Timeline(entries: [entry(configuration: configuration, family: context.family)], policy: .never)
     }
 
-    private func entry(family: WidgetKit.WidgetFamily) -> FictionalUsageEntry {
+    private func entry(
+        configuration: FocusWidgetIntent,
+        family: WidgetKit.WidgetFamily
+    ) -> FictionalUsageEntry {
         FictionalUsageEntry(
             date: Date(),
-            focusPresentation: FictionalFocusPresentations.codex(family: family.presentationFamily)
+            focusPresentation: FictionalFocusPresentationSource.presentation(
+                for: configuration,
+                family: family.presentationFamily
+            )
         )
     }
 }
@@ -92,7 +98,7 @@ struct AgentMeterDashboardWidget: Widget {
             DashboardPlaceholderView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Dashboard")
-        .description("A fictional preview of overall coding-agent usage.")
+        .description("Overall agent allowance usage.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }
@@ -109,7 +115,7 @@ struct AgentMeterFocusWidget: Widget {
             FocusPlaceholderView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Focus")
-        .description("A fictional preview of the current coding session.")
+        .description("Focused agent allowance limits.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }

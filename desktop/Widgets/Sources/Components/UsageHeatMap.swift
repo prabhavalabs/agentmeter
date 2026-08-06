@@ -30,8 +30,14 @@ struct UsageHeatMap: View {
                 }
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(accessibilitySummary))
+        .accessibilityRepresentation {
+            VStack(alignment: .leading) {
+                Text(accessibilitySummary)
+                ForEach(Array(projection.cells.enumerated()), id: \.offset) { _, cell in
+                    Text(WidgetHistoryAccessibility.heatMapDay(cell))
+                }
+            }
+        }
     }
 
     private var columns: [GridItem] {

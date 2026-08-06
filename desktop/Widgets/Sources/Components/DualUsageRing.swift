@@ -18,15 +18,12 @@ struct DualUsageRing: View {
             }
 
             VStack(spacing: 0) {
-                Text(displayText(for: outer))
-                    .font(.system(.title2, design: .rounded, weight: .bold))
-                    .monospacedDigit()
-                    .minimumScaleFactor(0.6)
-                Text(percentageMode == .used ? "used" : "remaining")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                ViewThatFits(in: .vertical) {
+                    fullLegend
+                    compactLegend
+                }
             }
-            .padding(28)
+            .padding(23)
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityElement(children: .ignore)
@@ -67,6 +64,48 @@ struct DualUsageRing: View {
         presentation.displayedPercent.map { "\($0)%" } ?? "Not reported"
     }
 
+    private var fullLegend: some View {
+        VStack(spacing: 0) {
+            Text(outer.label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Text(displayText(for: outer))
+                .font(.system(.title3, design: .rounded, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+            Text(percentageMode == .used ? "used" : "remaining")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if let inner {
+                Divider()
+                    .frame(width: 34)
+                Text(DualUsageRingLegend.innerText(inner))
+                    .font(.caption2.weight(.semibold))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
+            }
+        }
+        .minimumScaleFactor(0.55)
+    }
+
+    private var compactLegend: some View {
+        VStack(spacing: 0) {
+            Text(displayText(for: outer))
+                .font(.system(.body, design: .rounded, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+            if let inner {
+                Text(DualUsageRingLegend.innerText(inner))
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+            }
+        }
+    }
+
     private var accessibilitySummary: String {
         ([outer] + [inner].compactMap { $0 }).map { presentation in
             let value = presentation.displayedPercent.map { "\($0) percent" } ?? "Not reported"
@@ -80,5 +119,12 @@ struct DualUsageRing: View {
         case .scheduled: "Reset scheduled"
         case .pending: "Refresh pending"
         }
+    }
+}
+
+enum DualUsageRingLegend {
+    static func innerText(_ presentation: WidgetRingPresentation) -> String {
+        let value = presentation.displayedPercent.map { "\($0)%" } ?? "Not reported"
+        return "\(presentation.label) \(value)"
     }
 }

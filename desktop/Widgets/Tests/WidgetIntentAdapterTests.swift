@@ -80,6 +80,64 @@ import Testing
     #expect(Set(IntentTapDestinationOption.allCases) == [.overview, .providerDetail, .agents])
 }
 
+@Test func fictionalFocusSourceAppliesProviderWindowsAndRemainingMode() {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "claude", name: "Claude")
+    intent.outerWindow = WindowEntity(providerID: "claude", windowKind: "monthly", label: "Monthly")
+    intent.innerWindow = WindowEntity(providerID: "claude", windowKind: "session", label: "Session")
+    intent.percentage = .remaining
+
+    let presentation = FictionalFocusPresentationSource.presentation(
+        for: intent,
+        family: .large
+    )
+
+    #expect(presentation.providers.first?.id == "claude")
+    #expect(presentation.providers.first?.rings.map(\.windowKind) == ["monthly", "session"])
+    #expect(presentation.providers.first?.rings.map(\.displayedPercent) == [67, 76])
+    #expect(presentation.configuration.percentageMode == .remaining)
+}
+
+@Test func fictionalFocusSourceAppliesHistoryThemeResetModulesAndTapChoices() {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "gemini", name: "Gemini")
+    intent.historyStyle = .none
+    intent.theme = .providerTinted
+    intent.tapDestination = .agents
+    intent.showResetCountdown = false
+    intent.showAbsoluteResetDate = true
+    intent.showStatus = true
+    intent.showFreshness = true
+
+    let presentation = FictionalFocusPresentationSource.presentation(
+        for: intent,
+        family: .large
+    )
+
+    #expect(presentation.providers.first?.id == "gemini")
+    #expect(presentation.history == nil)
+    #expect(!presentation.modules.contains(.history))
+    #expect(presentation.modules.contains(.status))
+    #expect(presentation.modules.contains(.freshness))
+    #expect(presentation.configuration.theme == .providerTinted)
+    #expect(presentation.configuration.tapDestination == .agents)
+    #expect(!presentation.configuration.showsResetCountdown)
+    #expect(presentation.configuration.showsAbsoluteResetDate)
+}
+
+@Test func fictionalFocusSourceFallsBackSafelyForUnknownProvider() {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "private-account", name: "Private Account")
+
+    let presentation = FictionalFocusPresentationSource.presentation(
+        for: intent,
+        family: .small
+    )
+
+    #expect(presentation.providers.first?.id == "codex")
+    #expect(presentation.providers.first?.name == "Codex")
+}
+
 @Test func focusMappingRejectsWindowsFromAnotherProvider() {
     let intent = FocusWidgetIntent()
     intent.provider = ProviderEntity(id: "codex", name: "Codex")

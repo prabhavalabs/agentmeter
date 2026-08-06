@@ -3,12 +3,14 @@ import SwiftUI
 
 struct FocusWidgetView: View {
     let presentation: WidgetPresentation
+    @Environment(\.colorScheme) private var colorScheme
 
     private var provider: WidgetProviderPresentation? { presentation.providers.first }
     private var palette: WidgetThemePalette {
         WidgetThemePalette(
             theme: presentation.configuration.theme,
-            providerID: provider?.id ?? ""
+            providerID: provider?.id ?? "",
+            colorScheme: colorScheme
         )
     }
 
