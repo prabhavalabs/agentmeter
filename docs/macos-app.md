@@ -91,6 +91,48 @@ rows are included when the local provider source reports them. If a provider nam
 without reporting its percentage, AgentMeter displays **Not reported** instead of inventing a zero
 value.
 
+## Desktop widgets
+
+The managed app provides two WidgetKit choices. **AgentMeter Dashboard** shows several providers;
+**AgentMeter Focus** shows one provider with selectable outer and inner allowance windows. Both
+support the small, medium, large, and extra-large macOS families. Provider capacity is two in
+small, four in medium, five in large, and eight in extra-large. Weekly, monthly, or billing-cycle
+allowances are preferred as the primary outer value, while session, daily, and other shorter
+windows remain visible as the inner or additional values.
+
+Edit a widget to configure its providers, selected Focus windows, **Used** or **Remaining**
+percentage, 7- or 30-day history, layout, compact or comfortable density, theme, reset countdown
+or absolute date, optional status and freshness, and whether a click opens Overview, Agents, or a
+provider detail. Every widget instance stores its own configuration, so a Dashboard and multiple
+Focus widgets can make independent choices.
+
+Small and medium families omit history so allowance and reset values stay readable. Large and
+extra-large families can show a heat map or trend:
+
+- A heat map measures percentage points consumed during each local calendar day. Combined scope
+  averages available provider values; single-provider scope uses only the selected provider.
+- A trend shows the latest used percentage recorded on each day for the selected outer, inner, or
+  specific Focus window. Switching the rings to **Remaining** does not invert historical facts;
+  history continues to describe allowance consumption.
+- Missing days are gaps, not zeroes. The 7-day and 30-day ranges follow local calendar boundaries,
+  including daylight-saving changes.
+
+If a reset timestamp has passed but no fresh provider sample has established the next window, the
+widget says **Refresh pending**. It does not infer a zero or roll the old value into a new cycle.
+Widget timelines continue updating while the main window is closed because the menu-bar app and
+bridge remain active.
+
+The app writes one bounded JSON snapshot to
+`group.com.prabhavalabs.agentmeter.shared`; the extension reads that file directly. The snapshot
+contains only provider IDs and display names, health status, percentages, reset and update times,
+and downsampled daily history. It contains no account identity, prompt, code, repository or file
+path, API token, cookie, credential, raw response, local session log, cost, credit, or billing
+field. The extension has no IPC, Bluetooth, SQLite, network, or keychain dependency.
+
+The first widget release is managed-only because Apple requires the app and extension to carry
+matching App Group entitlements and compatible provisioning profiles. The community DMG remains
+app-only and has no `Contents/PlugIns` directory or App Group dependency.
+
 ## Install a release
 
 The public community DMG is ad-hoc signed and is not notarized by Apple. That means macOS cannot
@@ -130,19 +172,29 @@ idempotent and never intentionally runs two Bluetooth bridges after setup comple
 
 ## Build for local development
 
-Install the development and packaging dependencies, then sign with an installed Apple Development
-identity so ServiceManagement can authorize the helper:
+Install the development and packaging dependencies. The normal package target creates the
+app-only community build:
 
 ```bash
 make setup
-CODE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" make desktop-app
+make desktop-app
 ditto desktop/dist/AgentMeter.app /Applications/AgentMeter.app
 open /Applications/AgentMeter.app
 ```
 
-The bundle is written to `desktop/dist/AgentMeter.app`. If no identity is supplied, the script uses
-an ad-hoc signature suitable for build and interface checks, but macOS does not authorize its
-embedded background item. Use the synthetic bridge workflow below for ad-hoc UI development.
+The bundle is written to `desktop/dist/AgentMeter.app` with an ad-hoc signature suitable for build
+and interface checks. It has no widget and macOS does not authorize its embedded background item.
+Use the synthetic bridge workflow below for ad-hoc UI development. For an unsigned Xcode build
+that compiles and embeds the WidgetKit extension, run:
+
+```bash
+make desktop-widget-build
+make desktop-widget-verify
+```
+
+The verifier inspects
+`desktop/.build/xcode-derived/Build/Products/Debug/AgentMeter.app`. An unsigned build proves bundle
+structure only; gallery presence and App Group sharing require real signing.
 
 **Launch AgentMeter at login** controls whether the graphical app and menu item open after sign-in.
 The bundled bridge is a separate lightweight background item because it maintains collection and
@@ -161,21 +213,32 @@ No device, provider account, credentials, or Bluetooth permission is required fo
 
 ## Packaging and signing
 
-`desktop/scripts/package-app.sh` performs a release Swift build, packages one Python runtime as a
-one-folder helper, creates every required `.icns` size from the 1024-pixel source, assembles the
-modern ServiceManagement layout, signs it, and validates the complete code signature and property
-list.
+`desktop/scripts/package-app.sh` has two explicit paths. Community mode performs the existing
+SwiftPM/manual assembly and produces an ad-hoc, app-only bundle. Managed mode builds the Release
+Xcode scheme, copies that signed app into `desktop/dist` without mutating the Xcode build product,
+adds the signed PyInstaller bridge and release resources, preserves the extension signature, and
+then signs only the outer app with `desktop/Resources/AgentMeter.entitlements`. It never uses
+`codesign --deep` to repair nested code.
 
-For a Developer ID build, provide the identity:
+Managed mode requires a real team, signing identity, and the UUIDs of two installed provisioning
+profiles. Both profiles must grant `group.com.prabhavalabs.agentmeter.shared` and target their
+exact bundle IDs. The script does not permit Xcode portal updates and rejects the build if Xcode
+embeds any profile other than the requested UUIDs. It verifies the signed Xcode source product,
+then inspects app and extension signatures and entitlements separately after packaging:
 
 ```bash
-CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+AGENTMETER_DISTRIBUTION_MODE=managed \
+AGENTMETER_DEVELOPMENT_TEAM="TEAMID" \
+AGENTMETER_APP_PROVISIONING_PROFILE="APP-PROFILE-UUID" \
+AGENTMETER_WIDGET_PROVISIONING_PROFILE="WIDGET-PROFILE-UUID" \
+CODE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" \
   desktop/scripts/package-app.sh
 ```
 
-Developer ID credentials, notarization submission, and stapling are release-owner operations. An
-ad-hoc package is produced as an explicitly labelled community build. It runs the bridge as a child
-of the menu-bar application instead of attempting to authorize the managed background service.
+Distribution credentials, notarization submission, and stapling are release-owner operations. A
+managed distribution must use profiles and an identity appropriate for that release channel. The
+ad-hoc community package runs the bridge as a child of the menu-bar application instead of
+attempting to authorize the managed background service.
 
 Build and verify the community DMG without an Apple Developer account:
 
@@ -196,6 +259,25 @@ NOTARY_KEYCHAIN_PROFILE="AgentMeter Notary" desktop/scripts/notarize-app.sh
 The keychain profile must already have been created with `xcrun notarytool store-credentials`.
 The script submits a temporary archive, staples and validates the app, verifies Gatekeeper, and
 writes the distributable zip to `desktop/dist`.
+
+### Signed widget acceptance
+
+The automated unsigned build cannot substitute for this release-owner check. With a real
+development team and matching app/widget App Group profiles:
+
+1. Build managed mode, run `desktop/scripts/verify-widget-bundle.sh desktop/dist/AgentMeter.app`,
+   and inspect app and extension independently with `codesign -dvvv --entitlements :-`.
+2. Install the app and confirm Dashboard and Focus appear in the widget gallery.
+3. Add independent instances and exercise small, medium, large, and extra-large families.
+4. Verify used and remaining values, 7/30-day heat maps and trends, density, every theme, window
+   selections, and Overview, Agents, and provider-detail deep links.
+5. Close the main window and confirm widget data continues updating.
+6. Interrupt and restore the bridge, confirming honest stale/unavailable recovery.
+7. Use the reset-boundary synthetic fixture and confirm a passed reset says **Refresh pending**
+   until fresh provider data arrives.
+
+Do not report this checklist as passed without the actual team, profiles, installed widget gallery,
+and runtime observations.
 
 ## Troubleshooting
 

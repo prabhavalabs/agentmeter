@@ -2,7 +2,7 @@ PYTHON ?= python3.11
 VENV ?= .venv
 PIO ?= $(VENV)/bin/pio
 
-.PHONY: setup lint test host-test desktop-test desktop-build desktop-app desktop-community-dmg firmware-test firmware clean
+.PHONY: setup lint test host-test desktop-test desktop-build desktop-project desktop-widget-build desktop-widget-verify desktop-app desktop-community-dmg firmware-test firmware clean
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -23,6 +23,15 @@ desktop-test:
 
 desktop-build:
 	swift build --package-path desktop
+
+desktop-project:
+	desktop/scripts/generate-xcode-project.sh
+
+desktop-widget-build:
+	xcodebuild -project desktop/AgentMeter.xcodeproj -scheme AgentMeter -configuration Debug -derivedDataPath desktop/.build/xcode-derived CODE_SIGNING_ALLOWED=NO build
+
+desktop-widget-verify:
+	desktop/scripts/verify-widget-bundle.sh desktop/.build/xcode-derived/Build/Products/Debug/AgentMeter.app
 
 desktop-app:
 	desktop/scripts/package-app.sh

@@ -13,6 +13,8 @@ flowchart LR
     E -->|"Encrypted BLE snapshots, settings, and telemetry"| F["Firmware model"]
     E -.->|"USB serial fallback"| F
     E <-->|"Private user-only Unix socket"| I["Native macOS app"]
+    I -->|"Bounded local snapshot"| J["Shared App Group container"]
+    J --> K["WidgetKit extension"]
     F --> G["Overview and details"]
     F --> H["Local countdowns and stale state"]
 ```
@@ -61,6 +63,32 @@ The display may receive provider IDs and names, short status values, quota label
 CodexBar stays on loopback. Its temporary bearer token is passed through `CODEXBAR_DASHBOARD_TOKEN`, not command arguments or files. The supervised server remains alive only while collecting one snapshot and is stopped before the bridge waits for its next interval.
 
 The desktop socket opens no TCP port and accepts only the current macOS user. Local history uses fixed columns for normalized percentages, reset times, connection codes, and supported power telemetry. It does not store identity, prompts, code, credentials, raw responses, or billing details.
+
+The native app separately publishes one bounded widget JSON file to
+`group.com.prabhavalabs.agentmeter.shared`. It allowlists provider IDs and display names, health
+status, used percentages, reset and update epochs, and downsampled daily consumption. It excludes
+account identity, prompts, code, repositories and paths, tokens, cookies, credentials, raw
+responses, local session logs, costs, credits, and billing fields. The WidgetKit extension only
+reads this file; it has no IPC, Bluetooth, SQLite, network, or keychain dependency.
+
+Dashboard and Focus use App Intent configuration, so each installed widget instance retains its
+own provider, window, used-or-remaining, history, density, theme, and deep-link choices. Small and
+medium families omit history. Large and extra-large families can project daily consumption as a
+heat map or the latest daily used percentage as a trend. Passed reset timestamps remain **Refresh
+pending** until a fresh snapshot establishes the next provider window.
+
+## macOS distribution boundary
+
+The first WidgetKit release is managed-only. The app and extension have distinct bundle IDs and
+provisioning profiles but explicitly share the App Group entitlement. Managed packaging takes the
+signed Release Xcode product, preserves the extension signature, adds the independently signed
+bridge, and signs only the outer app with the app entitlement file. Verification inspects app and
+extension separately; signing never uses `--deep`.
+
+The community path remains the existing SwiftPM/manual, ad-hoc-signed app. Its bundle has no
+`Contents/PlugIns` directory, no WidgetKit extension, and no runtime App Group dependency. CI
+builds the committed Xcode project unsigned to verify widget structure, then packages and verifies
+the community app and DMG independently.
 
 ## Reliability rules
 

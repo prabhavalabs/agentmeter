@@ -43,15 +43,34 @@ The desktop package targets macOS 14 or later and uses Swift 6, SwiftUI, Network
 ```bash
 make desktop-test
 make desktop-build
+make desktop-widget-build
+make desktop-widget-verify
 make desktop-app
 open desktop/dist/AgentMeter.app
 ```
 
-The packaging script creates a self-contained local bundle with the production icon and bundled
-bridge. Set `CODE_SIGN_IDENTITY` to an installed Apple Development identity to test the managed
-background bridge locally, or to a Developer ID Application identity when preparing a notarized
-public build. An ad-hoc build can still be used with `AGENTMETER_IPC_PATH` for interface work, but
-macOS will not authorize its embedded launch agent.
+The committed Xcode project is generated deterministically from `desktop/project.yml`. Regeneration
+requires XcodeGen 2.45.4 or newer:
+
+```bash
+make desktop-project
+git diff --exit-code -- desktop/AgentMeter.xcodeproj
+```
+
+`desktop-widget-build` uses the committed project with `CODE_SIGNING_ALLOWED=NO`; it proves the
+extension compiles and is embedded but does not prove App Group access or gallery registration.
+`desktop-app` creates the existing self-contained, app-only community bundle with the production
+icon and bundled bridge. The community build can use `AGENTMETER_IPC_PATH` for interface work, but
+macOS will not authorize its embedded launch agent and it contains no widget.
+
+Managed packaging is separate. Set `AGENTMETER_DISTRIBUTION_MODE=managed`, provide
+`AGENTMETER_DEVELOPMENT_TEAM`, an installed identity in `CODE_SIGN_IDENTITY`, and exact local
+installed-profile UUIDs in `AGENTMETER_APP_PROVISIONING_PROFILE` and
+`AGENTMETER_WIDGET_PROVISIONING_PROFILE`. The profiles must target
+`com.prabhavalabs.agentmeter.desktop` and `com.prabhavalabs.agentmeter.desktop.widget` and grant
+`group.com.prabhavalabs.agentmeter.shared`. The script builds signed Release Xcode output, copies
+it before adding the bridge, preserves the extension signature, and re-signs only the outer app
+with explicit app entitlements—never `--deep`.
 
 To develop without the bridge service or hardware, create a private fake-server runtime and point the Swift executable to it:
 
@@ -95,7 +114,10 @@ make lint
 make test
 make firmware
 make desktop-test
+make desktop-widget-build
+make desktop-widget-verify
 make desktop-app
+desktop/scripts/verify-widget-bundle.sh --community desktop/dist/AgentMeter.app
 ```
 
 `make test` runs both host and native firmware tests. Hardware-dependent changes must additionally be flashed to the exact board and tested over the affected transport.

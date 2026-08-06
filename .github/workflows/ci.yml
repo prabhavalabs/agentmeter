@@ -30,6 +30,15 @@ jobs:
       - name: Run Swift tests
         run: swift test --package-path desktop
 
+      - name: Build and verify unsigned WidgetKit application
+        run: |
+          xcodebuild -project desktop/AgentMeter.xcodeproj -scheme AgentMeter \
+            -configuration Debug \
+            -derivedDataPath desktop/.build/xcode-derived \
+            CODE_SIGNING_ALLOWED=NO build
+          desktop/scripts/verify-widget-bundle.sh \
+            desktop/.build/xcode-derived/Build/Products/Debug/AgentMeter.app
+
       - name: Build application bundle
         run: desktop/scripts/package-app.sh
 

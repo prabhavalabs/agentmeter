@@ -51,6 +51,27 @@ The host starts a bounded CodexBar loopback collection with a temporary bearer t
 
 See [Architecture](docs/architecture.md) and [Device protocol](docs/protocol.md) for the complete design.
 
+## macOS widgets
+
+The managed macOS build includes independently configurable **AgentMeter Dashboard** and
+**AgentMeter Focus** widgets in small, medium, large, and extra-large families. Dashboard can show
+several providers; Focus selects one provider and its primary and secondary allowance windows.
+Each widget instance keeps its own providers, windows, used-or-remaining percentage, history,
+layout, density, theme, reset display, and tap destination.
+
+Small and medium widgets prioritize current allowance and reset information. Large and extra-large
+widgets can add a 7- or 30-day heat map or trend. Heat maps show daily allowance consumption;
+trends show the latest daily used percentage for the selected window. Missing samples remain gaps.
+After a reported reset time passes, the widget says **Refresh pending** until the app publishes
+fresh provider data rather than pretending usage reset to zero.
+
+Widget data is a bounded local JSON snapshot in the shared App Group container. It contains
+presentation-safe provider labels, status, percentages, reset times, and aggregated history—not
+accounts, prompts, code, paths, credentials, cookies, raw responses, or billing data. The first
+widget release is available only in the managed, App Group-signed build. The public community DMG
+remains app-only. See the [macOS companion guide](docs/macos-app.md#desktop-widgets) for build and
+configuration details.
+
 ## Hardware
 
 The first supported device is the **Waveshare ESP32-S3-Touch-AMOLED-2.16** with 8 MB PSRAM and 16 MB flash. The minimum build requires only:
@@ -101,14 +122,17 @@ Once the display updates, install the isolated background bridge. It starts imme
 .venv/bin/agentmeter service status
 ```
 
-Build and open the native companion on macOS 14 or later. A local ServiceManagement test requires
-an installed Apple Development signing identity:
+Build and open the app-only community companion on macOS 14 or later:
 
 ```bash
-CODE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" make desktop-app
+make desktop-app
 ditto desktop/dist/AgentMeter.app /Applications/AgentMeter.app
 open /Applications/AgentMeter.app
 ```
+
+This ad-hoc build supports interface checks and the bundled child bridge, but not the managed
+background service or widgets. Those features require the separate App Group-signed Xcode build
+and app/widget provisioning profiles described in the macOS companion guide.
 
 On first launch, the app registers its bundled bridge and walks through Bluetooth, device, and
 provider setup. An older repository-installed bridge is migrated automatically after the bundled
