@@ -299,7 +299,7 @@ struct DashboardProviderRow: View {
     }
 
     private var rowSpacing: CGFloat { style == .outerOnly ? 6 : 8 }
-    private var markSize: CGFloat { style == .outerOnly ? 20 : 24 }
+    private var markSize: CGFloat { style == .outerOnly ? 21 : 24 }
     private var ringSize: CGFloat { style == .expanded ? 42 : 34 }
     private var nameFont: Font { style == .outerOnly ? .caption.weight(.semibold) : .caption.weight(.bold) }
 }

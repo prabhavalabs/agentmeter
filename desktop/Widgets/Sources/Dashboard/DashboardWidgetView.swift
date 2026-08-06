@@ -193,6 +193,7 @@ struct DashboardWidgetView: View {
             }
         }
         .foregroundStyle(palette.primaryText)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .containerBackground(for: .widget) { palette.background }
         .preferredColorScheme(palette.preferredColorScheme)
         .widgetURL(DashboardWidgetDestination.url(for: presentation))

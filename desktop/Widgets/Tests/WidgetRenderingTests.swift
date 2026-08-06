@@ -643,13 +643,10 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         let colorSchemes: [ColorScheme] = scenario.expectedTheme == .midnight
             ? [.dark]
             : [.light, .dark]
-        let renderSize = scenario.expectedHistoryStyle == .none
-            ? CGSize(width: 360, height: 340)
-            : CGSize(width: 360, height: 380)
         for colorScheme in colorSchemes {
             assertSubstantiveRender(
                 DashboardWidgetView(presentation: presentation),
-                size: renderSize,
+                size: CGSize(width: 360, height: 380),
                 colorScheme: colorScheme
             )
         }
