@@ -1,5 +1,6 @@
 import AgentMeterCore
 import AgentMeterIPC
+import AgentMeterWidgetCore
 import Foundation
 import Observation
 
@@ -62,6 +63,7 @@ public final class AppModel {
     public private(set) var historySamples: [UsageHistorySample] = []
     public private(set) var historyRange: UsageHistoryRange = .last24Hours
     public private(set) var diagnostics: BridgeDiagnostics?
+    public private(set) var requestedProviderDetailID: String?
     public var notice: AppNotice?
 
     public let preferences: AppPreferences
@@ -90,6 +92,23 @@ public final class AppModel {
     }
 
     public var isBusy: Bool { !activeOperations.isEmpty }
+
+    public func navigate(to route: AgentMeterRoute) {
+        switch route {
+        case .overview:
+            selectedSection = .overview
+        case .agents:
+            selectedSection = .agents
+        case let .provider(providerID):
+            selectedSection = .overview
+            requestedProviderDetailID = providerID
+        }
+    }
+
+    public func completeRequestedProviderDetail(id: String) {
+        guard requestedProviderDetailID == id else { return }
+        requestedProviderDetailID = nil
+    }
 
     public func start(showFailure: Bool = true) async {
         guard !hasStarted else { return }

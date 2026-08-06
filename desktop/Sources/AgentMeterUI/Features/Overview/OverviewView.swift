@@ -30,6 +30,12 @@ public struct OverviewView: View {
         .sheet(item: $selectedProvider) { provider in
             ProviderUsageDetailsView(provider: provider, nowEpoch: nowEpoch)
         }
+        .onChange(of: model.requestedProviderDetailID, initial: true) { _, _ in
+            selectRequestedProvider(from: providers)
+        }
+        .onChange(of: providers) { _, updatedProviders in
+            selectRequestedProvider(from: updatedProviders)
+        }
     }
 
     private var header: some View {
@@ -156,6 +162,15 @@ public struct OverviewView: View {
             .sorted {
                 (order.firstIndex(of: $0.id) ?? .max) < (order.firstIndex(of: $1.id) ?? .max)
             }
+    }
+
+    private func selectRequestedProvider(from providers: [ProviderSummary]) {
+        guard let requestedID = model.requestedProviderDetailID,
+              let provider = providers.first(where: { $0.id == requestedID }) else {
+            return
+        }
+        selectedProvider = provider
+        model.completeRequestedProviderDetail(id: requestedID)
     }
 
     private var nowEpoch: Int { Int(Date().timeIntervalSince1970) }

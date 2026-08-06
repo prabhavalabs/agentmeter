@@ -1,4 +1,5 @@
 import AgentMeterUI
+import AgentMeterWidgetCore
 import AppKit
 import SwiftUI
 
@@ -23,6 +24,10 @@ struct AgentMeterApplication: App {
                 .environment(powerObserver)
                 .environment(notifications)
                 .preferredColorScheme(model.preferences.appearance.colorScheme)
+                .onOpenURL { url in
+                    model.navigate(to: AgentMeterRoute(url: url))
+                    ApplicationPresentationController.shared.windowWillOpen()
+                }
         }
         .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)

@@ -1,8 +1,38 @@
 import AgentMeterCore
 import AgentMeterIPC
 import AgentMeterUI
+import AgentMeterWidgetCore
 import Foundation
 import Testing
+
+@MainActor
+@Test func providerNavigationRequestsDetailFromOverview() {
+    let model = AppModel(
+        bridge: FakeBridgeAPI(state: makeState(revision: 1, phase: .connected)),
+        preferences: makePreferences()
+    )
+    model.selectedSection = .agents
+
+    model.navigate(to: .provider("codex"))
+
+    #expect(model.selectedSection == .overview)
+    #expect(model.requestedProviderDetailID == "codex")
+}
+
+@MainActor
+@Test func overviewNavigationKeepsPendingProviderDetailRequest() {
+    let model = AppModel(
+        bridge: FakeBridgeAPI(state: makeState(revision: 1, phase: .connected)),
+        preferences: makePreferences()
+    )
+    model.navigate(to: .provider("codex"))
+    model.selectedSection = .agents
+
+    model.navigate(to: .overview)
+
+    #expect(model.selectedSection == .overview)
+    #expect(model.requestedProviderDetailID == "codex")
+}
 
 @MainActor
 @Test func startLoadsStateThenAppliesOnlyNewerEvents() async {
