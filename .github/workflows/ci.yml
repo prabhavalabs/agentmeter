@@ -33,12 +33,16 @@ jobs:
       - name: Test widget bundle verifier
         run: desktop/scripts/test-verify-widget-bundle.sh
 
-      - name: Build and verify unsigned WidgetKit application
+      - name: Test CI workflow contract
+        run: desktop/scripts/test-ci-workflow.sh
+
+      - name: Test and verify unsigned WidgetKit application
         run: |
           xcodebuild -project desktop/AgentMeter.xcodeproj -scheme AgentMeter \
+            -destination 'platform=macOS' \
             -configuration Debug \
             -derivedDataPath desktop/.build/xcode-derived \
-            CODE_SIGNING_ALLOWED=NO build
+            CODE_SIGNING_ALLOWED=NO test
           desktop/scripts/verify-widget-bundle.sh \
             desktop/.build/xcode-derived/Build/Products/Debug/AgentMeter.app
 
