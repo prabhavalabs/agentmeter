@@ -13,7 +13,9 @@ packages:
 
 settings:
   base:
+    CURRENT_PROJECT_VERSION: "1"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
+    MARKETING_VERSION: "0.1.2"
     SWIFT_VERSION: "6.0"
 
 targets:
@@ -38,7 +40,9 @@ targets:
     settings:
       base:
         CODE_SIGN_ENTITLEMENTS: Resources/AgentMeter.entitlements
+        CODE_SIGN_STYLE: Manual
         INFOPLIST_FILE: Resources/Info.plist
+        PROVISIONING_PROFILE: "$(AGENTMETER_APP_PROVISIONING_PROFILE)"
         PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop
         PRODUCT_NAME: AgentMeter
         GENERATE_INFOPLIST_FILE: NO
@@ -60,7 +64,9 @@ targets:
       base:
         APPLICATION_EXTENSION_API_ONLY: YES
         CODE_SIGN_ENTITLEMENTS: Widgets/Resources/AgentMeterWidget.entitlements
+        CODE_SIGN_STYLE: Manual
         INFOPLIST_FILE: Widgets/Resources/Info.plist
+        PROVISIONING_PROFILE: "$(AGENTMETER_WIDGET_PROVISIONING_PROFILE)"
         PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.widget
         PRODUCT_NAME: AgentMeterWidgets
         GENERATE_INFOPLIST_FILE: NO

@@ -30,6 +30,9 @@ jobs:
       - name: Run Swift tests
         run: swift test --package-path desktop
 
+      - name: Test widget bundle verifier
+        run: desktop/scripts/test-verify-widget-bundle.sh
+
       - name: Build and verify unsigned WidgetKit application
         run: |
           xcodebuild -project desktop/AgentMeter.xcodeproj -scheme AgentMeter \

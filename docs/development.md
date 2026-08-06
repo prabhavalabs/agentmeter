@@ -43,6 +43,7 @@ The desktop package targets macOS 14 or later and uses Swift 6, SwiftUI, Network
 ```bash
 make desktop-test
 make desktop-build
+make desktop-widget-script-test
 make desktop-widget-build
 make desktop-widget-verify
 make desktop-app
@@ -70,7 +71,9 @@ installed-profile UUIDs in `AGENTMETER_APP_PROVISIONING_PROFILE` and
 `com.prabhavalabs.agentmeter.desktop` and `com.prabhavalabs.agentmeter.desktop.widget` and grant
 `group.com.prabhavalabs.agentmeter.shared`. The script builds signed Release Xcode output, copies
 it before adding the bridge, preserves the extension signature, and re-signs only the outer app
-with explicit app entitlements—never `--deep`.
+with explicit app entitlements—never `--deep`. It validates both installed profiles before the
+build, maps their UUIDs through separate manual signing settings, and gives app and extension the
+same requested version and build number.
 
 To develop without the bridge service or hardware, create a private fake-server runtime and point the Swift executable to it:
 
@@ -114,6 +117,7 @@ make lint
 make test
 make firmware
 make desktop-test
+make desktop-widget-script-test
 make desktop-widget-build
 make desktop-widget-verify
 make desktop-app

@@ -222,15 +222,18 @@ then signs only the outer app with `desktop/Resources/AgentMeter.entitlements`. 
 
 Managed mode requires a real team, signing identity, and the UUIDs of two installed provisioning
 profiles. Both profiles must grant `group.com.prabhavalabs.agentmeter.shared` and target their
-exact bundle IDs. The script does not permit Xcode portal updates and rejects the build if Xcode
-embeds any profile other than the requested UUIDs. It verifies the signed Xcode source product,
-then inspects app and extension signatures and entitlements separately after packaging:
+exact bundle IDs. Before building, the script privately decodes the two installed profiles and
+validates their UUID, team, bundle ID, and App Group, removing decoded metadata on exit or signal.
+Manual target settings feed the app UUID only to the app and the widget UUID only to the extension;
+the script does not permit Xcode portal updates and rejects any different embedded profile. The
+same version and build number are expanded into both Info.plists and checked before copying and
+final signing. App and extension signatures and entitlements are then inspected separately:
 
 ```bash
 AGENTMETER_DISTRIBUTION_MODE=managed \
 AGENTMETER_DEVELOPMENT_TEAM="TEAMID" \
-AGENTMETER_APP_PROVISIONING_PROFILE="APP-PROFILE-UUID" \
-AGENTMETER_WIDGET_PROVISIONING_PROFILE="WIDGET-PROFILE-UUID" \
+AGENTMETER_APP_PROVISIONING_PROFILE="11111111-1111-1111-1111-111111111111" \
+AGENTMETER_WIDGET_PROVISIONING_PROFILE="22222222-2222-2222-2222-222222222222" \
 CODE_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" \
   desktop/scripts/package-app.sh
 ```
