@@ -314,6 +314,9 @@ for forbidden_entitlement in \
     com.apple.security.network.server \
     com.apple.security.device.bluetooth \
     com.apple.security.device.usb \
+    com.apple.security.device.camera \
+    com.apple.security.device.audio-input \
+    com.apple.security.print \
     keychain-access-groups \
     com.apple.security.files.user-selected.read-only \
     com.apple.security.files.user-selected.read-write \
