@@ -137,6 +137,23 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.widget-core-tests
 
+  AgentMeterWidgetTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Widgets/Tests
+      - path: Widgets/Sources/Configuration
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterWidgetCore
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: YES
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.widget-tests
+
 schemes:
   AgentMeter:
     build:
@@ -149,3 +166,4 @@ schemes:
         - AgentMeterIPCTests
         - AgentMeterUITests
         - AgentMeterWidgetCoreTests
+        - AgentMeterWidgetTests

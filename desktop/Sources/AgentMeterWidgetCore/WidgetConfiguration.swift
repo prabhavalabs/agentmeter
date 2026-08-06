@@ -35,6 +35,8 @@ public enum WidgetModule: String, Codable, Equatable, Sendable, CaseIterable {
 public enum WidgetHistoryStyle: String, Codable, Equatable, Sendable, CaseIterable {
     case heatMap
     case bars
+    case trend
+    case none
 }
 
 public enum WidgetHistoryPeriod: String, Codable, Equatable, Sendable, CaseIterable {
@@ -54,8 +56,15 @@ public enum WidgetHeatMapScope: String, Codable, Equatable, Sendable, CaseIterab
     case combined
 }
 
+public enum WidgetTrendWindow: String, Codable, Equatable, Sendable, CaseIterable {
+    case outer
+    case inner
+    case focus
+}
+
 public enum WidgetLayoutPreset: String, Codable, Equatable, Sendable, CaseIterable {
     case automatic
+    case usageAndRings
     case compact
     case expanded
 }
@@ -69,11 +78,13 @@ public enum WidgetTheme: String, Codable, Equatable, Sendable, CaseIterable {
     case system
     case light
     case dark
+    case midnight
 }
 
 public enum WidgetTapDestination: String, Codable, Equatable, Sendable, CaseIterable {
     case dashboard
     case provider
+    case agents
     case settings
 }
 
@@ -88,10 +99,13 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
     public let historyStyle: WidgetHistoryStyle
     public let historyPeriod: WidgetHistoryPeriod
     public let heatMapScope: WidgetHeatMapScope
+    public let trendWindow: WidgetTrendWindow
     public let layout: WidgetLayoutPreset
     public let density: WidgetDensity
     public let theme: WidgetTheme
     public let tapDestination: WidgetTapDestination
+    public let showsResetCountdown: Bool
+    public let showsAbsoluteResetDate: Bool
 
     public init(
         kind: WidgetKind,
@@ -104,10 +118,13 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
         historyStyle: WidgetHistoryStyle,
         historyPeriod: WidgetHistoryPeriod,
         heatMapScope: WidgetHeatMapScope,
+        trendWindow: WidgetTrendWindow = .outer,
         layout: WidgetLayoutPreset,
         density: WidgetDensity,
         theme: WidgetTheme,
-        tapDestination: WidgetTapDestination
+        tapDestination: WidgetTapDestination,
+        showsResetCountdown: Bool = true,
+        showsAbsoluteResetDate: Bool = false
     ) {
         self.kind = kind
         self.providerIDs = providerIDs
@@ -119,9 +136,12 @@ public struct WidgetRenderConfiguration: Equatable, Sendable {
         self.historyStyle = historyStyle
         self.historyPeriod = historyPeriod
         self.heatMapScope = heatMapScope
+        self.trendWindow = trendWindow
         self.layout = layout
         self.density = density
         self.theme = theme
         self.tapDestination = tapDestination
+        self.showsResetCountdown = showsResetCountdown
+        self.showsAbsoluteResetDate = showsAbsoluteResetDate
     }
 }

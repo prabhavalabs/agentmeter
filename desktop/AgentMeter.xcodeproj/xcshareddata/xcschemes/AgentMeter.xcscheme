@@ -84,6 +84,17 @@
                ReferencedContainer = "container:AgentMeter.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "41A253BE662983EF8F2742BA"
+               BuildableName = "AgentMeterWidgetTests.xctest"
+               BlueprintName = "AgentMeterWidgetTests"
+               ReferencedContainer = "container:AgentMeter.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

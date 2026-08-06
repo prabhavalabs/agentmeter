@@ -1,3 +1,4 @@
+import AppIntents
 import SwiftUI
 import WidgetKit
 
@@ -5,23 +6,17 @@ private struct FictionalUsageEntry: TimelineEntry {
     let date: Date
 }
 
-private struct FictionalUsageProvider: TimelineProvider {
+private struct FictionalUsageProvider<Intent: WidgetConfigurationIntent>: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> FictionalUsageEntry {
         FictionalUsageEntry(date: Date())
     }
 
-    func getSnapshot(
-        in context: Context,
-        completion: @escaping (FictionalUsageEntry) -> Void
-    ) {
-        completion(FictionalUsageEntry(date: Date()))
+    func snapshot(for configuration: Intent, in context: Context) async -> FictionalUsageEntry {
+        FictionalUsageEntry(date: Date())
     }
 
-    func getTimeline(
-        in context: Context,
-        completion: @escaping (Timeline<FictionalUsageEntry>) -> Void
-    ) {
-        completion(Timeline(entries: [FictionalUsageEntry(date: Date())], policy: .never))
+    func timeline(for configuration: Intent, in context: Context) async -> Timeline<FictionalUsageEntry> {
+        Timeline(entries: [FictionalUsageEntry(date: Date())], policy: .never)
     }
 }
 
@@ -69,11 +64,16 @@ struct AgentMeterDashboardWidget: Widget {
     let kind = "com.prabhavalabs.agentmeter.dashboard"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: FictionalUsageProvider()) { entry in
+        AppIntentConfiguration(
+            kind: kind,
+            intent: DashboardWidgetIntent.self,
+            provider: FictionalUsageProvider<DashboardWidgetIntent>()
+        ) { entry in
             DashboardPlaceholderView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Dashboard")
         .description("A fictional preview of overall coding-agent usage.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }
 
@@ -81,10 +81,15 @@ struct AgentMeterFocusWidget: Widget {
     let kind = "com.prabhavalabs.agentmeter.focus"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: FictionalUsageProvider()) { entry in
+        AppIntentConfiguration(
+            kind: kind,
+            intent: FocusWidgetIntent.self,
+            provider: FictionalUsageProvider<FocusWidgetIntent>()
+        ) { entry in
             FocusPlaceholderView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Focus")
         .description("A fictional preview of the current coding session.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
     }
 }
