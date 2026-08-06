@@ -37,7 +37,7 @@ enum FictionalDashboardPresentations {
         return FictionalDashboardPresentationSource.presentation(for: intent, family: family)
     }
 
-    static func unavailableHistory(family: AgentMeterWidgetCore.WidgetFamily) -> WidgetPresentation {
+    static func legacyFocusFallback(family: AgentMeterWidgetCore.WidgetFamily) -> WidgetPresentation {
         let intent = baseIntent()
         intent.providers = [ProviderEntity(id: "codex", name: "Codex")]
         intent.historyStyle = .trend
@@ -122,11 +122,11 @@ enum FictionalDashboardPresentations {
     )
 }
 
-#Preview("Unavailable History · Large", as: .systemLarge) {
+#Preview("Legacy Focus Fallback · Large", as: .systemLarge) {
     AgentMeterDashboardWidget()
 } timeline: {
     FictionalUsageEntry(
         date: Date(timeIntervalSince1970: TimeInterval(FictionalDashboardPresentationSource.endingDayEpoch)),
-        dashboardPresentation: FictionalDashboardPresentations.unavailableHistory(family: .large)
+        dashboardPresentation: FictionalDashboardPresentations.legacyFocusFallback(family: .large)
     )
 }

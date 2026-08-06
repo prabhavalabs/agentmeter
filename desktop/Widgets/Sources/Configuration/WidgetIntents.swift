@@ -59,6 +59,7 @@ enum IntentTrendWindowOption: String, AppEnum {
         .inner: "Inner Ring",
         .focus: "Specific Focus Window",
     ]
+    static let dashboardSupportedValues: [Self] = [.outer, .inner]
 }
 
 enum IntentLayoutOption: String, AppEnum {
@@ -128,7 +129,11 @@ struct DashboardWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "History", default: .heatMap) var historyStyle: IntentHistoryStyleOption
     @Parameter(title: "History Range", default: .days30) var historyRange: IntentHistoryRangeOption
     @Parameter(title: "Heat Map Scope", default: .combined) var heatScope: IntentHeatScopeOption
-    @Parameter(title: "Trend Window", default: .outer) var trendWindow: IntentTrendWindowOption
+    @Parameter(
+        title: "Trend Window",
+        default: .outer,
+        supportedValues: [.outer, .inner]
+    ) var trendWindow: IntentTrendWindowOption
     @Parameter(title: "Layout", default: .usageAndRings) var layout: IntentLayoutOption
     @Parameter(title: "Density", default: .comfortable) var density: IntentDensityOption
     @Parameter(title: "Theme", default: .system) var theme: IntentThemeOption

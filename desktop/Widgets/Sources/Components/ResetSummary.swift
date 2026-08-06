@@ -25,7 +25,7 @@ struct ResetSummarySemantics: Equatable {
             var scheduled: [ResetSummaryContent] = []
             if showsCountdown { scheduled.append(.timer(resetDate)) }
             if showsAbsoluteDate { scheduled.append(.absoluteDate(resetDate)) }
-            content = scheduled.isEmpty ? [.text("Reset scheduled")] : scheduled
+            content = scheduled.isEmpty ? [.absoluteDate(resetDate)] : scheduled
         }
     }
 
@@ -71,6 +71,10 @@ struct ResetSummary: View {
     let semantics: ResetSummarySemantics
     var showsLabel = true
     var compact = false
+
+    var absoluteDateMinimumScaleFactor: CGFloat {
+        compact ? 0.65 : 0.85
+    }
 
     init(
         presentation: WidgetRingPresentation,
@@ -141,6 +145,8 @@ struct ResetSummary: View {
         case let .absoluteDate(resetDate):
             Text(resetDate, format: .dateTime.month(.abbreviated).day().hour().minute())
                 .lineLimit(1)
+                .minimumScaleFactor(absoluteDateMinimumScaleFactor)
+                .allowsTightening(compact)
         }
     }
 }

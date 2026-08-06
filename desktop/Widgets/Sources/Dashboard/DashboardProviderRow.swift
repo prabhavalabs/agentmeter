@@ -80,12 +80,16 @@ enum DashboardProviderAccessibility {
             provider.name,
             "Percentage mode \(percentageMode == .used ? "Used" : "Remaining")",
         ] + rings
-        if showsMetadata, modules.contains(.status) {
+        if showsMetadata, modules.contains(.status), provider.healthState == .healthy {
             parts.append("Status \(provider.status)")
         }
-        if showsMetadata, modules.contains(.freshness) {
-            parts.append("Freshness \(freshness == .fresh ? "Current" : "Stale")")
+        if showsMetadata, modules.contains(.freshness), freshness == .fresh {
+            parts.append("Freshness Current")
         }
+        parts.append(contentsOf: WidgetHealthSemantics.mandatoryLabels(
+            provider: provider,
+            freshness: freshness
+        ))
         return parts.joined(separator: ", ")
     }
 }
@@ -196,6 +200,10 @@ struct DashboardProviderRow: View {
                     }
                 }
 
+                if let healthLabel = WidgetHealthSemantics.providerLabel(provider) {
+                    WidgetHealthBadges(labels: [healthLabel])
+                }
+
                 if showsMetadata {
                     metadata
                 }
@@ -255,12 +263,12 @@ struct DashboardProviderRow: View {
     @ViewBuilder
     private var metadata: some View {
         HStack(spacing: 7) {
-            if modules.contains(.status) {
+            if modules.contains(.status), provider.healthState == .healthy {
                 Text(provider.status)
                     .lineLimit(1)
             }
-            if modules.contains(.freshness) {
-                Text(freshness == .fresh ? "Current" : "Stale")
+            if modules.contains(.freshness), freshness == .fresh {
+                Text("Current")
             }
         }
         .font(.caption2)

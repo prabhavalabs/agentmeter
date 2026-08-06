@@ -10,6 +10,17 @@ public struct WidgetTimelinePlan: Equatable, Sendable {
     }
 }
 
+public enum FocusWindowCapacity {
+    public static func additionalLimit(for family: WidgetFamily) -> Int {
+        switch family {
+        case .small: 0
+        case .medium: 1
+        case .large: 2
+        case .extraLarge: 4
+        }
+    }
+}
+
 public enum WidgetTimelinePlanner {
     public static func plan(
         snapshot: WidgetSnapshot,
@@ -80,12 +91,7 @@ public enum WidgetTimelinePlanner {
     ) -> (rings: Int, additional: Int) {
         switch configuration.kind {
         case .focus:
-            let additional = switch family {
-            case .small: 0
-            case .medium, .large: 2
-            case .extraLarge: 4
-            }
-            return (2, additional)
+            return (2, FocusWindowCapacity.additionalLimit(for: family))
         case .dashboard:
             let rings = configuration.layout == .compact || family == .small ? 1 : 2
             let additional = family == .extraLarge && configuration.layout != .compact ? 2 : 0

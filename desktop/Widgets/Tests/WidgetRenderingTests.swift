@@ -100,7 +100,7 @@ func everyTimelineFailureStateHasSubstantiveAccessibleRendering(state: WidgetTim
     .large,
     .extraLarge,
 ])
-func dashboardWidgetViewComposesDistinctProviderLinksOutsideSmall(
+func dashboardWidgetViewComposesRootDestinationAndDistinctProviderLinksOutsideSmall(
     family: AgentMeterWidgetCore.WidgetFamily
 ) {
     let presentation = FictionalDashboardPresentationSource.presentation(
@@ -110,7 +110,7 @@ func dashboardWidgetViewComposesDistinctProviderLinksOutsideSmall(
     let view = DashboardWidgetView(presentation: presentation)
     let interactions = view.interactionComposition
 
-    #expect(interactions.widgetURL == nil)
+    #expect(interactions.widgetURL == AgentMeterRoute.overview.url)
     #expect(interactions.providerURLs.count == presentation.providers.count)
     #expect(interactions.providerURLs.values.allSatisfy {
         if case .provider = AgentMeterRoute(url: $0) { return true }
@@ -140,13 +140,15 @@ func dashboardWidgetViewComposesDistinctProviderLinksOutsideSmall(
 
 @MainActor
 @Test(arguments: [ColorScheme.light, .dark])
-func dashboardUnavailableHistoryStateHasSubstantiveRendering(colorScheme: ColorScheme) {
+func legacyDashboardFocusTrendFallsBackToRenderedOuterHistory(colorScheme: ColorScheme) {
     let intent = configuredDashboardIntent()
     intent.historyStyle = .trend
     intent.trendWindow = .focus
     let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .large)
 
-    #expect(presentation.history?.availabilityMessage == "History unavailable for this window")
+    #expect(presentation.configuration.trendWindow == .outer)
+    #expect(presentation.history?.availabilityMessage == nil)
+    #expect(presentation.history?.windowLabel != nil)
     assertSubstantiveRender(
         DashboardWidgetView(presentation: presentation),
         size: CGSize(width: 360, height: 380),
@@ -329,7 +331,13 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         relativeTo: referenceDate
     )
 
-    #expect(neither.lines == ["Reset scheduled"])
+    #expect(neither.lines.count == 1)
+    #expect(neither.lines.first?.hasPrefix("Reset date ") == true)
+    #expect(ResetSummarySemantics(
+        presentation: ring,
+        showsCountdown: false,
+        showsAbsoluteDate: false
+    ).content == [.absoluteDate(Date(timeIntervalSince1970: 1_800_000_000))])
     #expect(countdown.lines.count == 1)
     #expect(countdown.lines.first?.hasPrefix("Reset countdown ") == true)
     #expect(absolute.lines.count == 1)
@@ -426,7 +434,305 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     #expect(summary.contains("Session allowance, Not reported, Reset time unavailable"))
     #expect(summary.contains("Weekly allowance, 73 percent remaining, Refresh pending"))
     #expect(summary.contains("Status Action required"))
-    #expect(summary.contains("Freshness Stale"))
+    #expect(summary.contains("Stale"))
+}
+
+@Test func exceptionalHealthRemainsVisibleAndAccessibleWhenMetadataIsDisabled() {
+    let provider = WidgetProviderPresentation(
+        id: "codex",
+        name: "Codex",
+        status: "error at /private/path",
+        healthState: .error,
+        rings: [
+            WidgetRingPresentation(
+                windowKind: "weekly",
+                label: "Weekly",
+                usedPercent: 42,
+                displayedPercent: 42,
+                resetState: .scheduled(epoch: 1_800_000_000)
+            ),
+        ]
+    )
+
+    #expect(WidgetHealthSemantics.mandatoryLabels(
+        provider: provider,
+        freshness: .stale
+    ) == ["Agent error", "Stale"])
+    #expect(WidgetHealthSemantics.mandatoryLabels(
+        provider: WidgetProviderPresentation(
+            id: "codex",
+            name: "Codex",
+            status: "stale",
+            healthState: .stale,
+            rings: provider.rings
+        ),
+        freshness: .stale
+    ) == ["Stale"])
+
+    let dashboardSummary = DashboardProviderAccessibility.summary(
+        provider,
+        percentageMode: .used,
+        style: .outerOnly,
+        additionalWindowLimit: 0,
+        modules: [.usage, .primaryReset],
+        freshness: .stale,
+        showsMetadata: false,
+        showsResetCountdown: true,
+        showsAbsoluteResetDate: false
+    )
+    let focusSummary = FocusProviderAccessibility.summary(
+        provider,
+        freshness: .stale,
+        modules: [.usage, .primaryReset],
+        showsHealthyMetadata: false
+    )
+
+    for summary in [dashboardSummary, focusSummary] {
+        #expect(summary.contains("Agent error"))
+        #expect(summary.contains("Stale"))
+        #expect(summary.contains("/private/path") == false)
+    }
+}
+
+@MainActor
+@Test(arguments: approvedWidgetSizes)
+func exceptionalHealthRendersInDashboardAndFocusAtEveryFamily(
+    family: AgentMeterWidgetCore.WidgetFamily,
+    size: CGSize
+) {
+    let dashboard = exceptionalHealthPresentation(kind: .dashboard, family: family)
+    let focus = exceptionalHealthPresentation(kind: .focus, family: family)
+
+    assertSubstantiveRender(
+        DashboardWidgetView(presentation: dashboard),
+        size: size,
+        colorScheme: .light
+    )
+    assertSubstantiveRender(
+        FocusWidgetView(presentation: focus),
+        size: size,
+        colorScheme: .dark
+    )
+}
+
+@MainActor
+@Test func focusWithoutUsageStillRendersExceptionalProviderHealth() {
+    let configuration = IntentConfigurationAdapter.focus(configuredFocusIntent())
+    let provider = WidgetProviderPresentation(
+        id: "codex",
+        name: "Codex",
+        status: "error",
+        healthState: .error,
+        rings: []
+    )
+    let presentation = WidgetPresentation(
+        configuration: configuration,
+        family: .small,
+        providers: [provider],
+        modules: [.usage, .primaryReset],
+        history: nil,
+        freshness: .stale,
+        overflowCount: 0
+    )
+
+    let view = FocusWidgetView(presentation: presentation)
+    #expect(view.providerHealthLabels == ["Agent error", "Stale"])
+    assertSubstantiveRender(
+        view,
+        size: CGSize(width: 170, height: 170),
+        colorScheme: .dark
+    )
+}
+
+@MainActor
+@Test func compactHealthBadgesKeepEveryFullAccessibilityLabelInNarrowHeaders() {
+    let badges = WidgetHealthBadges(labels: ["Agent error", "Stale"], compact: true)
+
+    #expect(badges.accessibilitySummary == "Agent error, Stale")
+    assertSubstantiveRender(
+        badges,
+        size: CGSize(width: 52, height: 24),
+        colorScheme: .dark
+    )
+}
+
+@Test func leadingDashboardTombstoneUsesFirstAvailableProviderForRoutesLinksAndHistory() {
+    let intent = configuredDashboardIntent()
+    intent.providers = [
+        ProviderEntity(id: "private-account@example.com", name: "Private Account"),
+        ProviderEntity(id: "codex", name: "Codex"),
+    ]
+    intent.tapDestination = .providerDetail
+    intent.heatScope = .singleProvider
+    let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .large)
+    let interactions = DashboardWidgetInteractions(presentation: presentation)
+
+    #expect(presentation.providers.first?.name == "Agent unavailable")
+    #expect(interactions.widgetURL == AgentMeterRoute.provider("codex").url)
+    #expect(interactions.providerURLs == ["codex": AgentMeterRoute.provider("codex").url])
+    #expect(interactions.providerURL(for: presentation.providers[0]) == nil)
+    #expect(interactions.providerURL(for: presentation.providers[1]) == AgentMeterRoute.provider("codex").url)
+    #expect(interactions.providerURL(for: WidgetProviderPresentation(
+        id: "codex",
+        name: "Agent unavailable",
+        status: "Agent unavailable",
+        availability: .missing,
+        healthState: .unavailable,
+        rings: []
+    )) == nil)
+    #expect(DashboardHistorySemantics(presentation: presentation).title == "Codex allowance consumed")
+}
+
+@MainActor
+@Test(arguments: approvedWidgetSizes)
+func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
+    family: AgentMeterWidgetCore.WidgetFamily,
+    size: CGSize
+) {
+    var plans = Set<FocusLayoutPlan>()
+    for layout in IntentLayoutOption.allCases {
+        let intent = configuredFocusIntent()
+        intent.layout = layout
+        intent.density = .comfortable
+        let presentation = FictionalFocusPresentationSource.presentation(for: intent, family: family)
+        plans.insert(FocusLayoutPlan(presentation: presentation))
+        assertSubstantiveRender(
+            FocusWidgetView(presentation: presentation),
+            size: size,
+            colorScheme: .dark
+        )
+    }
+    #expect(plans.count == IntentLayoutOption.allCases.count)
+
+    let comfortableIntent = configuredFocusIntent()
+    comfortableIntent.layout = .automatic
+    comfortableIntent.density = .comfortable
+    let compactIntent = configuredFocusIntent()
+    compactIntent.layout = .automatic
+    compactIntent.density = .compact
+    let comfortable = FictionalFocusPresentationSource.presentation(for: comfortableIntent, family: family)
+    let compact = FictionalFocusPresentationSource.presentation(for: compactIntent, family: family)
+    #expect(FocusLayoutPlan(presentation: comfortable) != FocusLayoutPlan(presentation: compact))
+    assertSubstantiveRender(
+        FocusWidgetView(presentation: compact),
+        size: size,
+        colorScheme: .light
+    )
+}
+
+@MainActor
+@Test func mediumFocusDefaultThirtyDayHeatMapAndOverflowFitTheApprovedCanvas() {
+    for layout in IntentLayoutOption.allCases {
+        for density in IntentDensityOption.allCases {
+            let presentation = focusThirtyDayHeatMapPresentation(
+                layout: layout,
+                density: density,
+                includesHistory: true,
+                includesAdditionalWindows: true
+            )
+            let plan = FocusLayoutPlan(presentation: presentation)
+
+            #expect(plan.mediumRequiredHeight != nil)
+            #expect((plan.mediumRequiredHeight ?? .infinity) <= 170)
+            #expect(UsageHeatMapLayout(cellCount: 30, compact: true).rowCount == 1)
+            assertSubstantiveRender(
+                FocusWidgetView(presentation: presentation),
+                size: CGSize(width: 360, height: 170),
+                colorScheme: .dark
+            )
+        }
+    }
+
+    let complete = focusThirtyDayHeatMapPresentation(
+        layout: .expanded,
+        density: .comfortable,
+        includesHistory: true,
+        includesAdditionalWindows: true
+    )
+    let withoutHistory = focusThirtyDayHeatMapPresentation(
+        layout: .expanded,
+        density: .comfortable,
+        includesHistory: false,
+        includesAdditionalWindows: true
+    )
+    let withoutAdditionalWindows = focusThirtyDayHeatMapPresentation(
+        layout: .expanded,
+        density: .comfortable,
+        includesHistory: true,
+        includesAdditionalWindows: false
+    )
+
+    #expect(renderedDifferenceRatio(
+        FocusWidgetView(presentation: complete),
+        FocusWidgetView(presentation: withoutHistory),
+        size: CGSize(width: 360, height: 170),
+        region: CGRect(x: 0, y: 0, width: 360, height: 52)
+    ) > 0.01)
+    #expect(renderedDifferenceRatio(
+        FocusWidgetView(presentation: complete),
+        FocusWidgetView(presentation: withoutAdditionalWindows),
+        size: CGSize(width: 360, height: 170),
+        region: CGRect(x: 145, y: 45, width: 205, height: 95)
+    ) > 0.005)
+}
+
+@Test(arguments: [
+    (AgentMeterWidgetCore.WidgetFamily.small, 0, Optional<String>.none, false),
+    (.medium, 1, Optional("+5"), true),
+    (.large, 2, Optional("+4"), true),
+    (.extraLarge, 4, Optional("+2"), true),
+])
+func focusFamiliesExposeCompactHistoryAndTruthfulAdditionalWindowOverflow(
+    family: AgentMeterWidgetCore.WidgetFamily,
+    limit: Int,
+    overflowLabel: String?,
+    showsHistory: Bool
+) {
+    let presentation = focusPresentationWithAdditionalWindows(family: family)
+    let semantics = FocusWidgetSemantics(presentation: presentation)
+
+    #expect(FocusWindowCapacity.additionalLimit(for: family) == limit)
+    #expect(semantics.additionalWindowLimit == limit)
+    #expect(semantics.additionalOverflowLabel == overflowLabel)
+    #expect(semantics.showsHistory == showsHistory)
+    if family != .small {
+        #expect(limit + semantics.additionalOverflowCount == 6)
+    }
+}
+
+@MainActor
+@Test(arguments: [
+    (AgentMeterWidgetCore.WidgetFamily.small, IntentLayoutOption.automatic, CGSize(width: 170, height: 170)),
+    (.large, .expanded, CGSize(width: 360, height: 380)),
+])
+func focusAbsoluteResetFallbackFitsNarrowResetColumns(
+    family: AgentMeterWidgetCore.WidgetFamily,
+    layout: IntentLayoutOption,
+    size: CGSize
+) {
+    let presentation = focusResetFallbackPresentation(family: family, layout: layout)
+    let compactSummary = ResetSummary(
+        presentation: presentation.providers[0].rings[0],
+        showsCountdown: false,
+        showsAbsoluteDate: false,
+        compact: true
+    )
+
+    #expect(compactSummary.absoluteDateMinimumScaleFactor < 1)
+    assertSubstantiveRender(
+        FocusWidgetView(presentation: presentation),
+        size: size,
+        colorScheme: .dark
+    )
+}
+
+@Test func focusViewSourceDoesNotIntroduceScrolling() throws {
+    let focusSource = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sources/Focus/FocusWidgetView.swift")
+    let source = try String(contentsOf: focusSource, encoding: .utf8)
+    #expect(source.contains("ScrollView") == false)
 }
 
 @Test func extraLargeRowsExposeAdditionalWindowsWithoutInventingThemElsewhere() {
@@ -480,8 +786,10 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
 
     let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .extraLarge)
 
-    #expect(presentation.providers.map(\.id) == ["gemini", "codex"])
-    #expect(presentation.providers.map { $0.rings.map(\.displayedPercent) } == [[37, 79], [58, 82]])
+    #expect(presentation.providers.map(\.name) == ["Gemini", "Agent unavailable", "Codex"])
+    #expect(presentation.providers.map(\.availability) == [.available, .missing, .available])
+    #expect(presentation.providers[1].id.contains("missing") == false)
+    #expect(presentation.providers.map { $0.rings.map(\.displayedPercent) } == [[37, 79], [], [58, 82]])
     #expect(presentation.configuration.percentageMode == .remaining)
     #expect(presentation.configuration.historyStyle == .trend)
     #expect(presentation.configuration.historyPeriod == .days7)
@@ -803,6 +1111,221 @@ private func presentationForLayout(
     return FictionalDashboardPresentationSource.presentation(for: intent, family: family)
 }
 
+private func focusPresentationWithAdditionalWindows(
+    family: AgentMeterWidgetCore.WidgetFamily
+) -> WidgetPresentation {
+    let configuration = IntentConfigurationAdapter.focus(configuredFocusIntent())
+    let ring: (Int) -> WidgetRingPresentation = { index in
+        WidgetRingPresentation(
+            windowKind: "window-\(index)",
+            label: "Window \(index)",
+            usedPercent: 10 + index,
+            displayedPercent: 10 + index,
+            resetState: .scheduled(epoch: 1_800_000_000 + index)
+        )
+    }
+    return WidgetPresentation(
+        configuration: configuration,
+        family: family,
+        providers: [
+            WidgetProviderPresentation(
+                id: "codex",
+                name: "Codex",
+                status: "ok",
+                rings: [ring(0), ring(1)],
+                additionalWindows: (2..<8).map(ring)
+            ),
+        ],
+        modules: [.usage, .primaryReset, .history],
+        history: WidgetHistoryProjection(
+            trendPoints: [
+                WidgetTrendPoint(dayStartEpoch: 0, latestUsedPercent: 12),
+                WidgetTrendPoint(dayStartEpoch: 86_400, latestUsedPercent: 42),
+            ],
+            windowKind: "window-0",
+            windowLabel: "Window 0"
+        ),
+        freshness: .fresh,
+        overflowCount: 0
+    )
+}
+
+private func focusThirtyDayHeatMapPresentation(
+    layout: IntentLayoutOption,
+    density: IntentDensityOption,
+    includesHistory: Bool,
+    includesAdditionalWindows: Bool
+) -> WidgetPresentation {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "codex", name: "Codex")
+    intent.outerWindow = WindowEntity(providerID: "codex", windowKind: "weekly", label: "Weekly")
+    intent.innerWindow = WindowEntity(providerID: "codex", windowKind: "session", label: "Session")
+    intent.historyStyle = includesHistory ? .heatMap : .none
+    intent.historyRange = .days30
+    intent.layout = layout
+    intent.density = density
+    intent.theme = .midnight
+    intent.showResetCountdown = true
+    intent.showAbsoluteResetDate = false
+    let configuration = IntentConfigurationAdapter.focus(intent)
+    let ring: (Int) -> WidgetRingPresentation = { index in
+        WidgetRingPresentation(
+            windowKind: "window-\(index)",
+            label: index == 0 ? "Weekly" : (index == 1 ? "Session" : "Window \(index)"),
+            usedPercent: 20 + index,
+            displayedPercent: 20 + index,
+            resetState: .scheduled(epoch: 1_800_000_000 + (index * 3_600))
+        )
+    }
+    let additional = includesAdditionalWindows ? (2..<8).map(ring) : []
+    let history = includesHistory ? WidgetHistoryProjection(
+        cells: (0..<30).map { index in
+            WidgetHeatMapCell(
+                dayStartEpoch: index * 86_400,
+                value: Double(index % 40),
+                band: index.isMultiple(of: 5) ? .high : .moderate
+            )
+        },
+        windowKind: "weekly",
+        windowLabel: "Weekly"
+    ) : nil
+    return WidgetPresentation(
+        configuration: configuration,
+        family: .medium,
+        providers: [
+            WidgetProviderPresentation(
+                id: "codex",
+                name: "Codex",
+                status: "ok",
+                rings: [ring(0), ring(1)],
+                additionalWindows: additional
+            ),
+        ],
+        modules: configuration.modules,
+        history: history,
+        freshness: .fresh,
+        overflowCount: 0
+    )
+}
+
+private func focusResetFallbackPresentation(
+    family: AgentMeterWidgetCore.WidgetFamily,
+    layout: IntentLayoutOption
+) -> WidgetPresentation {
+    let intent = FocusWidgetIntent()
+    intent.provider = ProviderEntity(id: "codex", name: "Codex")
+    intent.outerWindow = WindowEntity(providerID: "codex", windowKind: "weekly", label: "Weekly")
+    intent.innerWindow = WindowEntity(providerID: "codex", windowKind: "session", label: "Session")
+    intent.historyStyle = .none
+    intent.layout = layout
+    intent.theme = .midnight
+    intent.showResetCountdown = false
+    intent.showAbsoluteResetDate = false
+    let configuration = IntentConfigurationAdapter.focus(intent)
+    let rings = [
+        WidgetRingPresentation(
+            windowKind: "weekly",
+            label: "Weekly",
+            usedPercent: 42,
+            displayedPercent: 42,
+            resetState: .scheduled(epoch: 1_800_000_000)
+        ),
+        WidgetRingPresentation(
+            windowKind: "session",
+            label: "Session",
+            usedPercent: 18,
+            displayedPercent: 18,
+            resetState: .scheduled(epoch: 1_800_086_400)
+        ),
+    ]
+    return WidgetPresentation(
+        configuration: configuration,
+        family: family,
+        providers: [
+            WidgetProviderPresentation(
+                id: "codex",
+                name: "Codex",
+                status: "ok",
+                rings: rings
+            ),
+        ],
+        modules: configuration.modules,
+        history: nil,
+        freshness: .fresh,
+        overflowCount: 0
+    )
+}
+
+private func exceptionalHealthPresentation(
+    kind: WidgetKind,
+    family: AgentMeterWidgetCore.WidgetFamily
+) -> WidgetPresentation {
+    let configuration: WidgetRenderConfiguration
+    switch kind {
+    case .dashboard:
+        configuration = IntentConfigurationAdapter.dashboard(DashboardWidgetIntent())
+    case .focus:
+        configuration = IntentConfigurationAdapter.focus(configuredFocusIntent())
+    }
+    let outer = WidgetRingPresentation(
+        windowKind: "weekly",
+        label: "Weekly",
+        usedPercent: 42,
+        displayedPercent: 42,
+        resetState: .scheduled(epoch: 1_800_000_000)
+    )
+    let inner = WidgetRingPresentation(
+        windowKind: "session",
+        label: "Session",
+        usedPercent: 18,
+        displayedPercent: 18,
+        resetState: .scheduled(epoch: 1_800_003_600)
+    )
+    let additional = (0..<4).map { index in
+        WidgetRingPresentation(
+            windowKind: "additional-\(index)",
+            label: "Additional \(index)",
+            usedPercent: 20 + index,
+            displayedPercent: 20 + index,
+            resetState: .scheduled(epoch: 1_800_010_000 + index)
+        )
+    }
+    let providerCount = kind == .dashboard ? family.maximumDashboardProviders : 1
+    let providers = (0..<providerCount).map { index in
+        WidgetProviderPresentation(
+            id: "provider-\(index)",
+            name: "Provider \(index)",
+            status: "error at /private/path",
+            healthState: .error,
+            rings: [outer, inner],
+            additionalWindows: additional
+        )
+    }
+    let history = WidgetHistoryProjection(
+        cells: (0..<30).map { index in
+            WidgetHeatMapCell(
+                dayStartEpoch: index * 86_400,
+                value: Double(index % 41),
+                band: .moderate
+            )
+        },
+        trendPoints: (0..<7).map { index in
+            WidgetTrendPoint(dayStartEpoch: index * 86_400, latestUsedPercent: 20 + index)
+        },
+        windowKind: "weekly",
+        windowLabel: "Weekly"
+    )
+    return WidgetPresentation(
+        configuration: configuration,
+        family: family,
+        providers: providers,
+        modules: configuration.modules,
+        history: history,
+        freshness: .stale,
+        overflowCount: 0
+    )
+}
+
 private struct DashboardEndToEndScenario {
     let layout: IntentLayoutOption
     let expectedLayout: WidgetLayoutPreset
@@ -870,6 +1393,52 @@ private func assertSubstantiveRender<V: View>(
 
     #expect(Double(nontransparentCount) / Double(max(sampleCount, 1)) >= 0.05)
     #expect(colors.count >= 6)
+}
+
+@MainActor
+private func renderedDifferenceRatio<First: View, Second: View>(
+    _ first: First,
+    _ second: Second,
+    size: CGSize,
+    region: CGRect
+) -> Double {
+    guard let firstBitmap = renderedBitmap(first, size: size),
+          let secondBitmap = renderedBitmap(second, size: size) else { return 0 }
+    let minimumX = max(0, Int(region.minX.rounded(.down)))
+    let maximumX = min(firstBitmap.pixelsWide, Int(region.maxX.rounded(.up)))
+    let minimumY = max(0, Int(region.minY.rounded(.down)))
+    let maximumY = min(firstBitmap.pixelsHigh, Int(region.maxY.rounded(.up)))
+    var compared = 0
+    var different = 0
+
+    for y in minimumY..<maximumY {
+        for x in minimumX..<maximumX {
+            guard let firstColor = firstBitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                  let secondColor = secondBitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                continue
+            }
+            compared += 1
+            let delta = abs(firstColor.redComponent - secondColor.redComponent)
+                + abs(firstColor.greenComponent - secondColor.greenComponent)
+                + abs(firstColor.blueComponent - secondColor.blueComponent)
+                + abs(firstColor.alphaComponent - secondColor.alphaComponent)
+            if delta > 0.08 { different += 1 }
+        }
+    }
+    return Double(different) / Double(max(compared, 1))
+}
+
+@MainActor
+private func renderedBitmap<V: View>(_ view: V, size: CGSize) -> NSBitmapImageRep? {
+    let renderer = ImageRenderer(
+        content: view
+            .frame(width: size.width, height: size.height)
+            .environment(\.colorScheme, ColorScheme.dark)
+    )
+    renderer.proposedSize = ProposedViewSize(size)
+    renderer.scale = 1
+    guard let data = renderer.nsImage?.tiffRepresentation else { return nil }
+    return NSBitmapImageRep(data: data)
 }
 
 @MainActor

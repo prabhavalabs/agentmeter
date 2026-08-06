@@ -1,6 +1,22 @@
 import AgentMeterWidgetCore
 import SwiftUI
 
+struct UsageHeatMapLayout: Equatable {
+    let cellCount: Int
+    let compact: Bool
+
+    var columnCount: Int {
+        guard cellCount > 0 else { return 1 }
+        if compact { return min(cellCount, 30) }
+        return cellCount > 7 ? 10 : cellCount
+    }
+
+    var rowCount: Int {
+        guard cellCount > 0 else { return 0 }
+        return Int(ceil(Double(cellCount) / Double(columnCount)))
+    }
+}
+
 struct UsageHeatMap: View {
     let projection: WidgetHistoryProjection
     let lowAccent: Color
@@ -8,9 +24,10 @@ struct UsageHeatMap: View {
     let highAccent: Color
     let veryHighAccent: Color
     var showsHeader = true
+    var compact = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: compact ? 2 : 7) {
             if showsHeader {
                 HStack {
                     Label("Allowance consumption", systemImage: "square.grid.3x3.fill")
@@ -28,7 +45,7 @@ struct UsageHeatMap: View {
                     systemImage: "calendar.badge.exclamationmark"
                 )
             } else {
-                LazyVGrid(columns: columns, spacing: 3) {
+                LazyVGrid(columns: columns, spacing: compact ? 2 : 3) {
                     ForEach(Array(projection.cells.enumerated()), id: \.offset) { _, cell in
                         HeatMapCell(
                             cell: cell,
@@ -53,8 +70,12 @@ struct UsageHeatMap: View {
     }
 
     private var columns: [GridItem] {
-        let count = projection.cells.count > 7 ? 10 : max(1, projection.cells.count)
-        return Array(repeating: GridItem(.flexible(minimum: 4), spacing: 3), count: count)
+        let layout = UsageHeatMapLayout(cellCount: projection.cells.count, compact: compact)
+        let spacing: CGFloat = compact ? 2 : 3
+        return Array(
+            repeating: GridItem(.flexible(minimum: 4), spacing: spacing),
+            count: layout.columnCount
+        )
     }
 
     private var periodLabel: String {

@@ -189,6 +189,18 @@ import Testing
     #expect(mismatched.trendFocusWindowKind == nil)
 }
 
+@Test func dashboardTrendWindowOptionsExcludeFocusAndLegacyFocusFallsBackToOuter() {
+    #expect(IntentTrendWindowOption.dashboardSupportedValues == [.outer, .inner])
+    #expect(Set(IntentTrendWindowOption.allCases) == [.outer, .inner, .focus])
+
+    let legacyDashboard = DashboardWidgetIntent()
+    legacyDashboard.trendWindow = .focus
+    let configuration = IntentConfigurationAdapter.dashboard(legacyDashboard)
+
+    #expect(configuration.trendWindow == .outer)
+    #expect(configuration.trendFocusWindowKind == nil)
+}
+
 @Test func dashboardAllHistoryAndTapOptionsMapWithoutConflation() {
     let intent = DashboardWidgetIntent()
     intent.providers = [

@@ -106,6 +106,51 @@ private let fixedCalendar: Calendar = {
     #expect(entry.state?.message == "Agent unavailable")
 }
 
+@Test func dashboardAllMissingConfigurationProducesAgentUnavailableState() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = WidgetSnapshotStore(directoryURL: directory)
+    try store.writeIfChanged(snapshot(providers: [provider()]))
+    let intent = DashboardWidgetIntent()
+    intent.providers = [
+        ProviderEntity(id: "private-account@example.com", name: "Private Account"),
+        ProviderEntity(id: "missing-token", name: "Missing Token"),
+    ]
+    let timelineProvider = DashboardTimelineProvider(
+        loader: WidgetSnapshotLoader(store: store),
+        now: { fixedNow },
+        calendar: fixedCalendar
+    )
+
+    let entry = timelineProvider.snapshotEntry(for: intent, family: .large)
+
+    #expect(entry.presentation == nil)
+    #expect(entry.state == .agentUnavailable)
+    #expect(entry.state?.message == "Agent unavailable")
+}
+
+@Test func dashboardAvailableSelectionBeyondVisibleCapPreservesTombstonesAndOverflow() throws {
+    let directory = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = WidgetSnapshotStore(directoryURL: directory)
+    try store.writeIfChanged(snapshot(providers: [provider()]))
+    let intent = DashboardWidgetIntent()
+    intent.providers = (0..<5).map {
+        ProviderEntity(id: "missing-\($0)", name: "Missing \($0)")
+    } + [ProviderEntity(id: "codex", name: "Codex")]
+    let timelineProvider = DashboardTimelineProvider(
+        loader: WidgetSnapshotLoader(store: store),
+        now: { fixedNow },
+        calendar: fixedCalendar
+    )
+
+    let entry = timelineProvider.snapshotEntry(for: intent, family: .large)
+
+    #expect(entry.state == nil)
+    #expect(entry.presentation?.providers.allSatisfy { $0.availability == .missing } == true)
+    #expect(entry.presentation?.overflowCount == 1)
+}
+
 @Test func focusPresentationKeepsMissingUsageResetAndHistoryTruthful() throws {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }

@@ -12,7 +12,7 @@ enum IntentConfigurationAdapter {
             historyStyle: intent.historyStyle,
             historyRange: intent.historyRange,
             heatScope: intent.heatScope,
-            trendWindow: intent.trendWindow,
+            trendWindow: intent.trendWindow.dashboardRenderValue,
             trendFocusWindowKind: nil,
             layout: intent.layout,
             density: intent.density,
@@ -37,7 +37,7 @@ enum IntentConfigurationAdapter {
             historyStyle: intent.historyStyle,
             historyRange: intent.historyRange,
             heatScope: intent.heatScope,
-            trendWindow: intent.trendWindow,
+            trendWindow: intent.trendWindow.renderValue,
             trendFocusWindowKind: intent.trendWindow == .focus
                 ? matchingWindowKind(intent.specificTrendWindow, providerID: providerID)
                 : nil,
@@ -70,7 +70,7 @@ enum IntentConfigurationAdapter {
         historyStyle: IntentHistoryStyleOption,
         historyRange: IntentHistoryRangeOption,
         heatScope: IntentHeatScopeOption,
-        trendWindow: IntentTrendWindowOption,
+        trendWindow: WidgetTrendWindow,
         trendFocusWindowKind: String?,
         layout: IntentLayoutOption,
         density: IntentDensityOption,
@@ -97,7 +97,7 @@ enum IntentConfigurationAdapter {
             historyStyle: historyStyle.renderValue,
             historyPeriod: historyRange.renderValue,
             heatMapScope: heatScope.renderValue,
-            trendWindow: trendWindow.renderValue,
+            trendWindow: trendWindow,
             trendFocusWindowKind: trendFocusWindowKind,
             layout: layout.renderValue,
             density: density.renderValue,
@@ -140,6 +140,13 @@ private extension IntentHeatScopeOption {
 private extension IntentTrendWindowOption {
     var renderValue: WidgetTrendWindow {
         switch self { case .outer: .outer; case .inner: .inner; case .focus: .focus }
+    }
+
+    var dashboardRenderValue: WidgetTrendWindow {
+        switch self {
+        case .outer, .focus: .outer
+        case .inner: .inner
+        }
     }
 }
 

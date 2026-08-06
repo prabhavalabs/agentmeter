@@ -154,7 +154,9 @@ enum DashboardWidgetDestination {
         case .agents:
             return AgentMeterRoute.agents.url
         case .providerDetail:
-            guard let providerID = presentation.providers.first?.id,
+            guard let providerID = presentation.providers.first(where: {
+                $0.availability == .available
+            })?.id,
                   AgentMeterRoute.isValidProviderID(providerID) else {
                 return AgentMeterRoute.overview.url
             }
@@ -168,17 +170,22 @@ struct DashboardWidgetInteractions: Equatable {
     let providerURLs: [String: URL]
 
     init(presentation: WidgetPresentation) {
+        widgetURL = DashboardWidgetDestination.url(for: presentation)
         if presentation.family == .small {
-            widgetURL = DashboardWidgetDestination.url(for: presentation)
             providerURLs = [:]
             return
         }
 
-        widgetURL = nil
         providerURLs = presentation.providers.reduce(into: [:]) { result, provider in
-            guard AgentMeterRoute.isValidProviderID(provider.id) else { return }
+            guard provider.availability == .available,
+                  AgentMeterRoute.isValidProviderID(provider.id) else { return }
             result[provider.id] = AgentMeterRoute.provider(provider.id).url
         }
+    }
+
+    func providerURL(for provider: WidgetProviderPresentation) -> URL? {
+        guard provider.availability == .available else { return nil }
+        return providerURLs[provider.id]
     }
 }
 
@@ -278,8 +285,11 @@ struct DashboardWidgetView: View {
             Text("AgentMeter")
                 .font(compact ? .caption.weight(.bold) : .headline)
             Spacer(minLength: 2)
-            if presentation.modules.contains(.freshness), presentation.family == .large || presentation.family == .extraLarge {
-                Text(presentation.freshness == .fresh ? "Current" : "Stale")
+            if let freshnessAlert = WidgetHealthSemantics.freshnessLabel(presentation.freshness) {
+                WidgetHealthBadges(labels: [freshnessAlert])
+            } else if presentation.modules.contains(.freshness),
+                      presentation.family == .large || presentation.family == .extraLarge {
+                Text("Current")
                     .font(.caption2)
                     .foregroundStyle(palette.secondaryText)
             }
@@ -304,8 +314,8 @@ struct DashboardWidgetView: View {
             alignment: .leading,
             spacing: layoutPlan.spacing
         ) {
-            ForEach(presentation.providers, id: \.id) { provider in
-                if let destination = interactionComposition.providerURLs[provider.id] {
+            ForEach(Array(presentation.providers.enumerated()), id: \.offset) { _, provider in
+                if let destination = interactionComposition.providerURL(for: provider) {
                     Link(destination: destination) {
                         providerRow(provider)
                     }

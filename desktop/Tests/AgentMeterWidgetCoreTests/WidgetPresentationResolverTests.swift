@@ -65,6 +65,137 @@ func dashboardProviderMaximaAndOverflow(family: WidgetFamily, maximum: Int) {
     #expect(presentation.history == nil)
 }
 
+@Test func focusMediumKeepsCompactHistoryAndDropsHealthyMetadataModules() {
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: focusConfiguration(outer: "weekly", inner: nil),
+        snapshot: presentationSnapshot(providerCount: 1),
+        family: .medium,
+        nowEpoch: 2_000,
+        endingAtDayEpoch: 86_400,
+        calendar: utcCalendarForResolver
+    )
+
+    #expect(presentation.modules == [.usage, .primaryReset, .history])
+    #expect(presentation.history != nil)
+}
+
+@Test func dashboardPreservesConfiguredSlotsWithSafeUnavailableTombstones() {
+    let privateMissingID = "private-account@example.com"
+    let otherMissingID = "token-sk-secret"
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: dashboardConfiguration(providerIDs: [
+            privateMissingID,
+            "provider-1",
+            otherMissingID,
+            "provider-0",
+        ]),
+        snapshot: presentationSnapshot(providerCount: 2),
+        family: .medium,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.providers.map(\.name) == [
+        "Agent unavailable",
+        "Provider 1",
+        "Agent unavailable",
+        "Provider 0",
+    ])
+    #expect(presentation.providers.map(\.availability) == [
+        .missing,
+        .available,
+        .missing,
+        .available,
+    ])
+    #expect(presentation.providers.flatMap { [$0.id, $0.name, $0.status] }.contains(privateMissingID) == false)
+    #expect(presentation.providers.flatMap { [$0.id, $0.name, $0.status] }.contains(otherMissingID) == false)
+    #expect(presentation.overflowCount == 0)
+}
+
+@Test func dashboardTombstonesCountTowardTheFamilyCapAndOverflow() {
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: dashboardConfiguration(providerIDs: [
+            "missing-0",
+            "provider-0",
+            "missing-1",
+            "missing-2",
+            "missing-3",
+        ]),
+        snapshot: presentationSnapshot(providerCount: 1),
+        family: .medium,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.providers.count == 4)
+    #expect(presentation.providers.map(\.availability) == [.missing, .available, .missing, .missing])
+    #expect(presentation.overflowCount == 1)
+}
+
+@Test func dashboardTracksAnAvailableSelectionBeyondTheVisibleFamilyCap() {
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: dashboardConfiguration(providerIDs: [
+            "missing-0",
+            "missing-1",
+            "missing-2",
+            "missing-3",
+            "missing-4",
+            "provider-0",
+        ]),
+        snapshot: presentationSnapshot(providerCount: 1),
+        family: .large,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.providers.allSatisfy { $0.availability == .missing })
+    #expect(presentation.hasAvailableProviderSelection)
+    #expect(presentation.overflowCount == 1)
+}
+
+@Test(arguments: [
+    ("ok", WidgetProviderHealthState.healthy),
+    ("ready", .healthy),
+    ("error", .error),
+    ("error at /private/path", .error),
+    ("stale", .stale),
+    (" unavailable ", .unavailable),
+    ("future-status", .attention),
+])
+func providerHealthStateIsResolvedFromStableStatusCodes(
+    status: String,
+    expected: WidgetProviderHealthState
+) {
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: 1_900,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: nil,
+        providers: [
+            WidgetProviderSnapshot(
+                id: "codex",
+                name: "Codex",
+                status: status,
+                updatedAtEpoch: 1_900,
+                windows: [
+                    WidgetWindowSnapshot(
+                        kind: "weekly",
+                        label: "Weekly",
+                        usedPercent: 10,
+                        resetAtEpoch: 4_000
+                    ),
+                ],
+                history: []
+            ),
+        ]
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: focusConfiguration(outer: "weekly", inner: nil),
+        snapshot: snapshot,
+        family: .small,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.providers.first?.healthState == expected)
+}
+
 @Test func focusUsesExplicitWindowsAndExplainsUnavailableHistory() {
     let provider = WidgetProviderSnapshot(
         id: "codex",

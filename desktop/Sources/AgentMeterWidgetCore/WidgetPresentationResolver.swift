@@ -6,6 +6,19 @@ public enum WidgetFreshnessState: Equatable, Sendable {
     case stale
 }
 
+public enum WidgetProviderAvailability: Equatable, Sendable {
+    case available
+    case missing
+}
+
+public enum WidgetProviderHealthState: Equatable, Sendable {
+    case healthy
+    case stale
+    case error
+    case unavailable
+    case attention
+}
+
 public enum WidgetResetState: Equatable, Sendable {
     case unavailable
     case scheduled(epoch: Int)
@@ -46,6 +59,8 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
     public let id: String
     public let name: String
     public let status: String
+    public let availability: WidgetProviderAvailability
+    public let healthState: WidgetProviderHealthState
     public let rings: [WidgetRingPresentation]
     public let additionalWindows: [WidgetRingPresentation]
 
@@ -53,12 +68,16 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
         id: String,
         name: String,
         status: String,
+        availability: WidgetProviderAvailability = .available,
+        healthState: WidgetProviderHealthState = .healthy,
         rings: [WidgetRingPresentation],
         additionalWindows: [WidgetRingPresentation] = []
     ) {
         self.id = id
         self.name = name
         self.status = status
+        self.availability = availability
+        self.healthState = healthState
         self.rings = rings
         self.additionalWindows = additionalWindows
     }
@@ -72,6 +91,7 @@ public struct WidgetPresentation: Equatable, Sendable {
     public let history: WidgetHistoryProjection?
     public let freshness: WidgetFreshnessState
     public let overflowCount: Int
+    public let hasAvailableProviderSelection: Bool
 
     public init(
         configuration: WidgetRenderConfiguration,
@@ -80,7 +100,8 @@ public struct WidgetPresentation: Equatable, Sendable {
         modules: Set<WidgetModule>,
         history: WidgetHistoryProjection?,
         freshness: WidgetFreshnessState,
-        overflowCount: Int
+        overflowCount: Int,
+        hasAvailableProviderSelection: Bool? = nil
     ) {
         self.configuration = configuration
         self.family = family
@@ -89,6 +110,8 @@ public struct WidgetPresentation: Equatable, Sendable {
         self.history = history
         self.freshness = freshness
         self.overflowCount = overflowCount
+        self.hasAvailableProviderSelection = hasAvailableProviderSelection
+            ?? providers.contains { $0.availability == .available }
     }
 }
 
@@ -105,11 +128,21 @@ public enum WidgetPresentationResolver {
     ) -> WidgetPresentation {
         let candidates = selectedProviders(configuration: configuration, snapshot: snapshot)
         let maximum = configuration.kind == .focus ? 1 : family.maximumDashboardProviders
-        let resolvedSnapshots = Array(candidates.prefix(maximum))
-        let overflowCount = max(0, candidates.count - resolvedSnapshots.count)
-        let modules = resolvedModules(requested: configuration.modules, family: family)
-        let providers = resolvedSnapshots.map {
-            resolveProvider($0, configuration: configuration, nowEpoch: nowEpoch)
+        let renderedCandidates = Array(candidates.prefix(maximum))
+        let resolvedSnapshots = renderedCandidates.compactMap(\.snapshot)
+        let overflowCount = max(0, candidates.count - renderedCandidates.count)
+        let modules = resolvedModules(
+            requested: configuration.modules,
+            kind: configuration.kind,
+            family: family
+        )
+        let providers = renderedCandidates.map { candidate in
+            switch candidate {
+            case let .available(provider):
+                resolveProvider(provider, configuration: configuration, nowEpoch: nowEpoch)
+            case let .missing(slot):
+                unavailableProvider(slot: slot)
+            }
         }
         let history = resolveHistory(
             configuration: configuration,
@@ -126,7 +159,8 @@ public enum WidgetPresentationResolver {
             modules: modules,
             history: history,
             freshness: nowEpoch >= staleEpoch(for: snapshot) ? .stale : .fresh,
-            overflowCount: overflowCount
+            overflowCount: overflowCount,
+            hasAvailableProviderSelection: candidates.contains { $0.snapshot != nil }
         )
     }
 
@@ -145,45 +179,51 @@ public enum WidgetPresentationResolver {
     private static func selectedProviders(
         configuration: WidgetRenderConfiguration,
         snapshot: WidgetSnapshot
-    ) -> [WidgetProviderSnapshot] {
+    ) -> [SelectedProvider] {
         let byID = Dictionary(
             snapshot.providers.reversed().map { ($0.id, $0) },
             uniquingKeysWith: { first, _ in first }
         )
         var seen = Set<String>()
-        let requested = configuration.providerIDs.compactMap { id -> WidgetProviderSnapshot? in
+        let requested = configuration.providerIDs.enumerated().compactMap { slot, id -> SelectedProvider? in
             guard seen.insert(id).inserted else { return nil }
-            return byID[id]
+            return byID[id].map(SelectedProvider.available) ?? .missing(slot: slot)
         }
 
         switch configuration.kind {
         case .dashboard:
-            return configuration.providerIDs.isEmpty ? snapshot.providers : requested
+            return configuration.providerIDs.isEmpty
+                ? snapshot.providers.map(SelectedProvider.available)
+                : requested
         case .focus:
             if let focusProviderID = configuration.focusProviderID, let provider = byID[focusProviderID] {
-                return [provider]
+                return [.available(provider)]
             }
-            return Array((requested.isEmpty ? snapshot.providers : requested).prefix(1))
+            let availableRequested = requested.compactMap(\.snapshot).map(SelectedProvider.available)
+            return Array((availableRequested.isEmpty
+                ? snapshot.providers.map(SelectedProvider.available)
+                : availableRequested).prefix(1))
         }
     }
 
     private static func resolvedModules(
         requested: Set<WidgetModule>,
+        kind: WidgetKind,
         family: WidgetFamily
     ) -> Set<WidgetModule> {
         var result = requested.union([.usage, .primaryReset])
-        if family == .small || family == .medium {
+        if family == .small {
             result.remove(.history)
-        }
-        let capacity: Int
-        switch family {
-        case .small: capacity = 2
-        case .medium: capacity = 4
-        case .large, .extraLarge: capacity = WidgetModule.allCases.count
-        }
-
-        for module in [WidgetModule.history, .status, .freshness] where result.count > capacity {
-            result.remove(module)
+            result.remove(.status)
+            result.remove(.freshness)
+        } else if family == .medium {
+            switch kind {
+            case .dashboard:
+                result.remove(.history)
+            case .focus:
+                result.remove(.status)
+                result.remove(.freshness)
+            }
         }
         return result
     }
@@ -210,9 +250,35 @@ public enum WidgetPresentationResolver {
             id: provider.id,
             name: provider.name,
             status: provider.status,
+            healthState: healthState(for: provider.status),
             rings: rings,
             additionalWindows: additionalWindows
         )
+    }
+
+    private static func unavailableProvider(slot: Int) -> WidgetProviderPresentation {
+        WidgetProviderPresentation(
+            id: "unavailable-provider-slot-\(slot)",
+            name: "Agent unavailable",
+            status: "Agent unavailable",
+            availability: .missing,
+            healthState: .unavailable,
+            rings: []
+        )
+    }
+
+    private static func healthState(for status: String) -> WidgetProviderHealthState {
+        let normalized = status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch normalized {
+        case "ok", "ready", "allowance available", "fictional allowance data":
+            return .healthy
+        case "stale", "awaiting refresh", "waiting for refresh":
+            return .stale
+        default:
+            if normalized.hasPrefix("error") { return .error }
+            if normalized.contains("unavailable") { return .unavailable }
+            return .attention
+        }
     }
 
     private static func ring(
@@ -342,6 +408,16 @@ public enum WidgetPresentationResolver {
                 usedPercent: $0.usedPercent,
                 resetAtEpoch: $0.resetAtEpoch
             )
+        }
+    }
+
+    private enum SelectedProvider {
+        case available(WidgetProviderSnapshot)
+        case missing(slot: Int)
+
+        var snapshot: WidgetProviderSnapshot? {
+            guard case let .available(snapshot) = self else { return nil }
+            return snapshot
         }
     }
 }

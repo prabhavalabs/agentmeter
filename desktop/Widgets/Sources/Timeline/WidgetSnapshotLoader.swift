@@ -230,7 +230,7 @@ enum WidgetTimelineFactory {
             endingAtDayEpoch: endingDayEpoch,
             calendar: calendar
         )
-        guard presentation.providers.isEmpty == false else {
+        guard presentation.hasAvailableProviderSelection else {
             return WidgetTimelineEntry(date: date, state: .agentUnavailable)
         }
         return WidgetTimelineEntry(date: date, presentation: presentation)

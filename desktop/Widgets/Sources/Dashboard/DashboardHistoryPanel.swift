@@ -14,7 +14,9 @@ struct DashboardHistorySemantics: Equatable {
             if presentation.configuration.heatMapScope == .combined {
                 title = "Average allowance consumed"
             } else {
-                let provider = presentation.providers.first?.name ?? "Selected provider"
+                let provider = presentation.providers.first(where: {
+                    $0.availability == .available
+                })?.name ?? "Selected provider"
                 title = "\(provider) allowance consumed"
             }
         case .trend:
