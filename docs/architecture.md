@@ -28,7 +28,9 @@ The Python bridge:
 3. Fetches and validates dashboard schema version 1.
 4. Stops the supervised server after each snapshot so provider helpers consume no memory between refreshes.
 5. Isolates Claude CLI fallback in safe mode so passive collection cannot load user hooks, plugins, MCP servers, or project instructions.
-6. Selects up to eight configured providers and three quota windows per provider.
+6. Normalizes and preserves up to eight quota windows for each of eight configured providers for
+   desktop state and history, then projects only the first three windows per provider into the
+   bounded device payload.
 7. Removes identity, credentials, raw errors, costs, credits, and unrelated fields.
 8. Retains recent valid provider windows for up to one hour when a refresh returns an empty error row, marking the result stale.
 9. Creates deduplicated threshold events in memory.
@@ -72,9 +74,10 @@ responses, local session logs, costs, credits, and billing fields. The WidgetKit
 reads this file; it has no IPC, Bluetooth, SQLite, network, or keychain dependency.
 
 Dashboard and Focus use App Intent configuration, so each installed widget instance retains its
-own provider, window, used-or-remaining, history, density, theme, and deep-link choices. Small and
-medium families omit history. Large and extra-large families can project daily consumption as a
-heat map or the latest daily used percentage as a trend. Passed reset timestamps remain **Refresh
+own provider, window, used-or-remaining, history, density, theme, and deep-link choices. Dashboard
+omits history in small and medium. Focus omits history in small and can render compact history in
+medium. Large and extra-large families can project the fuller daily consumption history as a heat
+map or the latest daily used percentage as a trend. Passed reset timestamps remain **Refresh
 pending** until a fresh snapshot establishes the next provider window.
 
 ## macOS distribution boundary
@@ -86,9 +89,9 @@ bridge, and signs only the outer app with the app entitlement file. Verification
 extension separately; signing never uses `--deep`.
 
 The community path remains the existing SwiftPM/manual, ad-hoc-signed app. Its bundle has no
-`Contents/PlugIns` directory, no WidgetKit extension, and no runtime App Group dependency. CI
-builds the committed Xcode project unsigned to verify widget structure, then packages and verifies
-the community app and DMG independently.
+`Contents/PlugIns` directory, no WidgetKit extension, and no runtime App Group dependency. CI runs
+the complete committed Xcode test action without code signing and then verifies the resulting
+widget structure before packaging and verifying the community app and DMG independently.
 
 ## Reliability rules
 

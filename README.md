@@ -59,9 +59,10 @@ several providers; Focus selects one provider and its primary and secondary allo
 Each widget instance keeps its own providers, windows, used-or-remaining percentage, history,
 layout, density, theme, reset display, and tap destination.
 
-Small and medium widgets prioritize current allowance and reset information. Large and extra-large
-widgets can add a 7- or 30-day heat map or trend. Heat maps show daily allowance consumption;
-trends show the latest daily used percentage for the selected window. Missing samples remain gaps.
+Dashboard omits history in small and medium, while Focus omits it only in small and can show a
+compact history in medium. Large and extra-large widgets can show the fuller configured 7- or
+30-day heat map or trend. Heat maps show daily allowance consumption; trends show the latest daily
+used percentage for the selected window. Missing samples remain gaps.
 After a reported reset time passes, the widget says **Refresh pending** until the app publishes
 fresh provider data rather than pretending usage reset to zero.
 

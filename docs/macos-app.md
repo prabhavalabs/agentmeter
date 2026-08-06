@@ -106,8 +106,8 @@ or absolute date, optional status and freshness, and whether a click opens Overv
 provider detail. Every widget instance stores its own configuration, so a Dashboard and multiple
 Focus widgets can make independent choices.
 
-Small and medium families omit history so allowance and reset values stay readable. Large and
-extra-large families can show a heat map or trend:
+Dashboard omits history in small and medium. Focus omits history in small and can show compact
+history in medium. Large and extra-large families can show the fuller configured heat map or trend:
 
 - A heat map measures percentage points consumed during each local calendar day. Combined scope
   averages available provider values; single-provider scope uses only the selected provider.
