@@ -313,15 +313,19 @@ for forbidden_entitlement in \
     com.apple.security.network.client \
     com.apple.security.network.server \
     com.apple.security.device.bluetooth \
+    com.apple.security.device.usb \
     keychain-access-groups \
     com.apple.security.files.user-selected.read-only \
     com.apple.security.files.user-selected.read-write \
+    com.apple.security.files.user-selected.executable \
     com.apple.security.files.downloads.read-only \
     com.apple.security.files.downloads.read-write \
     com.apple.security.files.bookmarks.app-scope \
     com.apple.security.files.bookmarks.document-scope \
-    com.apple.security.files.absolute-path.read-only \
-    com.apple.security.files.absolute-path.read-write \
+    com.apple.security.temporary-exception.files.absolute-path.read-only \
+    com.apple.security.temporary-exception.files.absolute-path.read-write \
+    com.apple.security.temporary-exception.files.home-relative-path.read-only \
+    com.apple.security.temporary-exception.files.home-relative-path.read-write \
     com.apple.security.assets.movies.read-only \
     com.apple.security.assets.movies.read-write \
     com.apple.security.assets.music.read-only \
