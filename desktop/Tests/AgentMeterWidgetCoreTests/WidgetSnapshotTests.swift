@@ -153,6 +153,60 @@ import Testing
     #expect(snapshot.providers[0].history.isEmpty)
 }
 
+@Test func snapshotConvertsInvalidHistoricalLatestPercentagesToUnknown() throws {
+    let history = try buildHistory([
+        historyDay(dayStartEpoch: 20_000, consumedPercentPoints: 10, latestUsedPercent: -1),
+        historyDay(dayStartEpoch: 106_400, consumedPercentPoints: 20, latestUsedPercent: 101),
+        historyDay(dayStartEpoch: 192_800, consumedPercentPoints: 30, latestUsedPercent: nil),
+    ])
+
+    #expect(history.count == 3)
+    #expect(history.allSatisfy { $0.latestUsedPercent == nil })
+}
+
+@Test func snapshotOmitsNegativeHistoricalConsumptionInsteadOfInventingZero() throws {
+    let history = try buildHistory([
+        historyDay(dayStartEpoch: 20_000, consumedPercentPoints: -1, latestUsedPercent: 25),
+        historyDay(dayStartEpoch: 106_400, consumedPercentPoints: 0, latestUsedPercent: 25),
+    ])
+
+    #expect(history.map(\.dayStartEpoch) == [106_400])
+    #expect(history.map(\.consumedPercentPoints) == [0])
+}
+
+@Test func snapshotPreservesHistoricalConsumptionAboveOneHundred() throws {
+    let history = try buildHistory([
+        historyDay(dayStartEpoch: 20_000, consumedPercentPoints: 175, latestUsedPercent: 75),
+    ])
+
+    #expect(history.map(\.consumedPercentPoints) == [175])
+}
+
+private func buildHistory(_ days: [WidgetHistoryDay]) throws -> [WidgetHistoryDay] {
+    let snapshot = try WidgetSnapshotBuilder().build(
+        state: makeWidgetState(providerCount: 1, windowsPerProvider: 1),
+        summaries: [
+            "provider-0": WidgetHistorySummary(historyStartEpoch: 20_000, days: days),
+        ]
+    )
+    return snapshot.providers[0].history
+}
+
+private func historyDay(
+    dayStartEpoch: Int,
+    consumedPercentPoints: Int,
+    latestUsedPercent: Int?
+) -> WidgetHistoryDay {
+    WidgetHistoryDay(
+        providerId: "provider-0",
+        windowKind: "window-0",
+        dayStartEpoch: dayStartEpoch,
+        consumedPercentPoints: consumedPercentPoints,
+        latestUsedPercent: latestUsedPercent,
+        resetAtEpoch: nil
+    )
+}
+
 private func makeWidgetState(
     providerCount: Int,
     windowsPerProvider: Int,

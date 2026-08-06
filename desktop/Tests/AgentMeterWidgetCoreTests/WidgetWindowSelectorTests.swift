@@ -77,7 +77,7 @@ import Testing
     #expect(invalid.inner?.kind == "session")
 }
 
-@Test func identicalFocusOverridesStillChooseDistinctRingsWhenPossible() {
+@Test func outerFocusWinsWhenBothOverridesRequestTheSameKind() {
     let selection = WidgetWindowSelector.select(
         from: [window("weekly", "Weekly"), window("session", "Session")],
         focusOuterKind: "weekly",
@@ -86,6 +86,21 @@ import Testing
 
     #expect(selection.outer?.kind == "weekly")
     #expect(selection.inner?.kind == "session")
+}
+
+@Test func innerFocusOverrideReservesItsWindowBeforeOuterFallback() {
+    let selection = WidgetWindowSelector.select(
+        from: [
+            window("weekly", "Weekly"),
+            window("session", "Session"),
+            window("daily", "Daily"),
+        ],
+        focusInnerKind: "weekly"
+    )
+
+    #expect(selection.outer?.kind == "daily")
+    #expect(selection.inner?.kind == "weekly")
+    #expect(selection.additional.map(\.kind) == ["session"])
 }
 
 private func window(_ kind: String, _ label: String, usedPercent: Int? = 50) -> ProviderWindow {

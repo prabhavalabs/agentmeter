@@ -21,10 +21,24 @@ public enum WidgetWindowSelector {
     ) -> WidgetWindowSelection {
         let indexed = Array(windows.enumerated())
         let explicitOuter = matchingIndex(for: focusOuterKind, in: indexed)
-        let outerIndex = explicitOuter ?? preferredOuterIndex(in: indexed)
+        let explicitInner = matchingIndex(for: focusInnerKind, in: indexed)
+        let outerIndex: Int?
+        let innerIndex: Int?
 
-        let explicitInner = matchingIndex(for: focusInnerKind, in: indexed, excluding: outerIndex)
-        let innerIndex = explicitInner ?? preferredInnerIndex(in: indexed, excluding: outerIndex)
+        if let explicitOuter {
+            outerIndex = explicitOuter
+            if let explicitInner, explicitInner != explicitOuter {
+                innerIndex = explicitInner
+            } else {
+                innerIndex = preferredInnerIndex(in: indexed, excluding: explicitOuter)
+            }
+        } else if let explicitInner {
+            innerIndex = explicitInner
+            outerIndex = preferredOuterIndex(in: indexed, excluding: explicitInner)
+        } else {
+            outerIndex = preferredOuterIndex(in: indexed)
+            innerIndex = preferredInnerIndex(in: indexed, excluding: outerIndex)
+        }
         let selected = Set([outerIndex, innerIndex].compactMap { $0 })
 
         return WidgetWindowSelection(
@@ -48,12 +62,14 @@ public enum WidgetWindowSelector {
     }
 
     private static func preferredOuterIndex(
-        in windows: [(offset: Int, element: ProviderWindow)]
+        in windows: [(offset: Int, element: ProviderWindow)],
+        excluding excludedIndex: Int? = nil
     ) -> Int? {
-        firstIndex(in: windows, matching: isMonthlyOrBilling)
-            ?? firstIndex(in: windows, matching: isExactWeekly)
-            ?? firstIndex(in: windows) { isSessionLike($0) == false }
-            ?? windows.first?.offset
+        let remaining = windows.filter { $0.offset != excludedIndex }
+        return firstIndex(in: remaining, matching: isMonthlyOrBilling)
+            ?? firstIndex(in: remaining, matching: isExactWeekly)
+            ?? firstIndex(in: remaining) { isSessionLike($0) == false }
+            ?? remaining.first?.offset
     }
 
     private static func preferredInnerIndex(

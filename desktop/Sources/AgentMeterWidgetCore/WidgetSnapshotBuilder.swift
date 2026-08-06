@@ -69,7 +69,7 @@ public struct WidgetSnapshotBuilder: Sendable {
         WidgetWindowSnapshot(
             kind: window.kind,
             label: window.label,
-            usedPercent: window.usedPercent.flatMap { (0...100).contains($0) ? $0 : nil },
+            usedPercent: validatedPercent(window.usedPercent),
             resetAtEpoch: window.resetAtEpoch
         )
     }
@@ -80,10 +80,12 @@ public struct WidgetSnapshotBuilder: Sendable {
     ) -> [WidgetHistoryDay] {
         guard let summary else { return [] }
 
+        let validDays = summary.days.filter {
+            $0.providerId == provider.id && $0.consumedPercentPoints >= 0
+        }
+
         let availableKinds = Set(
-            summary.days.lazy
-                .filter { $0.providerId == provider.id }
-                .map(\.windowKind)
+            validDays.lazy.map(\.windowKind)
         )
         var seenKinds = Set<String>()
         let selectedKinds = provider.windows
@@ -98,8 +100,8 @@ public struct WidgetSnapshotBuilder: Sendable {
         let kindOrder = Dictionary(uniqueKeysWithValues: selectedKinds.enumerated().map { ($1, $0) })
 
         let recentDayEpochs = Set(
-            summary.days.lazy
-                .filter { $0.providerId == provider.id && kindOrder[$0.windowKind] != nil }
+            validDays.lazy
+                .filter { kindOrder[$0.windowKind] != nil }
                 .map(\.dayStartEpoch)
                 .sorted(by: >)
                 .reduce(into: [Int]()) { result, epoch in
@@ -110,10 +112,9 @@ public struct WidgetSnapshotBuilder: Sendable {
                 .prefix(WidgetSnapshot.maximumHistoryDayCount)
         )
 
-        return summary.days
+        return validDays
             .filter {
-                $0.providerId == provider.id
-                    && kindOrder[$0.windowKind] != nil
+                kindOrder[$0.windowKind] != nil
                     && recentDayEpochs.contains($0.dayStartEpoch)
             }
             .sorted {
@@ -125,6 +126,22 @@ public struct WidgetSnapshotBuilder: Sendable {
                 if leftKind != rightKind { return leftKind < rightKind }
                 return $0.windowKind < $1.windowKind
             }
+            .map(makeHistoryDaySnapshot)
+    }
+
+    private func makeHistoryDaySnapshot(_ day: WidgetHistoryDay) -> WidgetHistoryDay {
+        WidgetHistoryDay(
+            providerId: day.providerId,
+            windowKind: day.windowKind,
+            dayStartEpoch: day.dayStartEpoch,
+            consumedPercentPoints: day.consumedPercentPoints,
+            latestUsedPercent: validatedPercent(day.latestUsedPercent),
+            resetAtEpoch: day.resetAtEpoch
+        )
+    }
+
+    private func validatedPercent(_ value: Int?) -> Int? {
+        value.flatMap { (0...100).contains($0) ? $0 : nil }
     }
 
     private func historyStartEpoch(
