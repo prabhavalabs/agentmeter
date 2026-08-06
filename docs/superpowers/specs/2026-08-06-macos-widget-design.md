@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-06
 
-**Status:** Design approved; written specification awaiting review
+**Status:** Approved for implementation planning
 
 **Target:** macOS 14 and later
 
@@ -102,7 +102,7 @@ Each instance stores the relevant subset of these parameters:
 - Selected providers and their order.
 - Focus outer and inner windows.
 - Percentage display: used or remaining.
-- Visible modules: usage, relative reset countdown, absolute reset date, provider status, freshness, heat map, and trend graph.
+- Visible optional modules: relative reset countdown, absolute reset date, provider status, freshness, heat map, and trend graph. Current allowance usage remains mandatory.
 - History style: heat map, trend, or none.
 - History range: heat maps support 7 or 30 days; trends support 7 days, 30 days, or the current cycle. Heat-map default is 30 days.
 - Heat-map scope: one provider or combined selected providers.
@@ -235,6 +235,7 @@ Provider IDs must pass the existing normalized provider-ID validation before rou
 - Placeholder previews use fictional data.
 - The shared snapshot follows the same allowlist-only privacy boundary as existing device and history payloads.
 - The extension has no network, Bluetooth, keychain, or provider-credential responsibility.
+- The widget extension enables App Sandbox and receives no network, hardware, or user-selected-file entitlement; its only shared-file capability is the App Group.
 - App Group access is granted only to the app and widget targets.
 - Diagnostics may report snapshot version, byte size, age, and error category, but never snapshot contents.
 - The widget displays last-known state; it never takes quota-affecting or destructive actions.
