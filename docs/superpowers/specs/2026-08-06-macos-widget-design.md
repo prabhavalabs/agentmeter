@@ -136,8 +136,8 @@ The app and extension use the provisioned App Group:
 
 Bundle and widget identifiers are:
 
-- App: `com.prabhavalabs.agentmeter`
-- Extension: `com.prabhavalabs.agentmeter.widget`
+- App: `com.prabhavalabs.agentmeter.desktop`
+- Extension: `com.prabhavalabs.agentmeter.desktop.widget`
 - Dashboard kind: `com.prabhavalabs.agentmeter.dashboard`
 - Focus kind: `com.prabhavalabs.agentmeter.focus`
 
