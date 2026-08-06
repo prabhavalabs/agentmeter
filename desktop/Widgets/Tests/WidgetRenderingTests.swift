@@ -467,6 +467,195 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     }
 }
 
+@MainActor
+@Test func practicalDashboardIntentScenariosResolveAndRenderEndToEnd() {
+    let scenarios: [DashboardEndToEndScenario] = [
+        DashboardEndToEndScenario(
+            layout: .automatic,
+            expectedLayout: .automatic,
+            density: .comfortable,
+            expectedDensity: .comfortable,
+            theme: .system,
+            expectedTheme: .system,
+            percentage: .used,
+            expectedPercentage: .used,
+            historyStyle: .heatMap,
+            expectedHistoryStyle: .heatMap,
+            historyRange: .days30,
+            expectedHistoryPeriod: .days30,
+            heatScope: .combined,
+            expectedHeatScope: .combined,
+            trendWindow: .outer,
+            expectedTrendWindow: .outer,
+            showsCountdown: true,
+            showsAbsoluteDate: false,
+            showsStatus: false,
+            showsFreshness: true,
+            tapDestination: .overview,
+            expectedTapDestination: .overview,
+            expectedModules: [.usage, .primaryReset, .history, .freshness],
+            expectedHistoryWindowLabel: nil,
+            expectedURL: AgentMeterRoute.overview.url
+        ),
+        DashboardEndToEndScenario(
+            layout: .usageAndRings,
+            expectedLayout: .usageAndRings,
+            density: .comfortable,
+            expectedDensity: .comfortable,
+            theme: .providerTinted,
+            expectedTheme: .providerTinted,
+            percentage: .remaining,
+            expectedPercentage: .remaining,
+            historyStyle: .heatMap,
+            expectedHistoryStyle: .heatMap,
+            historyRange: .days7,
+            expectedHistoryPeriod: .days7,
+            heatScope: .singleProvider,
+            expectedHeatScope: .singleProvider,
+            trendWindow: .outer,
+            expectedTrendWindow: .outer,
+            showsCountdown: false,
+            showsAbsoluteDate: true,
+            showsStatus: true,
+            showsFreshness: false,
+            tapDestination: .agents,
+            expectedTapDestination: .agents,
+            expectedModules: [.usage, .primaryReset, .history, .status],
+            expectedHistoryWindowLabel: nil,
+            expectedURL: AgentMeterRoute.agents.url
+        ),
+        DashboardEndToEndScenario(
+            layout: .compact,
+            expectedLayout: .compact,
+            density: .compact,
+            expectedDensity: .compact,
+            theme: .neutral,
+            expectedTheme: .neutral,
+            percentage: .used,
+            expectedPercentage: .used,
+            historyStyle: .none,
+            expectedHistoryStyle: .none,
+            historyRange: .days30,
+            expectedHistoryPeriod: .days30,
+            heatScope: .combined,
+            expectedHeatScope: .combined,
+            trendWindow: .outer,
+            expectedTrendWindow: .outer,
+            showsCountdown: false,
+            showsAbsoluteDate: false,
+            showsStatus: false,
+            showsFreshness: true,
+            tapDestination: .providerDetail,
+            expectedTapDestination: .providerDetail,
+            expectedModules: [.usage, .primaryReset, .freshness],
+            expectedHistoryWindowLabel: nil,
+            expectedURL: AgentMeterRoute.provider("gemini").url
+        ),
+        DashboardEndToEndScenario(
+            layout: .expanded,
+            expectedLayout: .expanded,
+            density: .compact,
+            expectedDensity: .compact,
+            theme: .midnight,
+            expectedTheme: .midnight,
+            percentage: .remaining,
+            expectedPercentage: .remaining,
+            historyStyle: .trend,
+            expectedHistoryStyle: .trend,
+            historyRange: .days7,
+            expectedHistoryPeriod: .days7,
+            heatScope: .singleProvider,
+            expectedHeatScope: .singleProvider,
+            trendWindow: .inner,
+            expectedTrendWindow: .inner,
+            showsCountdown: true,
+            showsAbsoluteDate: true,
+            showsStatus: true,
+            showsFreshness: true,
+            tapDestination: .agents,
+            expectedTapDestination: .agents,
+            expectedModules: [.usage, .primaryReset, .history, .status, .freshness],
+            expectedHistoryWindowLabel: "Daily",
+            expectedURL: AgentMeterRoute.agents.url
+        ),
+    ]
+    let selectedProviders = [
+        ProviderEntity(id: "gemini", name: "Gemini"),
+        ProviderEntity(id: "claude", name: "Claude"),
+        ProviderEntity(id: "codex", name: "Codex"),
+        ProviderEntity(id: "cursor", name: "Cursor"),
+        ProviderEntity(id: "longname", name: "Aperture Research Allowance Service"),
+        ProviderEntity(id: "atlas", name: "Atlas"),
+        ProviderEntity(id: "nova", name: "Nova"),
+        ProviderEntity(id: "prism", name: "Prism"),
+    ]
+    let expectedVisibleProviderIDs = ["gemini", "claude", "codex", "cursor", "longname"]
+
+    for scenario in scenarios {
+        let intent = DashboardWidgetIntent()
+        intent.providers = selectedProviders
+        intent.layout = scenario.layout
+        intent.density = scenario.density
+        intent.theme = scenario.theme
+        intent.percentage = scenario.percentage
+        intent.historyStyle = scenario.historyStyle
+        intent.historyRange = scenario.historyRange
+        intent.heatScope = scenario.heatScope
+        intent.trendWindow = scenario.trendWindow
+        intent.showResetCountdown = scenario.showsCountdown
+        intent.showAbsoluteResetDate = scenario.showsAbsoluteDate
+        intent.showStatus = scenario.showsStatus
+        intent.showFreshness = scenario.showsFreshness
+        intent.tapDestination = scenario.tapDestination
+
+        let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .large)
+        let configuration = presentation.configuration
+        let semantics = DashboardWidgetSemantics(presentation: presentation)
+
+        #expect(configuration.kind == .dashboard)
+        #expect(presentation.family == .large)
+        #expect(configuration.layout == scenario.expectedLayout)
+        #expect(configuration.density == scenario.expectedDensity)
+        #expect(configuration.theme == scenario.expectedTheme)
+        #expect(configuration.percentageMode == scenario.expectedPercentage)
+        #expect(configuration.historyStyle == scenario.expectedHistoryStyle)
+        #expect(configuration.historyPeriod == scenario.expectedHistoryPeriod)
+        #expect(configuration.heatMapScope == scenario.expectedHeatScope)
+        #expect(configuration.trendWindow == scenario.expectedTrendWindow)
+        #expect(configuration.showsResetCountdown == scenario.showsCountdown)
+        #expect(configuration.showsAbsoluteResetDate == scenario.showsAbsoluteDate)
+        #expect(configuration.tapDestination == scenario.expectedTapDestination)
+        #expect(presentation.modules == scenario.expectedModules)
+        #expect(presentation.providers.map(\.id) == expectedVisibleProviderIDs)
+        #expect(semantics.visibleProviderCount == 5)
+        #expect(presentation.overflowCount == 3)
+        #expect(semantics.overflowLabel == "+3")
+        #expect(semantics.showsHistory == (scenario.expectedHistoryStyle != .none))
+        #expect(DashboardWidgetDestination.url(for: presentation) == scenario.expectedURL)
+        if let expectedHistoryWindowLabel = scenario.expectedHistoryWindowLabel {
+            #expect(presentation.history?.windowLabel == expectedHistoryWindowLabel)
+        } else if scenario.expectedHistoryStyle == .none {
+            #expect(presentation.history == nil)
+        } else {
+            #expect(presentation.history != nil)
+        }
+
+        let colorSchemes: [ColorScheme] = scenario.expectedTheme == .midnight
+            ? [.dark]
+            : [.light, .dark]
+        let renderSize = scenario.expectedHistoryStyle == .none
+            ? CGSize(width: 360, height: 340)
+            : CGSize(width: 360, height: 380)
+        for colorScheme in colorSchemes {
+            assertSubstantiveRender(
+                DashboardWidgetView(presentation: presentation),
+                size: renderSize,
+                colorScheme: colorScheme
+            )
+        }
+    }
+}
+
 @Test func dashboardViewSourceDoesNotIntroduceScrolling() throws {
     let dashboardDirectory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -521,6 +710,34 @@ private func presentationForLayout(
     let intent = configuredDashboardIntent()
     intent.layout = layout
     return FictionalDashboardPresentationSource.presentation(for: intent, family: family)
+}
+
+private struct DashboardEndToEndScenario {
+    let layout: IntentLayoutOption
+    let expectedLayout: WidgetLayoutPreset
+    let density: IntentDensityOption
+    let expectedDensity: WidgetDensity
+    let theme: IntentThemeOption
+    let expectedTheme: WidgetTheme
+    let percentage: IntentPercentageOption
+    let expectedPercentage: WidgetPercentageMode
+    let historyStyle: IntentHistoryStyleOption
+    let expectedHistoryStyle: WidgetHistoryStyle
+    let historyRange: IntentHistoryRangeOption
+    let expectedHistoryPeriod: WidgetHistoryPeriod
+    let heatScope: IntentHeatScopeOption
+    let expectedHeatScope: WidgetHeatMapScope
+    let trendWindow: IntentTrendWindowOption
+    let expectedTrendWindow: WidgetTrendWindow
+    let showsCountdown: Bool
+    let showsAbsoluteDate: Bool
+    let showsStatus: Bool
+    let showsFreshness: Bool
+    let tapDestination: IntentTapDestinationOption
+    let expectedTapDestination: WidgetTapDestination
+    let expectedModules: Set<WidgetModule>
+    let expectedHistoryWindowLabel: String?
+    let expectedURL: URL
 }
 
 @MainActor
