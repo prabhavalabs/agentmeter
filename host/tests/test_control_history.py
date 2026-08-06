@@ -1,7 +1,189 @@
 import stat
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 from agentmeter_host.control.history import HistoryError, HistoryStore
+
+
+def test_widget_summary_counts_positive_deltas_without_counting_resets(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    for sampled_at, percent, reset_at in (
+        (1_788_249_600, 10, 1_788_336_000),
+        (1_788_253_200, 16, 1_788_336_000),
+        (1_788_256_800, 3, 1_788_422_400),
+        (1_788_260_400, 8, 1_788_422_400),
+    ):
+        history.record_usage("claude", "weekly", sampled_at, percent, reset_at)
+
+    result = history.query_widget_summary(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert result["days"] == [
+        {
+            "providerId": "claude",
+            "windowKind": "weekly",
+            "dayStartEpoch": 1_788_220_800,
+            "consumedPercentPoints": 11,
+            "latestUsedPercent": 8,
+            "resetAtEpoch": 1_788_422_400,
+            "cycleStartEpoch": 1_788_256_800,
+        }
+    ]
+    history.close()
+
+
+def test_widget_summary_does_not_count_increases_without_known_reset_continuity(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_788_249_600, 10, None)
+    history.record_usage("claude", "weekly", 1_788_253_200, 20, None)
+
+    result = history.query_widget_summary(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert result["days"] == [
+        {
+            "providerId": "claude",
+            "windowKind": "weekly",
+            "dayStartEpoch": 1_788_220_800,
+            "consumedPercentPoints": 0,
+            "latestUsedPercent": 20,
+            "resetAtEpoch": None,
+            "cycleStartEpoch": None,
+        }
+    ]
+    history.close()
+
+
+def test_widget_summary_uses_local_day_starts_across_berlin_spring_dst(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    zone = ZoneInfo("Europe/Berlin")
+    march_29 = int(datetime(2026, 3, 29, 12, tzinfo=zone).timestamp())
+    march_30 = int(datetime(2026, 3, 30, 12, tzinfo=zone).timestamp())
+    history.record_usage("claude", "weekly", march_29, 10, 1_800_000_000)
+    history.record_usage("claude", "weekly", march_30, 10, 1_800_000_000)
+
+    result = history.query_widget_summary(
+        since_epoch=march_29,
+        provider_id="claude",
+        time_zone_identifier="Europe/Berlin",
+    )
+
+    day_starts = [day["dayStartEpoch"] for day in result["days"]]
+    assert day_starts[1] - day_starts[0] == 82_800
+    history.close()
+
+
+def test_widget_summary_derives_and_propagates_observed_cycle_starts(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    samples = (
+        (1_000, 10, 500_000),
+        (87_400, 20, 500_000),
+        (173_800, 25, 600_000),
+        (260_200, 30, 600_000),
+        (346_600, 3, 600_000),
+    )
+    for sampled_at, percent, reset_at in samples:
+        history.record_usage("claude", "weekly", sampled_at, percent, reset_at)
+
+    result = history.query_widget_summary(
+        since_epoch=0,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert [day["cycleStartEpoch"] for day in result["days"]] == [346_600] * 5
+    history.close()
+
+
+def test_widget_summary_leaves_cycle_start_unknown_without_boundary_evidence(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_000, 10, None)
+    history.record_usage("claude", "weekly", 87_400, 20, None)
+
+    result = history.query_widget_summary(
+        since_epoch=0,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert [day["cycleStartEpoch"] for day in result["days"]] == [None, None]
+    history.close()
+
+
+def test_widget_summary_uses_pre_boundary_baseline_and_omits_unknown_days(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_788_246_000, 20, 1_788_336_000)
+    history.record_usage("claude", "weekly", 1_788_249_600, 25, 1_788_336_000)
+    history.record_usage("claude", "session", 1_788_249_600, None, None)
+    history.record_usage("claude", "session", 1_788_336_000, None, None)
+
+    result = history.query_widget_summary(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert result == {
+        "historyStartEpoch": 1_788_246_000,
+        "days": [
+            {
+                "providerId": "claude",
+                "windowKind": "weekly",
+                "dayStartEpoch": 1_788_220_800,
+                "consumedPercentPoints": 5,
+                "latestUsedPercent": 25,
+                "resetAtEpoch": 1_788_336_000,
+                "cycleStartEpoch": 1_788_246_000,
+            }
+        ],
+    }
+    history.close()
+
+
+def test_widget_summary_keeps_known_zero_days_private_and_provider_scoped(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_788_249_600, 10, 1_788_336_000)
+    history.record_usage("codex", "weekly", 1_788_249_600, 90, 1_788_336_000)
+
+    result = history.query_widget_summary(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert result["historyStartEpoch"] == 1_788_249_600
+    assert result["days"] == [
+        {
+            "providerId": "claude",
+            "windowKind": "weekly",
+            "dayStartEpoch": 1_788_220_800,
+            "consumedPercentPoints": 0,
+            "latestUsedPercent": 10,
+            "resetAtEpoch": 1_788_336_000,
+            "cycleStartEpoch": 1_788_249_600,
+        }
+    ]
+    assert not {"name", "identity", "prompt", "rawValues"} & set(result["days"][0])
+    with pytest.raises(HistoryError, match="provider ID"):
+        history.query_widget_summary(
+            since_epoch=1_788_249_600,
+            provider_id="Claude!",
+            time_zone_identifier="UTC",
+        )
+    with pytest.raises(HistoryError, match="time zone identifier"):
+        history.query_widget_summary(
+            since_epoch=1_788_249_600,
+            provider_id="claude",
+            time_zone_identifier="Not/AZone",
+        )
+    history.close()
 
 
 def test_history_downsamples_and_prunes_without_identity(tmp_path) -> None:

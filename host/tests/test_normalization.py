@@ -385,14 +385,14 @@ def test_normalizer_rejects_stale_window_outside_device_contract() -> None:
         )
 
 
-def test_normalizer_keeps_at_most_three_windows_per_provider() -> None:
+def test_normalizer_keeps_at_most_eight_windows_per_provider() -> None:
     from agentmeter_host.normalization import DisplayPreferences, normalize_dashboard_snapshot
 
     dashboard = dashboard_snapshot()
     first_window = dashboard["providers"][0]["windows"][0]
     dashboard["providers"][0]["windows"] = [
         {**first_window, "kind": f"window_{index}", "label": f"Window {index}"}
-        for index in range(4)
+        for index in range(9)
     ]
 
     snapshot = normalize_dashboard_snapshot(
@@ -406,6 +406,11 @@ def test_normalizer_keeps_at_most_three_windows_per_provider() -> None:
         "window_0",
         "window_1",
         "window_2",
+        "window_3",
+        "window_4",
+        "window_5",
+        "window_6",
+        "window_7",
     ]
 
 
@@ -448,6 +453,7 @@ def test_normalizer_bounds_provider_and_window_text_for_device() -> None:
 
 def test_normalized_snapshot_matches_device_schema() -> None:
     from agentmeter_host.normalization import DisplayPreferences, normalize_dashboard_snapshot
+    from agentmeter_host.protocol import encode_device_snapshot
     from jsonschema import Draft202012Validator
 
     schema = json.loads((ROOT / "schemas/device-snapshot-v1.schema.json").read_text())
@@ -458,7 +464,7 @@ def test_normalized_snapshot_matches_device_schema() -> None:
         display=DisplayPreferences(55, (75, 90), False),
     )
 
-    Draft202012Validator(schema).validate(snapshot)
+    Draft202012Validator(schema).validate(json.loads(encode_device_snapshot(snapshot)))
 
 
 def test_normalizer_reports_malformed_v1_without_exposing_raw_fields() -> None:

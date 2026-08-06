@@ -19,7 +19,11 @@ from agentmeter_host.config import ConfigError, load_config
 from agentmeter_host.ipc.fake import SCENARIOS, run_fake_server
 from agentmeter_host.ipc.server import default_ipc_path
 from agentmeter_host.normalization import NormalizationError
-from agentmeter_host.protocol import DeviceProtocolError, encode_device_snapshot
+from agentmeter_host.protocol import (
+    DeviceProtocolError,
+    encode_device_snapshot,
+    project_device_snapshot,
+)
 from agentmeter_host.runtime import run_bridge
 from agentmeter_host.service import (
     ServiceError,
@@ -150,7 +154,7 @@ def run_snapshot(config_path: Path, *, pretty: bool) -> int:
         return 1
 
     if pretty:
-        print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+        print(json.dumps(project_device_snapshot(snapshot), ensure_ascii=False, indent=2))
     else:
         print(payload.decode("utf-8"))
     return 0

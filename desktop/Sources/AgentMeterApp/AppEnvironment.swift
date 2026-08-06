@@ -7,9 +7,23 @@ import Foundation
 enum AppEnvironment {
     static func makeModel() -> AppModel {
         let preferences = AppPreferences()
+        let bridge = UnixBridgeClient(path: ipcPath)
+        let widgetSnapshotCoordinator: any WidgetSnapshotCoordinating
+        if let sharedContainerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: "group.com.prabhavalabs.agentmeter.shared"
+        ) {
+            widgetSnapshotCoordinator = WidgetSnapshotCoordinator(
+                bridge: bridge,
+                directoryURL: sharedContainerURL,
+                reloader: WidgetKitTimelineReloader()
+            )
+        } else {
+            widgetSnapshotCoordinator = NoopWidgetSnapshotCoordinator()
+        }
         return AppModel(
-            bridge: UnixBridgeClient(path: ipcPath),
-            preferences: preferences
+            bridge: bridge,
+            preferences: preferences,
+            widgetSnapshotCoordinator: widgetSnapshotCoordinator
         )
     }
 

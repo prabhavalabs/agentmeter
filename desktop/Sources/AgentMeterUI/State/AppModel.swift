@@ -1,5 +1,6 @@
 import AgentMeterCore
 import AgentMeterIPC
+import AgentMeterWidgetCore
 import Foundation
 import Observation
 
@@ -50,6 +51,11 @@ private struct SettingsCommandResult: Decodable, Sendable {
     let settings: DeviceSettings?
 }
 
+private struct RequestedProviderCollection: Equatable, Sendable {
+    let ids: [String]
+    let pollIntervalSeconds: Int
+}
+
 @MainActor
 @Observable
 public final class AppModel {
@@ -62,20 +68,33 @@ public final class AppModel {
     public private(set) var historySamples: [UsageHistorySample] = []
     public private(set) var historyRange: UsageHistoryRange = .last24Hours
     public private(set) var diagnostics: BridgeDiagnostics?
+    public private(set) var requestedProviderDetailID: String?
     public var notice: AppNotice?
 
     public let preferences: AppPreferences
 
     @ObservationIgnored private let bridge: any BridgeAPI
+    @ObservationIgnored private let widgetSnapshotCoordinator: any WidgetSnapshotCoordinating
+    @ObservationIgnored private let widgetLocalDayScheduler: any WidgetLocalDayScheduling
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored private var widgetRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var widgetLocalDayTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingProviderCollection: RequestedProviderCollection?
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored public var stateEventHandler:
         (@MainActor @Sendable (BridgeEvent, ControlState, ControlState) -> Void)?
 
-    public init(bridge: any BridgeAPI, preferences: AppPreferences) {
+    public init(
+        bridge: any BridgeAPI,
+        preferences: AppPreferences,
+        widgetSnapshotCoordinator: any WidgetSnapshotCoordinating = NoopWidgetSnapshotCoordinator(),
+        widgetLocalDayScheduler: any WidgetLocalDayScheduling = WidgetLocalDayScheduler()
+    ) {
         self.bridge = bridge
         self.preferences = preferences
+        self.widgetSnapshotCoordinator = widgetSnapshotCoordinator
+        self.widgetLocalDayScheduler = widgetLocalDayScheduler
     }
 
     public var selectedSection: NavigationSection {
@@ -84,6 +103,23 @@ public final class AppModel {
     }
 
     public var isBusy: Bool { !activeOperations.isEmpty }
+
+    public func navigate(to route: AgentMeterRoute) {
+        switch route {
+        case .overview:
+            selectedSection = .overview
+        case .agents:
+            selectedSection = .agents
+        case let .provider(providerID):
+            selectedSection = .overview
+            requestedProviderDetailID = providerID
+        }
+    }
+
+    public func completeRequestedProviderDetail(id: String) {
+        guard requestedProviderDetailID == id else { return }
+        requestedProviderDetailID = nil
+    }
 
     public func start(showFailure: Bool = true) async {
         guard !hasStarted else { return }
@@ -94,7 +130,9 @@ public final class AppModel {
                 bridgeReachable = true
                 apply(try await bridge.status())
                 listenForEvents()
+                listenForWidgetLocalDayChanges()
                 await loadSupplementalData()
+                await widgetSnapshotCoordinator.refresh(state: state)
             } catch {
                 bridgeReachable = false
                 hasStarted = false
@@ -111,6 +149,12 @@ public final class AppModel {
         eventTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        widgetRefreshTask?.cancel()
+        widgetRefreshTask = nil
+        let localDayTask = widgetLocalDayTask
+        widgetLocalDayTask = nil
+        localDayTask?.cancel()
+        await localDayTask?.value
         hasStarted = false
         bridgeReachable = false
         await bridge.close()
@@ -161,6 +205,7 @@ public final class AppModel {
     public func refreshProviders() async {
         await perform(.providerRefresh, command: .refreshProviders)
         await loadSupplementalData()
+        await widgetSnapshotCoordinator.refresh(state: state)
     }
 
     public func patchSettings(_ patch: DeviceSettingsPatch) async {
@@ -170,8 +215,12 @@ public final class AppModel {
             do {
                 let result = try await bridge.perform(.patchSettings(patch))
                 let confirmed = try result.decodePayload(SettingsCommandResult.self)
+                let previousSettings = state.settings
                 if let settings = confirmed.settings {
                     applyConfirmedSettings(settings)
+                }
+                if widgetVisibilityChanged(from: previousSettings, to: state.settings) {
+                    await invalidateWidgetSnapshot(.visibilityChanged)
                 }
                 pendingSettingsPatch = nil
                 settingsSyncState = confirmed.syncStatus == "synced"
@@ -219,15 +268,45 @@ public final class AppModel {
     }
 
     public func updateProviderCollection(ids: [String], pollIntervalSeconds: Int) async {
-        await perform(
-            .providerRefresh,
-            command: .updateProviders(ids: ids, pollIntervalSeconds: pollIntervalSeconds)
-        )
+        var operationStarted = false
+        await withOperation(.providerRefresh) {
+            operationStarted = true
+            var updateWasAccepted = false
+            do {
+                _ = try await bridge.perform(
+                    .updateProviders(ids: ids, pollIntervalSeconds: pollIntervalSeconds)
+                )
+                updateWasAccepted = true
+                applyConfirmedProviderCollectionState(try await bridge.status())
+                bridgeReachable = true
+            } catch {
+                if let confirmed = try? await bridge.status() {
+                    applyConfirmedProviderCollectionState(confirmed)
+                } else if updateWasAccepted || providerCollectionWasCommitted(before: error) {
+                    applyRequestedProviderCollection(
+                        ids: ids,
+                        pollIntervalSeconds: pollIntervalSeconds
+                    )
+                }
+                present(error, title: "Action could not be completed")
+            }
+        }
+        guard operationStarted else { return }
+        await invalidateWidgetSnapshot(.visibilityChanged)
     }
 
     public func clearHistory() async {
-        await perform(.diagnostics, command: .clearHistory)
-        historySamples = []
+        await withOperation(.diagnostics) {
+            do {
+                _ = try await bridge.perform(.clearHistory)
+                apply(try await bridge.status())
+                bridgeReachable = true
+                historySamples = []
+                await invalidateWidgetSnapshot(.historyCleared)
+            } catch {
+                present(error, title: "Action could not be completed")
+            }
+        }
     }
 
     public func loadHistory(
@@ -325,6 +404,17 @@ public final class AppModel {
                     let previous = self.state
                     self.apply(incoming)
                     self.stateEventHandler?(event, previous, incoming)
+                    if self.widgetVisibilityChanged(
+                        from: previous.settings,
+                        to: self.state.settings
+                    ) {
+                        await self.invalidateWidgetSnapshot(
+                            .visibilityChanged,
+                            state: self.state
+                        )
+                    } else if event.type == "providers.changed" || event.type == "state.changed" {
+                        self.scheduleWidgetRefresh(state: self.state)
+                    }
                 }
             } catch is CancellationError {
                 return
@@ -355,9 +445,37 @@ public final class AppModel {
         }
     }
 
+    private func listenForWidgetLocalDayChanges() {
+        guard widgetLocalDayTask == nil else { return }
+        let scheduler = widgetLocalDayScheduler
+        widgetLocalDayTask = Task { [weak self] in
+            while Task.isCancelled == false {
+                do {
+                    try await scheduler.waitForNextLocalDay()
+                } catch {
+                    return
+                }
+                guard Task.isCancelled == false, let self else { return }
+                self.scheduleWidgetRefresh(state: self.state)
+            }
+        }
+    }
+
     private func apply(_ incoming: ControlState) {
         guard incoming.revision >= state.revision else { return }
-        state = incoming
+        if let pendingProviderCollection {
+            if incoming.bridge.configuredProviderIds == pendingProviderCollection.ids {
+                self.pendingProviderCollection = nil
+                state = stateByApplyingConfiguredProviderCollection(to: incoming)
+            } else {
+                state = stateByApplying(
+                    pendingProviderCollection,
+                    to: incoming
+                )
+            }
+        } else {
+            state = stateByApplyingConfiguredProviderCollection(to: incoming)
+        }
         discoveredDevices = incoming.peripherals
         bridgeReachable = incoming.bridge.running
         if pendingSettingsPatch == nil {
@@ -379,6 +497,117 @@ public final class AppModel {
             providers: state.providers,
             bridge: state.bridge
         )
+    }
+
+    private func applyRequestedProviderCollection(
+        ids: [String],
+        pollIntervalSeconds: Int
+    ) {
+        let requested = RequestedProviderCollection(
+            ids: ids,
+            pollIntervalSeconds: pollIntervalSeconds
+        )
+        pendingProviderCollection = requested
+        state = stateByApplying(requested, to: state)
+    }
+
+    private func applyConfirmedProviderCollectionState(_ confirmed: ControlState) {
+        pendingProviderCollection = nil
+        apply(confirmed)
+    }
+
+    private func stateByApplying(
+        _ requested: RequestedProviderCollection,
+        to base: ControlState
+    ) -> ControlState {
+        let currentBridge = base.bridge
+        let projectedBridge = BridgeStatus(
+            version: currentBridge.version,
+            running: currentBridge.running,
+            lastProviderRefreshEpoch: currentBridge.lastProviderRefreshEpoch,
+            lastDeviceSyncEpoch: currentBridge.lastDeviceSyncEpoch,
+            lastErrorCode: currentBridge.lastErrorCode,
+            providerHealth: currentBridge.providerHealth,
+            configuredProviderIds: requested.ids,
+            pollIntervalSeconds: requested.pollIntervalSeconds
+        )
+        return ControlState(
+            revision: base.revision,
+            connection: base.connection,
+            peripherals: base.peripherals,
+            information: base.information,
+            telemetry: base.telemetry,
+            settings: base.settings,
+            providers: authoritativeProviderProjection(
+                requested.ids,
+                from: base.providers
+            ),
+            bridge: projectedBridge
+        )
+    }
+
+    private func stateByApplyingConfiguredProviderCollection(
+        to base: ControlState
+    ) -> ControlState {
+        stateByApplying(
+            RequestedProviderCollection(
+                ids: base.bridge.configuredProviderIds,
+                pollIntervalSeconds: base.bridge.pollIntervalSeconds
+            ),
+            to: base
+        )
+    }
+
+    private func authoritativeProviderProjection(
+        _ providerIds: [String],
+        from providers: [ProviderSummary]
+    ) -> [ProviderSummary] {
+        guard providerIds.isEmpty == false else { return providers }
+        let providersById = Dictionary(
+            providers.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var seen = Set<String>()
+        return providerIds.compactMap { providerId in
+            guard seen.insert(providerId).inserted else { return nil }
+            return providersById[providerId]
+        }
+    }
+
+    private func providerCollectionWasCommitted(before error: Error) -> Bool {
+        guard let bridgeError = error as? BridgeClientError,
+              case let .remote(code, _, _) = bridgeError else { return false }
+        return code == "providerRefreshFailed"
+    }
+
+    private func widgetVisibilityChanged(
+        from previous: DeviceSettings?,
+        to current: DeviceSettings?
+    ) -> Bool {
+        previous?.hiddenProviderIds != current?.hiddenProviderIds
+            || previous?.providerOrder != current?.providerOrder
+    }
+
+    private func scheduleWidgetRefresh(state: ControlState) {
+        widgetRefreshTask?.cancel()
+        let coordinator = widgetSnapshotCoordinator
+        widgetRefreshTask = Task {
+            await coordinator.refresh(state: state)
+        }
+    }
+
+    private func invalidateWidgetSnapshot(
+        _ invalidation: WidgetSnapshotInvalidation,
+        state publicationState: ControlState? = nil
+    ) async {
+        widgetRefreshTask?.cancel()
+        widgetRefreshTask = nil
+        let publicationState = publicationState ?? state
+        await widgetSnapshotCoordinator.invalidate(
+            state: publicationState,
+            invalidation: invalidation
+        )
+        scheduleWidgetRefresh(state: publicationState)
     }
 
     private func updateSettingsSyncState() {

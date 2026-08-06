@@ -30,7 +30,7 @@ def test_decode_status_request() -> None:
     assert request.payload == {}
 
 
-@pytest.mark.parametrize("command", sorted(COMMAND_TYPES))
+@pytest.mark.parametrize("command", sorted(COMMAND_TYPES | {"history.summary"}))
 def test_decode_accepts_every_documented_command(command: str) -> None:
     assert decode_request(request_line(type=command)).type == command
 

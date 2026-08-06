@@ -39,6 +39,8 @@ public actor FakeBridgeAPI: BridgeAPI {
         switch command {
         case .queryHistory:
             payload = try UsageHistoryResult(usage: []).jsonValue()
+        case .queryWidgetHistory:
+            payload = try WidgetHistorySummary(historyStartEpoch: nil, days: []).jsonValue()
         case .diagnostics:
             payload = try BridgeDiagnostics(
                 bridgeVersion: state.bridge.version,

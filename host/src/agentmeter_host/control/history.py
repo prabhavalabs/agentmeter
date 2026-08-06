@@ -4,8 +4,10 @@ import os
 import re
 import sqlite3
 from collections import defaultdict
+from datetime import datetime, time
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _BUCKET_SECONDS = 300
 _RETENTION_SECONDS = 30 * 86_400
@@ -277,6 +279,100 @@ class HistoryStore:
             parameters,
         ).fetchall()
         return self._usage_documents(rows)
+
+    def query_widget_summary(
+        self,
+        *,
+        since_epoch: int,
+        provider_id: str,
+        time_zone_identifier: str,
+    ) -> dict[str, object]:
+        self._validate_epoch(since_epoch, "history boundary")
+        self._validate_id(provider_id, "provider ID")
+        if not isinstance(time_zone_identifier, str):
+            raise HistoryError("time zone identifier is invalid")
+        try:
+            zone = ZoneInfo(time_zone_identifier)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise HistoryError("time zone identifier is invalid") from error
+        rows = self._connection.execute(
+            """
+            SELECT provider_id, window_kind, sampled_at, used_percent, reset_at
+            FROM usage_sample WHERE provider_id = ?
+            ORDER BY window_kind ASC, sampled_at ASC
+            """,
+            (provider_id,),
+        ).fetchall()
+        return self._widget_summary_document(rows, since_epoch=since_epoch, zone=zone)
+
+    @staticmethod
+    def _widget_summary_document(
+        rows: list[tuple[Any, ...]],
+        *,
+        since_epoch: int,
+        zone: ZoneInfo,
+    ) -> dict[str, object]:
+        history_start_epoch = next((row[2] for row in rows if row[3] is not None), None)
+        previous: dict[str, tuple[int | None, int | None]] = {}
+        known_resets: dict[str, int] = {}
+        known_percents: dict[str, int] = {}
+        cycle_starts: dict[str, int | None] = {}
+        days: dict[tuple[str, int], dict[str, object]] = {}
+
+        for provider_id, window_kind, sampled_at, used_percent, reset_at in rows:
+            previous_percent, previous_reset_at = previous.get(window_kind, (None, None))
+            cycle_start = cycle_starts.get(window_kind)
+            known_reset = known_resets.get(window_kind)
+            if reset_at is not None:
+                if known_reset is None or reset_at != known_reset:
+                    cycle_start = sampled_at
+                known_resets[window_kind] = reset_at
+            if used_percent is not None:
+                known_percent = known_percents.get(window_kind)
+                if known_percent is not None and known_percent - used_percent >= 5:
+                    cycle_start = sampled_at
+                known_percents[window_kind] = used_percent
+            cycle_starts[window_kind] = cycle_start
+            if sampled_at >= since_epoch and used_percent is not None:
+                local_date = datetime.fromtimestamp(sampled_at, zone).date()
+                day_start_epoch = int(
+                    datetime.combine(local_date, time.min, tzinfo=zone).timestamp()
+                )
+                day = days.setdefault(
+                    (window_kind, day_start_epoch),
+                    {
+                        "providerId": provider_id,
+                        "windowKind": window_kind,
+                        "dayStartEpoch": day_start_epoch,
+                        "consumedPercentPoints": 0,
+                        "latestUsedPercent": used_percent,
+                        "resetAtEpoch": reset_at,
+                        "cycleStartEpoch": cycle_start,
+                    },
+                )
+                if (
+                    previous_percent is not None
+                    and previous_reset_at is not None
+                    and reset_at is not None
+                    and previous_reset_at == reset_at
+                    and used_percent >= previous_percent
+                ):
+                    day["consumedPercentPoints"] += used_percent - previous_percent
+                day["latestUsedPercent"] = used_percent
+                day["resetAtEpoch"] = reset_at
+                day["cycleStartEpoch"] = cycle_start
+            previous[window_kind] = (used_percent, reset_at)
+
+        for (window_kind, _), day in days.items():
+            day["cycleStartEpoch"] = cycle_starts.get(window_kind)
+
+        return {
+            "historyStartEpoch": history_start_epoch,
+            "days": sorted(
+                days.values(),
+                key=lambda day: (day["dayStartEpoch"], day["windowKind"]),
+            ),
+        }
 
     @staticmethod
     def _usage_documents(rows: list[tuple[Any, ...]]) -> list[dict[str, object]]:

@@ -1,3 +1,4 @@
+import AgentMeterCore
 import Testing
 @testable import AgentMeterUI
 
@@ -7,6 +8,12 @@ import Testing
     #expect(ProviderPalette.accentHex(for: "gemini") == 0x5EC8FF)
     #expect(ProviderPalette.accentHex(for: "cursor") == 0xD6D5CC)
     #expect(ProviderPalette.accentHex(for: "future-agent") == 0x8B7CFF)
+}
+
+@Test func providerPaletteDelegatesToSharedProviderVisuals() {
+    for providerId in ["codex", "claude", "gemini", "cursor", "future-agent"] {
+        #expect(ProviderPalette.accentHex(for: providerId) == ProviderVisuals.accentHex(for: providerId))
+    }
 }
 
 @MainActor

@@ -7,7 +7,7 @@ from typing import Any, Protocol
 
 from agentmeter_host.alerts import AlertEngine
 from agentmeter_host.config import HostConfig
-from agentmeter_host.protocol import encode_device_snapshot
+from agentmeter_host.protocol import encode_device_snapshot, project_device_snapshot
 from agentmeter_host.snapshot import DeviceSnapshotCollector, collect_device_snapshot
 from agentmeter_host.transport.ble import BleakBackend, BleTransport
 from agentmeter_host.transport.serial import SerialTransport
@@ -72,7 +72,7 @@ class BridgeRuntime:
         collected = self._provider_history.apply(
             await self._collector(self._config, message_id=message_id)
         )
-        snapshot = self._alerts.apply(collected)
+        snapshot = self._alerts.apply(project_device_snapshot(collected))
         payload = encode_device_snapshot(snapshot)
         await self._transport.send(payload, message_id=message_id)
         self.message_id = (message_id + 1) & 0xFFFF

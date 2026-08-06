@@ -31,7 +31,7 @@ from agentmeter_host.control.settings import (
     PendingSettingsPatch,
 )
 from agentmeter_host.ipc.protocol import IpcCommandError, IpcRequest
-from agentmeter_host.protocol import encode_device_snapshot
+from agentmeter_host.protocol import encode_device_snapshot, project_device_snapshot
 from agentmeter_host.runtime import ProviderHistory
 from agentmeter_host.snapshot import DeviceSnapshotCollector
 from agentmeter_host.transport.ble import ConnectedPeripheral, TransportError
@@ -137,6 +137,7 @@ class BridgeController:
         self._provider_refresh_send_requested = False
         self._reconnect_needed = asyncio.Event()
         self._latest_snapshot: dict[str, Any] | None = None
+        self._latest_device_snapshot: dict[str, Any] | None = None
         self._next_snapshot_id = 0
         self._next_management_id = 1
         self._manual_disconnect = False
@@ -387,7 +388,8 @@ class BridgeController:
         try:
             async with self._collector_session_factory(config) as session:
                 collected = await session.collect(config, message_id=message_id)
-            snapshot = self._alerts.apply(self._provider_history.apply(collected))
+            snapshot = self._provider_history.apply(collected)
+            device_snapshot = self._alerts.apply(project_device_snapshot(snapshot))
         except Exception as error:
             self.state = replace(
                 self.state,
@@ -403,6 +405,7 @@ class BridgeController:
             ) from error
         self._next_snapshot_id = (message_id + 1) & 0xFFFF
         self._latest_snapshot = snapshot
+        self._latest_device_snapshot = device_snapshot
         self._history.record_snapshot(snapshot)
         providers = self._provider_summaries(snapshot)
         provider_health = tuple((provider.identifier, provider.status) for provider in providers)
@@ -472,11 +475,11 @@ class BridgeController:
         self._commit("device.changed")
 
     async def _send_latest_snapshot(self) -> None:
-        if self._latest_snapshot is None:
+        if self._latest_device_snapshot is None:
             return
-        message_id = int(self._latest_snapshot["messageId"])
+        message_id = int(self._latest_device_snapshot["messageId"])
         await self._transport.send(
-            encode_device_snapshot(self._latest_snapshot),
+            encode_device_snapshot(self._latest_device_snapshot),
             message_id=message_id,
         )
         now = int(self._clock())
@@ -745,6 +748,18 @@ class BridgeController:
             except HistoryError as error:
                 raise IpcCommandError("invalidPayload", str(error)) from error
             return {"usage": usage}
+        if command == "history.summary":
+            required = {"sinceEpoch", "providerId", "timeZoneIdentifier"}
+            if set(request.payload) != required:
+                raise IpcCommandError("invalidPayload", "History summary query is invalid")
+            try:
+                return self._history.query_widget_summary(
+                    since_epoch=request.payload["sinceEpoch"],
+                    provider_id=request.payload["providerId"],
+                    time_zone_identifier=request.payload["timeZoneIdentifier"],
+                )
+            except HistoryError as error:
+                raise IpcCommandError("invalidPayload", str(error)) from error
         if command == "history.clear":
             self._require_empty(request)
             self._history.clear()
