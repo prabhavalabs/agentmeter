@@ -9,7 +9,7 @@ struct WidgetProviderMark: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(accent.opacity(0.14))
+                .strokeBorder(accent, lineWidth: max(1, size * 0.055))
             glyph
                 .foregroundStyle(accent)
         }

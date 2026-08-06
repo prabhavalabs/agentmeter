@@ -4,7 +4,8 @@ import SwiftUI
 
 struct UsageTrendChart: View {
     let projection: WidgetHistoryProjection
-    let accent: Color
+    let lineAccent: Color
+    let pointAccent: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -44,14 +45,14 @@ struct UsageTrendChart: View {
                     y: .value("Used allowance", sample.value),
                     series: .value("Continuous segment", sample.segment)
                 )
-                .foregroundStyle(accent)
+                .foregroundStyle(lineAccent)
                 .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
 
                 PointMark(
                     x: .value("Day", sample.date),
                     y: .value("Used allowance", sample.value)
                 )
-                .foregroundStyle(accent)
+                .foregroundStyle(pointAccent)
                 .symbolSize(16)
             }
 

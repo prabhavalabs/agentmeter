@@ -4,16 +4,17 @@ import SwiftUI
 struct DualUsageRing: View {
     let outer: WidgetRingPresentation
     let inner: WidgetRingPresentation?
-    let accent: Color
+    let outerAccent: Color
+    let innerAccent: Color
     let percentageMode: WidgetPercentageMode
     var track: Color = Color.secondary.opacity(0.18)
 
     var body: some View {
         ZStack {
-            ring(for: outer, lineWidth: 9, color: accent)
+            ring(for: outer, lineWidth: 9, color: outerAccent, dash: [])
 
             if let inner {
-                ring(for: inner, lineWidth: 7, color: accent.opacity(0.62))
+                ring(for: inner, lineWidth: 6, color: innerAccent, dash: [5, 3])
                     .padding(15)
             }
 
@@ -34,7 +35,8 @@ struct DualUsageRing: View {
     private func ring(
         for presentation: WidgetRingPresentation,
         lineWidth: CGFloat,
-        color: Color
+        color: Color,
+        dash: [CGFloat]
     ) -> some View {
         Circle()
             .stroke(track, style: StrokeStyle(lineWidth: lineWidth))
@@ -44,13 +46,13 @@ struct DualUsageRing: View {
                 .trim(from: 0, to: drawingProgress(displayedPercent))
                 .stroke(
                     color,
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, dash: dash)
                 )
                 .rotationEffect(.degrees(-90))
         } else {
             Circle()
                 .stroke(
-                    color.opacity(0.55),
+                    color,
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, dash: [2, 5])
                 )
         }

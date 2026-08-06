@@ -3,7 +3,10 @@ import SwiftUI
 
 struct UsageHeatMap: View {
     let projection: WidgetHistoryProjection
-    let accent: Color
+    let lowAccent: Color
+    let moderateAccent: Color
+    let highAccent: Color
+    let veryHighAccent: Color
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -24,7 +27,13 @@ struct UsageHeatMap: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 3) {
                     ForEach(Array(projection.cells.enumerated()), id: \.offset) { _, cell in
-                        HeatMapCell(cell: cell, accent: accent)
+                        HeatMapCell(
+                            cell: cell,
+                            lowAccent: lowAccent,
+                            moderateAccent: moderateAccent,
+                            highAccent: highAccent,
+                            veryHighAccent: veryHighAccent
+                        )
                             .aspectRatio(1, contentMode: .fit)
                     }
                 }
@@ -57,7 +66,10 @@ struct UsageHeatMap: View {
 
 private struct HeatMapCell: View {
     let cell: WidgetHeatMapCell
-    let accent: Color
+    let lowAccent: Color
+    let moderateAccent: Color
+    let highAccent: Color
+    let veryHighAccent: Color
 
     var body: some View {
         ZStack {
@@ -66,7 +78,18 @@ private struct HeatMapCell: View {
             RoundedRectangle(cornerRadius: 2.5, style: .continuous)
                 .strokeBorder(border, lineWidth: cell.hasData ? 0.6 : 1)
 
-            if cell.hasData == false {
+            if let positiveAccent, let positiveScale {
+                GeometryReader { geometry in
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(positiveAccent)
+                        .frame(
+                            width: max(2, geometry.size.width * positiveScale),
+                            height: max(2, geometry.size.height * positiveScale)
+                        )
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .padding(1.5)
+            } else if cell.hasData == false {
                 Rectangle()
                     .fill(Color.secondary.opacity(0.55))
                     .frame(height: 1)
@@ -83,15 +106,35 @@ private struct HeatMapCell: View {
     private var fill: Color {
         switch cell.band {
         case .zero: return Color.secondary.opacity(0.08)
-        case .low: return accent.opacity(0.22)
-        case .moderate: return accent.opacity(0.4)
-        case .high: return accent.opacity(0.65)
-        case .veryHigh: return accent.opacity(0.92)
+        case .low, .moderate, .high, .veryHigh: return Color.clear
         case nil: return Color.clear
         }
     }
 
     private var border: Color {
-        cell.hasData ? accent.opacity(0.22) : Color.secondary.opacity(0.45)
+        if let positiveAccent {
+            return positiveAccent
+        }
+        return Color.secondary.opacity(cell.hasData ? 0.3 : 0.45)
+    }
+
+    private var positiveAccent: Color? {
+        switch cell.band {
+        case .low: lowAccent
+        case .moderate: moderateAccent
+        case .high: highAccent
+        case .veryHigh: veryHighAccent
+        case .zero, nil: nil
+        }
+    }
+
+    private var positiveScale: CGFloat? {
+        switch cell.band {
+        case .low: 0.28
+        case .moderate: 0.46
+        case .high: 0.68
+        case .veryHigh: 0.92
+        case .zero, nil: nil
+        }
     }
 }

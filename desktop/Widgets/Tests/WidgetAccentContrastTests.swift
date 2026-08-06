@@ -1,9 +1,35 @@
 import AgentMeterCore
 import AgentMeterWidgetCore
+import Foundation
 import SwiftUI
 import Testing
 
-@Test func everyProviderAccentMeetsNonTextContrastInLightAndDarkThemes() {
+@Test func dataAccentSourcesNeverReduceResolvedColorsWithOpacity() throws {
+    let widgetDirectory = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let sourcePaths = [
+        "Sources/Components/DualUsageRing.swift",
+        "Sources/Components/UsageHeatMap.swift",
+        "Sources/Components/UsageTrendChart.swift",
+        "Sources/Components/WidgetProviderMark.swift",
+        "Sources/Focus/FocusWidgetView.swift",
+    ]
+    let opacityPattern = try NSRegularExpression(
+        pattern: #"(?:\b(?:accent|color|[A-Za-z0-9_]*Accent)\b|dataAccent\([^)]*\))\s*\.\s*opacity\s*\("#
+    )
+
+    for sourcePath in sourcePaths {
+        let source = try String(
+            contentsOf: widgetDirectory.appendingPathComponent(sourcePath),
+            encoding: .utf8
+        )
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        #expect(opacityPattern.firstMatch(in: source, range: range) == nil)
+    }
+}
+
+@Test func everyFinalDataAccentMeetsNonTextContrastInLightAndDarkThemes() {
     let providers = ["codex", "claude", "gemini", "cursor"]
     let themes: [WidgetTheme] = [
         .system,
@@ -23,16 +49,15 @@ import Testing
                     requestedScheme: requestedScheme,
                     providerBaseAccent: base
                 )
-                let resolved = WidgetAccentResolver.resolve(
-                    base: base,
-                    against: background,
-                    scheme: WidgetThemeContrastModel.effectiveScheme(
-                        theme: theme,
-                        requestedScheme: requestedScheme
-                    )
+                let dataAccents = WidgetThemeContrastModel.dataAccents(
+                    theme: theme,
+                    requestedScheme: requestedScheme,
+                    providerBaseAccent: base
                 )
 
-                #expect(resolved.contrastRatio(against: background) >= 3.0)
+                for role in WidgetDataAccentRole.allCases {
+                    #expect(dataAccents[role].contrastRatio(against: background) >= 3.0)
+                }
             }
         }
     }

@@ -58,7 +58,8 @@ struct FocusWidgetView: View {
             DualUsageRing(
                 outer: outer,
                 inner: provider.rings.dropFirst().first,
-                accent: palette.accent,
+                outerAccent: palette.dataAccent(.outerRing),
+                innerAccent: palette.dataAccent(.innerRing),
                 percentageMode: presentation.configuration.percentageMode,
                 track: palette.track
             )
@@ -84,7 +85,8 @@ struct FocusWidgetView: View {
             DualUsageRing(
                 outer: outer,
                 inner: provider.rings.dropFirst().first,
-                accent: palette.accent,
+                outerAccent: palette.dataAccent(.outerRing),
+                innerAccent: palette.dataAccent(.innerRing),
                 percentageMode: presentation.configuration.percentageMode,
                 track: palette.track
             )
@@ -115,7 +117,8 @@ struct FocusWidgetView: View {
                 DualUsageRing(
                     outer: outer,
                     inner: provider.rings.dropFirst().first,
-                    accent: palette.accent,
+                    outerAccent: palette.dataAccent(.outerRing),
+                    innerAccent: palette.dataAccent(.innerRing),
                     percentageMode: presentation.configuration.percentageMode,
                     track: palette.track
                 )
@@ -147,7 +150,8 @@ struct FocusWidgetView: View {
                     DualUsageRing(
                         outer: outer,
                         inner: provider.rings.dropFirst().first,
-                        accent: palette.accent,
+                        outerAccent: palette.dataAccent(.outerRing),
+                        innerAccent: palette.dataAccent(.innerRing),
                         percentageMode: presentation.configuration.percentageMode,
                         track: palette.track
                     )
@@ -179,7 +183,7 @@ struct FocusWidgetView: View {
             WidgetProviderMark(
                 providerID: provider.id,
                 name: provider.name,
-                accent: palette.accent,
+                accent: palette.dataAccent(.providerMark),
                 size: compact ? 23 : 32
             )
             VStack(alignment: .leading, spacing: 0) {
@@ -252,9 +256,19 @@ struct FocusWidgetView: View {
             } else {
                 switch presentation.configuration.historyStyle {
                 case .heatMap, .bars:
-                    UsageHeatMap(projection: history, accent: palette.accent)
+                    UsageHeatMap(
+                        projection: history,
+                        lowAccent: palette.dataAccent(.heatLow),
+                        moderateAccent: palette.dataAccent(.heatModerate),
+                        highAccent: palette.dataAccent(.heatHigh),
+                        veryHighAccent: palette.dataAccent(.heatVeryHigh)
+                    )
                 case .trend:
-                    UsageTrendChart(projection: history, accent: palette.accent)
+                    UsageTrendChart(
+                        projection: history,
+                        lineAccent: palette.dataAccent(.trendLine),
+                        pointAccent: palette.dataAccent(.trendPoint)
+                    )
                 case .none:
                     EmptyView()
                 }

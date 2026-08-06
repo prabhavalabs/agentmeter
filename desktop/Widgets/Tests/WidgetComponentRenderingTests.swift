@@ -24,7 +24,13 @@ func dualUsageRingRendersInAdaptiveAppearances(colorScheme: ColorScheme) {
     )
 
     assertRendered(
-        DualUsageRing(outer: outer, inner: inner, accent: Color.mint, percentageMode: .used),
+        DualUsageRing(
+            outer: outer,
+            inner: inner,
+            outerAccent: Color.mint,
+            innerAccent: Color.mint,
+            percentageMode: .used
+        ),
         size: CGSize(width: 180, height: 180),
         colorScheme: colorScheme
     )
@@ -49,12 +55,22 @@ func usageHistoryViewsRenderGapsAndZeroInAdaptiveAppearances(colorScheme: ColorS
     )
 
     assertRendered(
-        UsageHeatMap(projection: projection, accent: Color.mint),
+        UsageHeatMap(
+            projection: projection,
+            lowAccent: Color.mint,
+            moderateAccent: Color.mint,
+            highAccent: Color.mint,
+            veryHighAccent: Color.mint
+        ),
         size: CGSize(width: 320, height: 120),
         colorScheme: colorScheme
     )
     assertRendered(
-        UsageTrendChart(projection: projection, accent: Color.mint),
+        UsageTrendChart(
+            projection: projection,
+            lineAccent: Color.mint,
+            pointAccent: Color.mint
+        ),
         size: CGSize(width: 320, height: 160),
         colorScheme: colorScheme
     )

@@ -7,28 +7,17 @@ struct WidgetThemePalette {
     let primaryText: Color
     let secondaryText: Color
     let track: Color
-    let accent: Color
+    let dataAccents: WidgetDataAccentPalette
     let preferredColorScheme: ColorScheme?
 
     init(theme: WidgetTheme, providerID: String, colorScheme: ColorScheme) {
         let providerBaseRGB = WidgetRGB(hex: ProviderVisuals.accentHex(for: providerID))
-        let effectiveScheme = WidgetThemeContrastModel.effectiveScheme(
-            theme: theme,
-            requestedScheme: colorScheme
-        )
-        let contrastBackground = WidgetThemeContrastModel.background(
+        dataAccents = WidgetThemeContrastModel.dataAccents(
             theme: theme,
             requestedScheme: colorScheme,
             providerBaseAccent: providerBaseRGB
         )
-        let resolvedAccent = WidgetAccentResolver.resolve(
-            base: providerBaseRGB,
-            against: contrastBackground,
-            scheme: effectiveScheme
-        )
-        let providerAccent = Color(widgetRGB: resolvedAccent)
         let providerBaseAccent = Color(widgetRGB: providerBaseRGB)
-        accent = providerAccent
 
         switch theme {
         case .system:
@@ -65,9 +54,13 @@ struct WidgetThemePalette {
             background = providerBaseAccent.opacity(0.105)
             primaryText = .primary
             secondaryText = .secondary
-            track = providerAccent.opacity(0.18)
+            track = Color.secondary.opacity(0.2)
             preferredColorScheme = nil
         }
+    }
+
+    func dataAccent(_ role: WidgetDataAccentRole) -> Color {
+        Color(widgetRGB: dataAccents[role])
     }
 }
 
@@ -116,6 +109,41 @@ struct WidgetRGB: Hashable, Sendable {
     }
 }
 
+enum WidgetDataAccentRole: CaseIterable, Sendable {
+    case outerRing
+    case innerRing
+    case heatLow
+    case heatModerate
+    case heatHigh
+    case heatVeryHigh
+    case trendLine
+    case trendPoint
+    case providerMark
+}
+
+struct WidgetDataAccentPalette: Sendable {
+    private let opaqueAccent: WidgetRGB
+
+    init(opaqueAccent: WidgetRGB) {
+        self.opaqueAccent = opaqueAccent
+    }
+
+    subscript(role: WidgetDataAccentRole) -> WidgetRGB {
+        switch role {
+        case .outerRing,
+             .innerRing,
+             .heatLow,
+             .heatModerate,
+             .heatHigh,
+             .heatVeryHigh,
+             .trendLine,
+             .trendPoint,
+             .providerMark:
+            opaqueAccent
+        }
+    }
+}
+
 enum WidgetAccentResolver {
     static let minimumContrast = 3.0
 
@@ -138,6 +166,24 @@ enum WidgetAccentResolver {
 }
 
 enum WidgetThemeContrastModel {
+    static func dataAccents(
+        theme: WidgetTheme,
+        requestedScheme: ColorScheme,
+        providerBaseAccent: WidgetRGB
+    ) -> WidgetDataAccentPalette {
+        let background = background(
+            theme: theme,
+            requestedScheme: requestedScheme,
+            providerBaseAccent: providerBaseAccent
+        )
+        let resolved = WidgetAccentResolver.resolve(
+            base: providerBaseAccent,
+            against: background,
+            scheme: effectiveScheme(theme: theme, requestedScheme: requestedScheme)
+        )
+        return WidgetDataAccentPalette(opaqueAccent: resolved)
+    }
+
     static func effectiveScheme(theme: WidgetTheme, requestedScheme: ColorScheme) -> ColorScheme {
         switch theme {
         case .light: .light
