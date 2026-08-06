@@ -82,9 +82,34 @@ public struct WidgetSnapshotStore: Sendable {
     private func boundedRead(from url: URL, maximumCount: Int) throws -> Data {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
-        let data = try handle.read(upToCount: maximumCount + 1) ?? Data()
-        guard data.count <= maximumCount else {
+
+        var descriptorStatus = stat()
+        guard Darwin.fstat(handle.fileDescriptor, &descriptorStatus) == 0 else {
+            throw currentPOSIXError()
+        }
+        guard descriptorStatus.st_size <= maximumCount else {
             throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
+        }
+
+        return try Self.readBounded(maximumCount: maximumCount) { requestedCount in
+            try handle.read(upToCount: requestedCount)
+        }
+    }
+
+    static func readBounded(
+        maximumCount: Int,
+        readChunk: (Int) throws -> Data?
+    ) throws -> Data {
+        var data = Data()
+        while data.count <= maximumCount {
+            let requestedCount = maximumCount - data.count + 1
+            guard let chunk = try readChunk(requestedCount), !chunk.isEmpty else {
+                return data
+            }
+            data.append(chunk)
+            guard data.count <= maximumCount else {
+                throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
+            }
         }
         return data
     }

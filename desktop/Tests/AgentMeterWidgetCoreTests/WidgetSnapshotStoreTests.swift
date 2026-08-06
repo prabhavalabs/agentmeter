@@ -82,6 +82,16 @@ import Testing
     }
 }
 
+@Test func boundedSnapshotReadContinuesAcrossShortReadsAndRejectsTrailingBytes() throws {
+    var chunks = [Data("abc".utf8), Data("def".utf8), Data("g".utf8), Data()]
+
+    #expect(throws: WidgetSnapshotStoreError.encodedSizeExceedsLimit) {
+        try WidgetSnapshotStore.readBounded(maximumCount: 6) { _ in
+            chunks.removeFirst()
+        }
+    }
+}
+
 @Test func snapshotStoreCleansTemporaryFileWhenCommitFails() throws {
     try withTemporaryDirectory { directory in
         let store = WidgetSnapshotStore(directoryURL: directory)
