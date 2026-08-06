@@ -34,3 +34,61 @@ private enum Fixture {
         #expect(try JSONDecoder().decode(ConnectionPhase.self, from: data) == phase)
     }
 }
+
+@Test func decodesWidgetHistorySummaryDayFields() throws {
+    let data = Data(
+        """
+        {
+          "historyStartEpoch": 1788249600,
+          "days": [
+            {
+              "providerId": "claude",
+              "windowKind": "session",
+              "dayStartEpoch": 1788242400,
+              "consumedPercentPoints": 17,
+              "latestUsedPercent": 28,
+              "resetAtEpoch": 1788336000
+            }
+          ]
+        }
+        """.utf8
+    )
+
+    let summary = try JSONDecoder().decode(WidgetHistorySummary.self, from: data)
+    let day = try #require(summary.days.first)
+
+    #expect(summary.historyStartEpoch == 1_788_249_600)
+    #expect(day.providerId == "claude")
+    #expect(day.windowKind == "session")
+    #expect(day.dayStartEpoch == 1_788_242_400)
+    #expect(day.consumedPercentPoints == 17)
+    #expect(day.latestUsedPercent == 28)
+    #expect(day.resetAtEpoch == 1_788_336_000)
+}
+
+@Test func decodesWidgetHistorySummaryOptionalNulls() throws {
+    let data = Data(
+        """
+        {
+          "historyStartEpoch": null,
+          "days": [
+            {
+              "providerId": "claude",
+              "windowKind": "weekly",
+              "dayStartEpoch": 1788242400,
+              "consumedPercentPoints": 0,
+              "latestUsedPercent": null,
+              "resetAtEpoch": null
+            }
+          ]
+        }
+        """.utf8
+    )
+
+    let summary = try JSONDecoder().decode(WidgetHistorySummary.self, from: data)
+    let day = try #require(summary.days.first)
+
+    #expect(summary.historyStartEpoch == nil)
+    #expect(day.latestUsedPercent == nil)
+    #expect(day.resetAtEpoch == nil)
+}

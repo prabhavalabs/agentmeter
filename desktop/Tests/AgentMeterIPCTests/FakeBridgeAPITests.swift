@@ -46,3 +46,34 @@ import Testing
         "currentCycle": .boolean(true),
     ])
 }
+
+@Test func queryWidgetHistoryCommandCarriesRequiredFields() throws {
+    let command = BridgeCommand.queryWidgetHistory(
+        sinceEpoch: 1_788_249_600,
+        providerId: "claude",
+        timeZoneIdentifier: "Europe/Berlin"
+    )
+
+    #expect(try command.payload() == [
+        "sinceEpoch": .integer(1_788_249_600),
+        "providerId": .string("claude"),
+        "timeZoneIdentifier": .string("Europe/Berlin"),
+    ])
+}
+
+@Test func fakeBridgeReturnsEmptyWidgetHistorySummary() async throws {
+    let bridge = FakeBridgeAPI()
+
+    let result = try await bridge.perform(
+        .queryWidgetHistory(
+            sinceEpoch: 1_788_249_600,
+            providerId: "claude",
+            timeZoneIdentifier: "Europe/Berlin"
+        )
+    )
+
+    #expect(
+        try result.decodePayload(WidgetHistorySummary.self)
+            == WidgetHistorySummary(historyStartEpoch: nil, days: [])
+    )
+}

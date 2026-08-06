@@ -26,6 +26,11 @@ public enum BridgeCommand: Sendable {
         bucketSeconds: Int? = nil,
         currentCycle: Bool = false
     )
+    case queryWidgetHistory(
+        sinceEpoch: Int,
+        providerId: String,
+        timeZoneIdentifier: String
+    )
     case clearHistory
     case diagnostics
     case restartBridge
@@ -44,6 +49,7 @@ public enum BridgeCommand: Sendable {
         case .refreshProviders: "providers.refresh"
         case .updateProviders: "providers.update"
         case .queryHistory: "history.query"
+        case .queryWidgetHistory: "history.summary"
         case .clearHistory: "history.clear"
         case .diagnostics: "diagnostics.get"
         case .restartBridge: "bridge.restart"
@@ -73,6 +79,12 @@ public enum BridgeCommand: Sendable {
             if let bucketSeconds { payload["bucketSeconds"] = .integer(bucketSeconds) }
             if currentCycle { payload["currentCycle"] = .boolean(true) }
             return payload
+        case let .queryWidgetHistory(sinceEpoch, providerId, timeZoneIdentifier):
+            return [
+                "sinceEpoch": .integer(sinceEpoch),
+                "providerId": .string(providerId),
+                "timeZoneIdentifier": .string(timeZoneIdentifier),
+            ]
         default:
             return [:]
         }

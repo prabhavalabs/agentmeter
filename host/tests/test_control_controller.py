@@ -262,6 +262,68 @@ async def test_history_ipc_accepts_bucketed_queries(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_history_summary_ipc_returns_widget_contract(tmp_path) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+    history.record_usage("claude", "session", 1_788_249_600, 11, 1_788_336_000)
+
+    result = await controller.handle_ipc(
+        IpcRequest(
+            id="summary-1",
+            type="history.summary",
+            payload={
+                "sinceEpoch": 1_788_249_600,
+                "providerId": "claude",
+                "timeZoneIdentifier": "Europe/Berlin",
+            },
+        )
+    )
+
+    assert set(result) == {"historyStartEpoch", "days"}
+    history.close()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"sinceEpoch": 1_788_249_600, "providerId": "claude"},
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "claude",
+            "timeZoneIdentifier": "Europe/Berlin",
+            "limit": 7,
+        },
+        {
+            "sinceEpoch": True,
+            "providerId": "claude",
+            "timeZoneIdentifier": "Europe/Berlin",
+        },
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "Claude!",
+            "timeZoneIdentifier": "Europe/Berlin",
+        },
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "claude",
+            "timeZoneIdentifier": "Not/AZone",
+        },
+    ],
+    ids=["missing-key", "extra-key", "boolean-epoch", "invalid-provider", "invalid-zone"],
+)
+@pytest.mark.asyncio
+async def test_history_summary_ipc_rejects_invalid_payloads(tmp_path, payload) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+
+    with pytest.raises(IpcCommandError) as error:
+        await controller.handle_ipc(
+            IpcRequest(id="summary-invalid", type="history.summary", payload=payload)
+        )
+
+    assert error.value.code == "invalidPayload"
+    history.close()
+
+
+@pytest.mark.asyncio
 async def test_cached_provider_keeps_last_successful_update_time(tmp_path) -> None:
     good = device_snapshot(message_id=0)
     failed = copy.deepcopy(good)
