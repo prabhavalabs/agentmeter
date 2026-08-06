@@ -373,6 +373,7 @@ import Testing
         )
         await model.start()
         var snapshot = try #require(try store.load())
+        #expect(model.state.providers.map(\.id) == ["codex", "claude"])
         #expect(snapshot.providers.map(\.id) == ["codex", "claude"])
 
         await model.updateProviderCollection(
@@ -382,6 +383,7 @@ import Testing
 
         snapshot = try #require(try store.load())
         #expect(model.state.bridge.configuredProviderIds == ["codex"])
+        #expect(model.state.providers.map(\.id) == ["codex"])
         #expect(snapshot.providers.map(\.id) == ["codex"])
 
         await bridge.emitState(
@@ -398,6 +400,7 @@ import Testing
 
         snapshot = try #require(try store.load())
         #expect(model.state.bridge.configuredProviderIds == ["codex"])
+        #expect(model.state.providers.map(\.id) == ["codex"])
         #expect(snapshot.providers.map(\.id) == ["codex"])
         await model.stop()
     }
@@ -433,9 +436,29 @@ import Testing
 
         let snapshot = try #require(try store.load())
         #expect(model.state.bridge.configuredProviderIds == ["codex", "claude"])
+        #expect(model.state.providers.map(\.id) == ["codex", "claude"])
         #expect(snapshot.providers.map(\.id) == ["codex", "claude"])
         await model.stop()
     }
+}
+
+@MainActor
+@Test func authoritativeProviderProjectionPreservesConfiguredOrderAndHiddenProviderData() async {
+    let bridge = FakeBridgeAPI(
+        state: makeProviderCollectionState(
+            revision: 1,
+            configuredProviderIds: ["claude", "codex"],
+            hiddenProviderIds: ["claude"]
+        )
+    )
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+
+    await model.start()
+
+    #expect(model.state.providers.map(\.id) == ["claude", "codex"])
+    #expect(model.state.providers.map(\.name) == ["Claude", "Codex"])
+    #expect(model.state.settings?.hiddenProviderIds == ["claude"])
+    await model.stop()
 }
 
 @MainActor
@@ -751,7 +774,8 @@ private let appModelTestCalendar: Calendar = {
 
 private func makeProviderCollectionState(
     revision: UInt64,
-    configuredProviderIds: [String]
+    configuredProviderIds: [String],
+    hiddenProviderIds: [String] = []
 ) -> ControlState {
     let providers = [
         ProviderSummary(
@@ -796,7 +820,7 @@ private func makeProviderCollectionState(
             screenOffAfterSeconds: 300,
             alertThresholds: [70, 90],
             soundEnabled: false,
-            hiddenProviderIds: [],
+            hiddenProviderIds: hiddenProviderIds,
             providerOrder: ["codex", "claude"]
         ),
         providers: providers,

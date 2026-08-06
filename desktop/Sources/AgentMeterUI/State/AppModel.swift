@@ -466,7 +466,7 @@ public final class AppModel {
         if let pendingProviderCollection {
             if incoming.bridge.configuredProviderIds == pendingProviderCollection.ids {
                 self.pendingProviderCollection = nil
-                state = incoming
+                state = stateByApplyingConfiguredProviderCollection(to: incoming)
             } else {
                 state = stateByApplying(
                     pendingProviderCollection,
@@ -474,7 +474,7 @@ public final class AppModel {
                 )
             }
         } else {
-            state = incoming
+            state = stateByApplyingConfiguredProviderCollection(to: incoming)
         }
         discoveredDevices = incoming.peripherals
         bridgeReachable = incoming.bridge.running
@@ -538,9 +538,40 @@ public final class AppModel {
             information: base.information,
             telemetry: base.telemetry,
             settings: base.settings,
-            providers: base.providers,
+            providers: authoritativeProviderProjection(
+                requested.ids,
+                from: base.providers
+            ),
             bridge: projectedBridge
         )
+    }
+
+    private func stateByApplyingConfiguredProviderCollection(
+        to base: ControlState
+    ) -> ControlState {
+        stateByApplying(
+            RequestedProviderCollection(
+                ids: base.bridge.configuredProviderIds,
+                pollIntervalSeconds: base.bridge.pollIntervalSeconds
+            ),
+            to: base
+        )
+    }
+
+    private func authoritativeProviderProjection(
+        _ providerIds: [String],
+        from providers: [ProviderSummary]
+    ) -> [ProviderSummary] {
+        guard providerIds.isEmpty == false else { return providers }
+        let providersById = Dictionary(
+            providers.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var seen = Set<String>()
+        return providerIds.compactMap { providerId in
+            guard seen.insert(providerId).inserted else { return nil }
+            return providersById[providerId]
+        }
     }
 
     private func providerCollectionWasCommitted(before error: Error) -> Bool {
