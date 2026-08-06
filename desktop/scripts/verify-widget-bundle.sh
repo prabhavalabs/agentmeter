@@ -6,6 +6,26 @@ readonly EXPECTED_APP_IDENTIFIER="com.prabhavalabs.agentmeter.desktop"
 readonly EXPECTED_WIDGET_IDENTIFIER="com.prabhavalabs.agentmeter.desktop.widget"
 readonly EXPECTED_EXTENSION_POINT="com.apple.widgetkit-extension"
 readonly SHARED_APP_GROUP="group.com.prabhavalabs.agentmeter.shared"
+readonly -a FORBIDDEN_WIDGET_ENTITLEMENTS=(
+    com.apple.security.network.client
+    com.apple.security.network.server
+    com.apple.security.device.bluetooth
+    keychain-access-groups
+    com.apple.security.files.user-selected.read-only
+    com.apple.security.files.user-selected.read-write
+    com.apple.security.files.downloads.read-only
+    com.apple.security.files.downloads.read-write
+    com.apple.security.files.bookmarks.app-scope
+    com.apple.security.files.bookmarks.document-scope
+    com.apple.security.files.absolute-path.read-only
+    com.apple.security.files.absolute-path.read-write
+    com.apple.security.assets.movies.read-only
+    com.apple.security.assets.movies.read-write
+    com.apple.security.assets.music.read-only
+    com.apple.security.assets.music.read-write
+    com.apple.security.assets.pictures.read-only
+    com.apple.security.assets.pictures.read-write
+)
 
 temporary_directory=""
 
@@ -185,11 +205,13 @@ if [[ -e "${widget_code_resources}" || -L "${widget_code_resources}" ]]; then
     widget_signed=true
 fi
 
-entitlements_contain_shared_group() {
+verify_entitlements() {
     local bundle="$1"
     local label="$2"
     local entitlements_file
     local groups_json
+    local sandbox_value
+    local forbidden_entitlement
 
     if [[ -z "${temporary_directory}" ]]; then
         temporary_directory=$(mktemp -d \
@@ -206,12 +228,29 @@ entitlements_contain_shared_group() {
         'com\.apple\.security\.application-groups' \
         json \
         -o - \
-        "${entitlements_file}" 2>/dev/null); then
+        "${entitlements_file}" 2>/dev/null | tr -d '[:space:]'); then
         fail "${label} entitlements do not declare ${SHARED_APP_GROUP}"
     fi
 
-    [[ "${groups_json}" == *\"${SHARED_APP_GROUP}\"* ]] || \
-        fail "${label} entitlements do not declare ${SHARED_APP_GROUP}"
+    [[ "${groups_json}" == "[\"${SHARED_APP_GROUP}\"]" ]] || \
+        fail "${label} entitlements must declare exactly ${SHARED_APP_GROUP}"
+
+    if [[ "${label}" == "widget extension" ]]; then
+        sandbox_value=$(/usr/libexec/PlistBuddy \
+            -c 'Print :com.apple.security.app-sandbox' \
+            "${entitlements_file}" 2>/dev/null) || \
+            fail "widget extension entitlements must enable com.apple.security.app-sandbox"
+        [[ "${sandbox_value}" == true ]] || \
+            fail "widget extension entitlements must enable com.apple.security.app-sandbox"
+
+        for forbidden_entitlement in "${FORBIDDEN_WIDGET_ENTITLEMENTS[@]}"; do
+            if /usr/libexec/PlistBuddy \
+                -c "Print :${forbidden_entitlement}" \
+                "${entitlements_file}" >/dev/null 2>&1; then
+                fail "widget extension entitlements must not declare ${forbidden_entitlement}"
+            fi
+        done
+    fi
 }
 
 if [[ "${app_signed}" == true || "${widget_signed}" == true ]]; then
@@ -224,8 +263,8 @@ if [[ "${app_signed}" == true || "${widget_signed}" == true ]]; then
         fail "widget extension signature verification failed for ${widget_bundle}"
     codesign --verify --strict --verbose=2 "${app_bundle}" || \
         fail "outer app signature verification failed for ${app_bundle}"
-    entitlements_contain_shared_group "${app_bundle}" "app"
-    entitlements_contain_shared_group "${widget_bundle}" "widget extension"
+    verify_entitlements "${app_bundle}" "app"
+    verify_entitlements "${widget_bundle}" "widget extension"
 fi
 
 print -- "Verified AgentMeter widget bundle: ${widget_bundle}"

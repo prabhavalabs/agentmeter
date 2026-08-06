@@ -66,6 +66,23 @@ add_executables() {
     cp /usr/bin/true "${widget}/Contents/MacOS/AgentMeterWidgets"
 }
 
+sign_managed_app() {
+    local app="$1"
+    local widget_entitlements="$2"
+    local app_entitlements="${3:-${DESKTOP_ROOT}/Resources/AgentMeter.entitlements}"
+    local widget="${app}/Contents/PlugIns/AgentMeterWidgets.appex"
+
+    add_executables "${app}"
+    codesign --force --timestamp=none \
+        --entitlements "${widget_entitlements}" \
+        --sign - \
+        "${widget}" >/dev/null 2>&1
+    codesign --force --timestamp=none \
+        --entitlements "${app_entitlements}" \
+        --sign - \
+        "${app}" >/dev/null 2>&1
+}
+
 expect_pass() {
     local name="$1"
     shift
@@ -242,6 +259,87 @@ codesign --force --timestamp=none \
     --sign - \
     "${signed_app}" >/dev/null 2>&1
 expect_pass "app and widget with shared App Group pass" "${VERIFIER}" "${signed_app}"
+
+missing_sandbox_entitlements="${TEST_ROOT}/missing-sandbox.plist"
+cp "${DESKTOP_ROOT}/Widgets/Resources/AgentMeterWidget.entitlements" \
+    "${missing_sandbox_entitlements}"
+/usr/libexec/PlistBuddy -c 'Delete :com.apple.security.app-sandbox' \
+    "${missing_sandbox_entitlements}"
+missing_sandbox_app=$(new_app "Missing widget sandbox.app")
+sign_managed_app "${missing_sandbox_app}" "${missing_sandbox_entitlements}"
+expect_failure "widget without App Sandbox is rejected" \
+    "widget extension entitlements must enable com.apple.security.app-sandbox" \
+    "${VERIFIER}" "${missing_sandbox_app}"
+
+disabled_sandbox_entitlements="${TEST_ROOT}/disabled-sandbox.plist"
+cp "${DESKTOP_ROOT}/Widgets/Resources/AgentMeterWidget.entitlements" \
+    "${disabled_sandbox_entitlements}"
+/usr/libexec/PlistBuddy -c 'Set :com.apple.security.app-sandbox false' \
+    "${disabled_sandbox_entitlements}"
+disabled_sandbox_app=$(new_app "Disabled widget sandbox.app")
+sign_managed_app "${disabled_sandbox_app}" "${disabled_sandbox_entitlements}"
+expect_failure "widget with disabled App Sandbox is rejected" \
+    "widget extension entitlements must enable com.apple.security.app-sandbox" \
+    "${VERIFIER}" "${disabled_sandbox_app}"
+
+extra_group_entitlements="${TEST_ROOT}/extra-widget-group.plist"
+cp "${DESKTOP_ROOT}/Widgets/Resources/AgentMeterWidget.entitlements" \
+    "${extra_group_entitlements}"
+/usr/libexec/PlistBuddy \
+    -c 'Add :com.apple.security.application-groups:1 string group.example.unexpected' \
+    "${extra_group_entitlements}"
+extra_group_app=$(new_app "Extra widget App Group.app")
+sign_managed_app "${extra_group_app}" "${extra_group_entitlements}"
+expect_failure "widget with an extra App Group is rejected" \
+    "widget extension entitlements must declare exactly group.com.prabhavalabs.agentmeter.shared" \
+    "${VERIFIER}" "${extra_group_app}"
+
+extra_app_group_entitlements="${TEST_ROOT}/extra-app-group.plist"
+cp "${DESKTOP_ROOT}/Resources/AgentMeter.entitlements" \
+    "${extra_app_group_entitlements}"
+/usr/libexec/PlistBuddy \
+    -c 'Add :com.apple.security.application-groups:1 string group.example.unexpected' \
+    "${extra_app_group_entitlements}"
+extra_app_group_app=$(new_app "Extra app App Group.app")
+sign_managed_app \
+    "${extra_app_group_app}" \
+    "${DESKTOP_ROOT}/Widgets/Resources/AgentMeterWidget.entitlements" \
+    "${extra_app_group_entitlements}"
+expect_failure "app with an extra App Group is rejected" \
+    "app entitlements must declare exactly group.com.prabhavalabs.agentmeter.shared" \
+    "${VERIFIER}" "${extra_app_group_app}"
+
+for forbidden_entitlement in \
+    com.apple.security.network.client \
+    com.apple.security.network.server \
+    com.apple.security.device.bluetooth \
+    keychain-access-groups \
+    com.apple.security.files.user-selected.read-only \
+    com.apple.security.files.user-selected.read-write \
+    com.apple.security.files.downloads.read-only \
+    com.apple.security.files.downloads.read-write \
+    com.apple.security.files.bookmarks.app-scope \
+    com.apple.security.files.bookmarks.document-scope \
+    com.apple.security.files.absolute-path.read-only \
+    com.apple.security.files.absolute-path.read-write \
+    com.apple.security.assets.movies.read-only \
+    com.apple.security.assets.movies.read-write \
+    com.apple.security.assets.music.read-only \
+    com.apple.security.assets.music.read-write \
+    com.apple.security.assets.pictures.read-only \
+    com.apple.security.assets.pictures.read-write
+do
+    forbidden_entitlements="${TEST_ROOT}/forbidden-${forbidden_entitlement}.plist"
+    cp "${DESKTOP_ROOT}/Widgets/Resources/AgentMeterWidget.entitlements" \
+        "${forbidden_entitlements}"
+    /usr/libexec/PlistBuddy -c "Add :${forbidden_entitlement} bool true" \
+        "${forbidden_entitlements}"
+    forbidden_app=$(new_app "Forbidden ${forbidden_entitlement}.app")
+    sign_managed_app "${forbidden_app}" "${forbidden_entitlements}"
+    expect_failure "widget forbidden entitlement ${forbidden_entitlement} is rejected" \
+        "widget extension entitlements must not declare ${forbidden_entitlement}" \
+        "${VERIFIER}" "${forbidden_app}"
+done
 
 interrupt_app=$(new_app "Interrupted entitlement inspection.app")
 add_executables "${interrupt_app}"
