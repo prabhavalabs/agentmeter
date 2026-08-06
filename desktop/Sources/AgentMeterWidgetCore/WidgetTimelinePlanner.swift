@@ -14,8 +14,7 @@ public enum FocusWindowCapacity {
     public static func additionalLimit(for family: WidgetFamily) -> Int {
         switch family {
         case .small: 0
-        case .medium: 1
-        case .large: 2
+        case .medium, .large: 2
         case .extraLarge: 4
         }
     }

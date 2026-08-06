@@ -634,6 +634,7 @@ func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
 
             #expect(plan.mediumRequiredHeight != nil)
             #expect((plan.mediumRequiredHeight ?? .infinity) <= 170)
+            #expect((plan.mediumPrimaryContentHeight ?? 0) >= 116)
             #expect(UsageHeatMapLayout(cellCount: 30, compact: true).rowCount == 1)
             assertSubstantiveRender(
                 FocusWidgetView(presentation: presentation),
@@ -678,7 +679,7 @@ func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
 
 @Test(arguments: [
     (AgentMeterWidgetCore.WidgetFamily.small, 0, Optional<String>.none, false),
-    (.medium, 1, Optional("+5"), true),
+    (.medium, 2, Optional("+4"), true),
     (.large, 2, Optional("+4"), true),
     (.extraLarge, 4, Optional("+2"), true),
 ])

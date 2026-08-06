@@ -98,9 +98,9 @@ struct FocusLayoutPlan: Hashable {
         case .medium:
             historyHeight = switch historyEmphasis {
             case .hidden: 0
-            case .compact: 22
-            case .balanced: 24
-            case .expanded: 26
+            case .compact: 20
+            case .balanced: 22
+            case .expanded: 24
             }
         case .large, .extraLarge:
             historyHeight = switch historyEmphasis {
@@ -112,7 +112,7 @@ struct FocusLayoutPlan: Hashable {
         }
 
         if presentation.family == .medium {
-            let primaryHeight = max(ringSize, 88)
+            let primaryHeight = max(ringSize, 116)
             mediumPrimaryContentHeight = primaryHeight
             mediumRequiredHeight = (padding * 2)
                 + primaryHeight
