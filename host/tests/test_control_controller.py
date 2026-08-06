@@ -4,6 +4,7 @@ import asyncio
 import copy
 import json
 from dataclasses import replace
+from datetime import UTC, datetime
 
 import pytest
 from agentmeter_host.config import HostConfig
@@ -16,7 +17,7 @@ from agentmeter_host.ipc.protocol import IpcCommandError, IpcRequest
 from agentmeter_host.normalization import DisplayPreferences
 from agentmeter_host.transport.ble import ConnectedPeripheral, TransportError
 from agentmeter_host.transport.management import ManagementError
-from helpers import device_snapshot
+from helpers import device_snapshot, provider_usage
 
 
 def device_settings(*, revision: int = 8, always_on: bool = False) -> dict:
@@ -384,6 +385,78 @@ async def test_controller_connects_syncs_and_publishes_confirmed_state(tmp_path)
         "send:0",
     ]
     assert transport.sent[0]["providers"][0]["id"] == "codex"
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_full_normalized_windows_reach_controller_history_but_device_stays_at_three(
+    tmp_path,
+) -> None:
+    from agentmeter_host.normalization import normalize_provider_usages
+
+    usage = provider_usage("codex")
+    usage["usage"]["tertiary"] = {
+        "usedPercent": 52,
+        "resetsAt": "2026-08-15T18:00:00Z",
+    }
+    usage["usage"]["extraRateWindows"] = [
+        {
+            "id": "opus-monthly",
+            "title": "Opus monthly",
+            "window": {
+                "usedPercent": 95,
+                "resetsAt": "2026-09-01T18:00:00Z",
+            },
+        },
+        {
+            "id": "sonnet-weekly",
+            "title": "Sonnet weekly",
+            "window": {
+                "usedPercent": 74,
+                "resetsAt": "2026-08-08T18:00:00Z",
+            },
+        },
+    ]
+    normalized = normalize_provider_usages(
+        {"codex": usage},
+        provider_ids=("codex",),
+        message_id=0,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+    )
+    transport = FakeManagedTransport()
+    controller, _settings_store, history = make_controller(
+        tmp_path,
+        transport=transport,
+        collector_factory=SequenceCollectorFactory(normalized),
+    )
+
+    await controller.connect("device-1")
+
+    expected_kinds = [
+        "session",
+        "weekly",
+        "tertiary",
+        "opus-monthly",
+        "sonnet-weekly",
+    ]
+    assert [window.kind for window in controller.state.providers[0].windows] == expected_kinds
+    summary = await controller.handle_ipc(
+        IpcRequest(
+            id="all-windows-history",
+            type="history.summary",
+            payload={
+                "sinceEpoch": normalized["generatedAtEpoch"],
+                "providerId": "codex",
+                "timeZoneIdentifier": "UTC",
+            },
+        )
+    )
+    assert {day["windowKind"] for day in summary["days"]} == set(expected_kinds)
+    assert [
+        window["kind"] for window in transport.sent[0]["providers"][0]["windows"]
+    ] == expected_kinds[:3]
+    assert transport.sent[0]["event"] is None
     history.close()
 
 

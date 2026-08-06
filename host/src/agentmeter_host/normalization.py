@@ -156,7 +156,7 @@ def _normalize_dashboard_snapshot(
                 "usedPercent": _used_percent(window["usedPercent"]),
                 "resetAtEpoch": _epoch(window.get("resetAt")),
             }
-            for window in provider["windows"][:3]
+            for window in provider["windows"][:8]
         ]
         providers.append(
             {
@@ -263,7 +263,7 @@ def _dashboard_provider_from_usage(
         ]
         normalized_windows = [window for window in windows if window is not None]
         for extra in usage.get("extraRateWindows") or []:
-            if len(normalized_windows) == 3:
+            if len(normalized_windows) == 8:
                 break
             if not isinstance(extra, dict):
                 raise ValueError("extra usage window is invalid")

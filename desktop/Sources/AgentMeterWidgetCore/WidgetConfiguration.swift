@@ -1,6 +1,6 @@
 public enum WidgetKind: String, Codable, Equatable, Sendable, CaseIterable {
-    case dashboard
-    case focus
+    case dashboard = "com.prabhavalabs.agentmeter.dashboard"
+    case focus = "com.prabhavalabs.agentmeter.focus"
 }
 
 public enum WidgetFamily: String, Codable, Equatable, Sendable, CaseIterable {

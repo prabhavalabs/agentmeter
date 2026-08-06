@@ -89,11 +89,16 @@ import Testing
         screenOffAfterSeconds: 300,
         alertThresholds: [70, 90],
         soundEnabled: false,
-        hiddenProviderIds: ["gemini"],
+        hiddenProviderIds: ["codex"],
         providerOrder: ["codex", "claude", "gemini", "cursor"]
     )
     let bridge = ConfirmingSettingsBridge(initial: initial, confirmed: confirmed)
-    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
     await model.start()
     var patch = DeviceSettingsPatch(baseRevision: 3)
     patch.alwaysOn = true
@@ -105,6 +110,67 @@ import Testing
     #expect(model.state.revision == 7)
     #expect(model.state.connection == initial.connection)
     #expect(model.state.settings == confirmed)
+    #expect(await coordinator.invalidations() == ["visibilityChanged"])
+    await model.stop()
+}
+
+@MainActor
+@Test func settingsEventsCanRevokeWidgetVisibilityWhileAnOlderRefreshIsInFlight() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
+    await model.start()
+    let gate = ModelRefreshGate()
+    await coordinator.blockNextRefresh(on: gate)
+
+    await bridge.emitState(
+        makeState(revision: 2, phase: .connected),
+        eventType: "providers.changed"
+    )
+    await gate.waitUntilEntered()
+    await bridge.emitState(
+        makeState(
+            revision: 3,
+            phase: .connected,
+            hiddenProviderIds: ["codex"]
+        ),
+        eventType: "settings.changed"
+    )
+    for _ in 0..<100 where await coordinator.invalidations().isEmpty {
+        await Task.yield()
+    }
+
+    #expect(await coordinator.invalidations() == ["visibilityChanged"])
+    await gate.open()
+    await model.stop()
+}
+
+@MainActor
+@Test func clearingHistoryInvalidatesWidgetHistoryWhileARefreshIsInFlight() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
+    await model.start()
+    let gate = ModelRefreshGate()
+    await coordinator.blockNextRefresh(on: gate)
+    await bridge.emitState(
+        makeState(revision: 2, phase: .connected),
+        eventType: "providers.changed"
+    )
+    await gate.waitUntilEntered()
+
+    await model.clearHistory()
+
+    #expect(await coordinator.invalidations() == ["historyCleared"])
+    await gate.open()
     await model.stop()
 }
 
@@ -241,7 +307,8 @@ private func makeState(
     phase: ConnectionPhase,
     peripherals: [PeripheralSummary] = [],
     managementAvailable: Bool? = true,
-    includesSettings: Bool = true
+    includesSettings: Bool = true,
+    hiddenProviderIds: [String] = ["gemini"]
 ) -> ControlState {
     ControlState(
         revision: revision,
@@ -264,7 +331,7 @@ private func makeState(
                 screenOffAfterSeconds: 300,
                 alertThresholds: [70, 90],
                 soundEnabled: false,
-                hiddenProviderIds: ["gemini"],
+                hiddenProviderIds: hiddenProviderIds,
                 providerOrder: ["codex", "claude", "gemini", "cursor"]
             )
             : nil,
@@ -324,10 +391,60 @@ private actor ConfirmingSettingsBridge: BridgeAPI {
 
 private actor RecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
     private var recordedRevisions: [UInt64] = []
+    private var recordedInvalidations: [String] = []
+    private var nextRefreshGate: ModelRefreshGate?
 
     func refresh(state: ControlState) async {
         recordedRevisions.append(state.revision)
+        let gate = nextRefreshGate
+        nextRefreshGate = nil
+        if let gate { await gate.enter() }
+    }
+
+    func invalidateAndRefresh(
+        state _: ControlState,
+        invalidation: WidgetSnapshotInvalidation
+    ) async {
+        switch invalidation {
+        case .visibilityChanged:
+            recordedInvalidations.append("visibilityChanged")
+        case .historyCleared:
+            recordedInvalidations.append("historyCleared")
+        }
     }
 
     func revisions() -> [UInt64] { recordedRevisions }
+    func invalidations() -> [String] { recordedInvalidations }
+
+    func blockNextRefresh(on gate: ModelRefreshGate) {
+        nextRefreshGate = gate
+    }
+}
+
+private actor ModelRefreshGate {
+    private var entered = false
+    private var isOpen = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var openWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func enter() async {
+        entered = true
+        let waitingForEntry = entryWaiters
+        entryWaiters.removeAll()
+        waitingForEntry.forEach { $0.resume() }
+        guard isOpen == false else { return }
+        await withCheckedContinuation { openWaiters.append($0) }
+    }
+
+    func waitUntilEntered() async {
+        guard entered == false else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        let waiters = openWaiters
+        openWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+    }
 }

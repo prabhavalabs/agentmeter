@@ -38,6 +38,29 @@ def test_snapshot_command_prints_device_json(monkeypatch, capsys) -> None:
     assert observed_providers == ["codex", "claude", "gemini", "cursor"]
 
 
+def test_pretty_snapshot_command_prints_only_device_visible_windows(monkeypatch, capsys) -> None:
+    import agentmeter_host.cli as cli
+
+    snapshot = device_snapshot()
+    first_window = snapshot["providers"][0]["windows"][0]
+    snapshot["providers"][0]["windows"] = [
+        {**first_window, "kind": f"window-{index}"} for index in range(5)
+    ]
+
+    async def fake_collect(_config):
+        return snapshot
+
+    monkeypatch.setattr(cli, "collect_device_snapshot", fake_collect, raising=False)
+
+    assert main(["snapshot", "--pretty", "--config", str(ROOT / "config.example.toml")]) == 0
+    printed = json.loads(capsys.readouterr().out)
+    assert [window["kind"] for window in printed["providers"][0]["windows"]] == [
+        "window-0",
+        "window-1",
+        "window-2",
+    ]
+
+
 def test_doctor_requires_codexbar_for_snapshot_collection(monkeypatch, capsys) -> None:
     import agentmeter_host.cli as cli
 

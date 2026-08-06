@@ -1,3 +1,4 @@
+import AgentMeterWidgetCore
 import SwiftUI
 import WidgetKit
 
@@ -10,7 +11,7 @@ struct AgentMeterWidgetBundle: WidgetBundle {
 }
 
 struct AgentMeterDashboardWidget: Widget {
-    let kind = "com.prabhavalabs.agentmeter.dashboard"
+    let kind = WidgetKind.dashboard.rawValue
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
@@ -27,7 +28,7 @@ struct AgentMeterDashboardWidget: Widget {
 }
 
 struct AgentMeterFocusWidget: Widget {
-    let kind = "com.prabhavalabs.agentmeter.focus"
+    let kind = WidgetKind.focus.rawValue
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(

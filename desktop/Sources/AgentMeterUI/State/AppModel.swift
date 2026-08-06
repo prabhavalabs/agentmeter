@@ -70,8 +70,11 @@ public final class AppModel {
 
     @ObservationIgnored private let bridge: any BridgeAPI
     @ObservationIgnored private let widgetSnapshotCoordinator: any WidgetSnapshotCoordinating
+    @ObservationIgnored private let widgetLocalDayScheduler: any WidgetLocalDayScheduling
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
+    @ObservationIgnored private var widgetRefreshTask: Task<Void, Never>?
+    @ObservationIgnored private var widgetLocalDayTask: Task<Void, Never>?
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored public var stateEventHandler:
         (@MainActor @Sendable (BridgeEvent, ControlState, ControlState) -> Void)?
@@ -79,11 +82,13 @@ public final class AppModel {
     public init(
         bridge: any BridgeAPI,
         preferences: AppPreferences,
-        widgetSnapshotCoordinator: any WidgetSnapshotCoordinating = NoopWidgetSnapshotCoordinator()
+        widgetSnapshotCoordinator: any WidgetSnapshotCoordinating = NoopWidgetSnapshotCoordinator(),
+        widgetLocalDayScheduler: any WidgetLocalDayScheduling = WidgetLocalDayScheduler()
     ) {
         self.bridge = bridge
         self.preferences = preferences
         self.widgetSnapshotCoordinator = widgetSnapshotCoordinator
+        self.widgetLocalDayScheduler = widgetLocalDayScheduler
     }
 
     public var selectedSection: NavigationSection {
@@ -119,6 +124,7 @@ public final class AppModel {
                 bridgeReachable = true
                 apply(try await bridge.status())
                 listenForEvents()
+                listenForWidgetLocalDayChanges()
                 await loadSupplementalData()
                 await widgetSnapshotCoordinator.refresh(state: state)
             } catch {
@@ -137,6 +143,12 @@ public final class AppModel {
         eventTask = nil
         reconnectTask?.cancel()
         reconnectTask = nil
+        widgetRefreshTask?.cancel()
+        widgetRefreshTask = nil
+        let localDayTask = widgetLocalDayTask
+        widgetLocalDayTask = nil
+        localDayTask?.cancel()
+        await localDayTask?.value
         hasStarted = false
         bridgeReachable = false
         await bridge.close()
@@ -197,8 +209,12 @@ public final class AppModel {
             do {
                 let result = try await bridge.perform(.patchSettings(patch))
                 let confirmed = try result.decodePayload(SettingsCommandResult.self)
+                let previousSettings = state.settings
                 if let settings = confirmed.settings {
                     applyConfirmedSettings(settings)
+                }
+                if widgetVisibilityChanged(from: previousSettings, to: state.settings) {
+                    await invalidateWidgetSnapshot(.visibilityChanged)
                 }
                 pendingSettingsPatch = nil
                 settingsSyncState = confirmed.syncStatus == "synced"
@@ -250,11 +266,21 @@ public final class AppModel {
             .providerRefresh,
             command: .updateProviders(ids: ids, pollIntervalSeconds: pollIntervalSeconds)
         )
+        await invalidateWidgetSnapshot(.visibilityChanged)
     }
 
     public func clearHistory() async {
-        await perform(.diagnostics, command: .clearHistory)
-        historySamples = []
+        await withOperation(.diagnostics) {
+            do {
+                _ = try await bridge.perform(.clearHistory)
+                apply(try await bridge.status())
+                bridgeReachable = true
+                historySamples = []
+                await invalidateWidgetSnapshot(.historyCleared)
+            } catch {
+                present(error, title: "Action could not be completed")
+            }
+        }
     }
 
     public func loadHistory(
@@ -352,8 +378,16 @@ public final class AppModel {
                     let previous = self.state
                     self.apply(incoming)
                     self.stateEventHandler?(event, previous, incoming)
-                    if event.type == "providers.changed" || event.type == "state.changed" {
-                        await self.widgetSnapshotCoordinator.refresh(state: incoming)
+                    if self.widgetVisibilityChanged(
+                        from: previous.settings,
+                        to: incoming.settings
+                    ) {
+                        self.scheduleWidgetInvalidation(
+                            state: incoming,
+                            invalidation: .visibilityChanged
+                        )
+                    } else if event.type == "providers.changed" || event.type == "state.changed" {
+                        self.scheduleWidgetRefresh(state: incoming)
                     }
                 }
             } catch is CancellationError {
@@ -385,6 +419,22 @@ public final class AppModel {
         }
     }
 
+    private func listenForWidgetLocalDayChanges() {
+        guard widgetLocalDayTask == nil else { return }
+        let scheduler = widgetLocalDayScheduler
+        widgetLocalDayTask = Task { [weak self] in
+            while Task.isCancelled == false {
+                do {
+                    try await scheduler.waitForNextLocalDay()
+                } catch {
+                    return
+                }
+                guard Task.isCancelled == false, let self else { return }
+                self.scheduleWidgetRefresh(state: self.state)
+            }
+        }
+    }
+
     private func apply(_ incoming: ControlState) {
         guard incoming.revision >= state.revision else { return }
         state = incoming
@@ -408,6 +458,45 @@ public final class AppModel {
             settings: settings,
             providers: state.providers,
             bridge: state.bridge
+        )
+    }
+
+    private func widgetVisibilityChanged(
+        from previous: DeviceSettings?,
+        to current: DeviceSettings?
+    ) -> Bool {
+        previous?.hiddenProviderIds != current?.hiddenProviderIds
+            || previous?.providerOrder != current?.providerOrder
+    }
+
+    private func scheduleWidgetRefresh(state: ControlState) {
+        widgetRefreshTask?.cancel()
+        let coordinator = widgetSnapshotCoordinator
+        widgetRefreshTask = Task {
+            await coordinator.refresh(state: state)
+        }
+    }
+
+    private func scheduleWidgetInvalidation(
+        state: ControlState,
+        invalidation: WidgetSnapshotInvalidation
+    ) {
+        widgetRefreshTask?.cancel()
+        let coordinator = widgetSnapshotCoordinator
+        widgetRefreshTask = Task {
+            await coordinator.invalidateAndRefresh(
+                state: state,
+                invalidation: invalidation
+            )
+        }
+    }
+
+    private func invalidateWidgetSnapshot(_ invalidation: WidgetSnapshotInvalidation) async {
+        widgetRefreshTask?.cancel()
+        widgetRefreshTask = nil
+        await widgetSnapshotCoordinator.invalidateAndRefresh(
+            state: state,
+            invalidation: invalidation
         )
     }
 

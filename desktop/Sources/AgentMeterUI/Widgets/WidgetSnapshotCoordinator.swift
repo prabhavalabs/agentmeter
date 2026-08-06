@@ -8,26 +8,70 @@ import WidgetKit
 
 public protocol WidgetSnapshotCoordinating: Sendable {
     func refresh(state: ControlState) async
+    func invalidateAndRefresh(
+        state: ControlState,
+        invalidation: WidgetSnapshotInvalidation
+    ) async
+}
+
+public extension WidgetSnapshotCoordinating {
+    func invalidateAndRefresh(
+        state: ControlState,
+        invalidation _: WidgetSnapshotInvalidation
+    ) async {
+        await refresh(state: state)
+    }
+}
+
+public enum WidgetSnapshotInvalidation: Sendable {
+    case visibilityChanged
+    case historyCleared
 }
 
 public protocol WidgetTimelineReloading: Sendable {
     func reloadWidgetTimelines() async
 }
 
+public protocol WidgetTimelineKindReloading: Sendable {
+    func reloadTimelines(ofKind kind: String) async
+}
+
+public struct WidgetCenterTimelineReloadSink: WidgetTimelineKindReloading {
+    public init() {}
+
+    public func reloadTimelines(ofKind kind: String) async {
+        #if canImport(WidgetKit)
+        WidgetCenter.shared.reloadTimelines(ofKind: kind)
+        #endif
+    }
+}
+
 public struct NoopWidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
     public init() {}
 
     public func refresh(state _: ControlState) async {}
+
+    public func invalidateAndRefresh(
+        state _: ControlState,
+        invalidation _: WidgetSnapshotInvalidation
+    ) async {}
 }
 
 public struct WidgetKitTimelineReloader: WidgetTimelineReloading {
-    public init() {}
+    private let sink: any WidgetTimelineKindReloading
+
+    public init() {
+        sink = WidgetCenterTimelineReloadSink()
+    }
+
+    public init(sink: any WidgetTimelineKindReloading) {
+        self.sink = sink
+    }
 
     public func reloadWidgetTimelines() async {
-        #if canImport(WidgetKit)
-        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.dashboard.rawValue)
-        WidgetCenter.shared.reloadTimelines(ofKind: WidgetKind.focus.rawValue)
-        #endif
+        for kind in WidgetKind.allCases {
+            await sink.reloadTimelines(ofKind: kind.rawValue)
+        }
     }
 }
 
@@ -39,6 +83,7 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
     private let now: @Sendable () -> Date
 
     private var cachedSummaries: [String: WidgetHistorySummary] = [:]
+    private var cachedTimeZoneIdentifier: String?
     private var refreshGeneration: UInt64 = 0
 
     public init(
@@ -48,19 +93,37 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         calendar: Calendar? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
-        self.bridge = bridge
-        self.store = store
-        self.reloader = reloader
-        self.now = now
+        let provider: @Sendable () -> Calendar
         if let calendar {
-            calendarProvider = { calendar }
+            provider = { calendar }
         } else {
-            calendarProvider = {
+            provider = {
                 var calendar = Calendar(identifier: .gregorian)
                 calendar.timeZone = .current
                 return calendar
             }
         }
+        self.init(
+            bridge: bridge,
+            store: store,
+            reloader: reloader,
+            calendarProvider: provider,
+            now: now
+        )
+    }
+
+    public init(
+        bridge: any BridgeAPI,
+        store: WidgetSnapshotStore,
+        reloader: any WidgetTimelineReloading,
+        calendarProvider: @escaping @Sendable () -> Calendar,
+        now: @escaping @Sendable () -> Date = { .now }
+    ) {
+        self.bridge = bridge
+        self.store = store
+        self.reloader = reloader
+        self.calendarProvider = calendarProvider
+        self.now = now
     }
 
     public init(
@@ -80,6 +143,20 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
     }
 
     public func refresh(state: ControlState) async {
+        await performRefresh(state: state, invalidation: nil)
+    }
+
+    public func invalidateAndRefresh(
+        state: ControlState,
+        invalidation: WidgetSnapshotInvalidation
+    ) async {
+        await performRefresh(state: state, invalidation: invalidation)
+    }
+
+    private func performRefresh(
+        state: ControlState,
+        invalidation: WidgetSnapshotInvalidation?
+    ) async {
         refreshGeneration &+= 1
         let generation = refreshGeneration
         let publicationState = stateForPublication(from: state)
@@ -93,8 +170,30 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         ) else { return }
         let sinceEpoch = max(0, Int(historyStart.timeIntervalSince1970))
         let timeZoneIdentifier = calendar.timeZone.identifier
+        if cachedTimeZoneIdentifier != timeZoneIdentifier {
+            cachedSummaries.removeAll()
+            cachedTimeZoneIdentifier = timeZoneIdentifier
+        }
+        if invalidation == .historyCleared {
+            cachedSummaries.removeAll()
+        }
+        cachedSummaries = Dictionary(
+            uniqueKeysWithValues: providerIds.compactMap { providerId in
+                cachedSummaries[providerId].map {
+                    (providerId, clipped($0, sinceEpoch: sinceEpoch))
+                }
+            }
+        )
+        if invalidation != nil {
+            guard await publish(
+                state: publicationState,
+                providerIds: providerIds,
+                generation: generation
+            ) else { return }
+        }
 
         for providerId in providerIds {
+            guard Task.isCancelled == false else { return }
             do {
                 let result = try await bridge.perform(
                     .queryWidgetHistory(
@@ -104,14 +203,27 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
                     )
                 )
                 let summary = try result.decodePayload(WidgetHistorySummary.self)
-                guard generation == refreshGeneration else { return }
-                cachedSummaries[providerId] = summary
+                guard Task.isCancelled == false, generation == refreshGeneration else { return }
+                cachedSummaries[providerId] = clipped(summary, sinceEpoch: sinceEpoch)
             } catch {
-                guard generation == refreshGeneration else { return }
+                guard Task.isCancelled == false, generation == refreshGeneration else { return }
             }
         }
-        guard generation == refreshGeneration else { return }
+        guard Task.isCancelled == false, generation == refreshGeneration else { return }
 
+        _ = await publish(
+            state: publicationState,
+            providerIds: providerIds,
+            generation: generation
+        )
+    }
+
+    private func publish(
+        state: ControlState,
+        providerIds: [String],
+        generation: UInt64
+    ) async -> Bool {
+        guard Task.isCancelled == false, generation == refreshGeneration else { return false }
         let summaries = Dictionary(
             uniqueKeysWithValues: providerIds.compactMap { providerId in
                 cachedSummaries[providerId].map { (providerId, $0) }
@@ -119,14 +231,18 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         )
         do {
             let snapshot = try WidgetSnapshotBuilder().build(
-                state: publicationState,
+                state: state,
                 summaries: summaries
             )
-            guard try store.writeIfChanged(snapshot) else { return }
-            await reloader.reloadWidgetTimelines()
+            guard Task.isCancelled == false, generation == refreshGeneration else { return false }
+            if try store.writeIfChanged(snapshot) {
+                await reloader.reloadWidgetTimelines()
+            }
         } catch {
             // Widget publication is supplemental; the live application state remains authoritative.
+            return false
         }
+        return Task.isCancelled == false && generation == refreshGeneration
     }
 
     private func currentGregorianCalendar() -> Calendar {
@@ -134,6 +250,16 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = configured.timeZone
         return calendar
+    }
+
+    private func clipped(
+        _ summary: WidgetHistorySummary,
+        sinceEpoch: Int
+    ) -> WidgetHistorySummary {
+        WidgetHistorySummary(
+            historyStartEpoch: summary.historyStartEpoch,
+            days: summary.days.filter { $0.dayStartEpoch >= sinceEpoch }
+        )
     }
 
     private func stateForPublication(from state: ControlState) -> ControlState {
