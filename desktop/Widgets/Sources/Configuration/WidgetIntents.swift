@@ -27,11 +27,13 @@ enum IntentHistoryStyleOption: String, AppEnum {
 enum IntentHistoryRangeOption: String, AppEnum {
     case days7
     case days30
+    case currentCycle
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "History Range")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
         .days7: "7 Days",
         .days30: "30 Days",
+        .currentCycle: "Current Cycle",
     ]
 }
 

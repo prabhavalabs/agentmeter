@@ -76,6 +76,18 @@ import Testing
     }
 }
 
+@Test func currentCycleIntentMapsWithoutAFixedDayFallback() {
+    let intent = FocusWidgetIntent()
+    intent.historyStyle = .trend
+    intent.historyRange = .currentCycle
+
+    let configuration = IntentConfigurationAdapter.focus(intent)
+
+    #expect(configuration.historyPeriod == .currentCycle)
+    #expect(configuration.historyPeriod.fixedDayCount == nil)
+    #expect(Set(IntentHistoryRangeOption.allCases) == [.days7, .days30, .currentCycle])
+}
+
 @Test func tapIntentExposesOnlyRoutableDestinations() {
     #expect(Set(IntentTapDestinationOption.allCases) == [.overview, .providerDetail, .agents])
 }

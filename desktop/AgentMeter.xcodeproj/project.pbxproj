@@ -18,6 +18,7 @@
 		1585EFB283E9FA601FD9937F /* JsonLineDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3877C43A7260CDD43E8DD2F /* JsonLineDecoderTests.swift */; };
 		186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
 		1C54823D1578345A395D9FCA /* WidgetStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA66ED3180281C864B89381B /* WidgetStateView.swift */; };
+		1D2500E915836C556C2CFA67 /* WidgetLocalDaySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */; };
 		1DC79AA66ABD329092045169 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
 		217C39145DC5D1F9F9F32E8B /* BridgeDistributionModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9F0FA5846787D50560BBB7 /* BridgeDistributionModeTests.swift */; };
 		2310D3BFF98980ADFB3F9897 /* UserNotificationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C81F1C7953B2BE2E847B8CF /* UserNotificationControllerTests.swift */; };
@@ -142,6 +143,7 @@
 		2DCDD224CB044A3B7C37E75B /* WidgetIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetIntents.swift; sourceTree = "<group>"; };
 		343B8C81E358EC55056950FC /* WidgetHistoryProjectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetHistoryProjectionTests.swift; sourceTree = "<group>"; };
 		35FA3318F9F210BCD7B23736 /* WidgetTimelinePlannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTimelinePlannerTests.swift; sourceTree = "<group>"; };
+		364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetLocalDaySchedulerTests.swift; sourceTree = "<group>"; };
 		3DB7D20A006EE6998D0D6834 /* AgentMeterWidgetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentMeterWidgetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F9F0FA5846787D50560BBB7 /* BridgeDistributionModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeDistributionModeTests.swift; sourceTree = "<group>"; };
 		43A2F92987D2D697D954941D /* UnixBridgeClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnixBridgeClientTests.swift; sourceTree = "<group>"; };
@@ -408,6 +410,7 @@
 				F83FBFE1962F9CAAED078DD0 /* MenuProviderDetailsTests.swift */,
 				09D518E9D78EC1CFD9BAE036 /* ThemeTests.swift */,
 				2C81F1C7953B2BE2E847B8CF /* UserNotificationControllerTests.swift */,
+				364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */,
 				BFEA3A95DCD61DDB08963A5F /* WidgetSnapshotCoordinatorTests.swift */,
 			);
 			path = AgentMeterUITests;
@@ -761,6 +764,7 @@
 				DC4D0E1ABF5B72865D7B78D5 /* MenuProviderDetailsTests.swift in Sources */,
 				939A7ADF8483777CEEB4CCCC /* ThemeTests.swift in Sources */,
 				2310D3BFF98980ADFB3F9897 /* UserNotificationControllerTests.swift in Sources */,
+				1D2500E915836C556C2CFA67 /* WidgetLocalDaySchedulerTests.swift in Sources */,
 				6204D558B92C094A401A83E4 /* WidgetSnapshotCoordinatorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

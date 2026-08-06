@@ -41,9 +41,13 @@ private let fixedCalendar: Calendar = {
     let directory = try temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let store = WidgetSnapshotStore(directoryURL: directory)
+    let resetWindows = [
+        WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 42, resetAtEpoch: 20_600),
+        WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: 7, resetAtEpoch: 20_700),
+    ]
     try store.writeIfChanged(snapshot(
         generatedAt: 18_000,
-        providers: [provider(resetAt: 20_600)]
+        providers: [provider(windows: resetWindows)]
     ))
     let timelineProvider = DashboardTimelineProvider(
         loader: WidgetSnapshotLoader(store: store),
@@ -60,16 +64,17 @@ private let fixedCalendar: Calendar = {
         family: .large
     )
 
-    #expect(timeline.entries.map { Int($0.date.timeIntervalSince1970) } == [20_000, 20_600, 106_400])
+    #expect(timeline.entries.map { Int($0.date.timeIntervalSince1970) } == [20_000, 20_600, 20_700, 106_400])
     #expect(timeline.entries.first?.presentation?.freshness == .stale)
     #expect(timeline.entries.first?.presentation?.providers.first?.rings.first?.resetState == .scheduled(epoch: 20_600))
     #expect(timeline.entries[1].presentation?.providers.first?.rings.first?.resetState == .pending)
     #expect(timeline.entries[1].presentation?.providers.first?.rings.first?.resetText == "Refresh pending")
+    #expect(timeline.entries[2].presentation?.providers.first?.rings.last?.resetState == .pending)
     #expect(schedule.reloadPolicy == .after(Date(timeIntervalSince1970: 106_400)))
 
     try store.writeIfChanged(snapshot(
         generatedAt: 19_900,
-        providers: [provider(resetAt: 20_600)]
+        providers: [provider(windows: resetWindows)]
     ))
     let freshSchedule = timelineProvider.widgetSchedule(
         for: DashboardWidgetIntent(),
@@ -77,7 +82,7 @@ private let fixedCalendar: Calendar = {
     )
     #expect(freshSchedule.entries.first?.presentation?.freshness == .fresh)
     #expect(freshSchedule.entries.first?.state == nil)
-    #expect(freshSchedule.entries.map { Int($0.date.timeIntervalSince1970) } == [20_000, 20_600, 20_800, 106_400])
+    #expect(freshSchedule.entries.map { Int($0.date.timeIntervalSince1970) } == [20_000, 20_600, 20_700, 20_800, 106_400])
     #expect(freshSchedule.reloadPolicy == .after(Date(timeIntervalSince1970: 106_400)))
 }
 

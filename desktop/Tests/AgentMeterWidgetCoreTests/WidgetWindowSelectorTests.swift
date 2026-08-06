@@ -25,6 +25,17 @@ import Testing
     #expect(selection.inner?.kind == "session")
 }
 
+@Test func exactWeeklyOutranksAModelSpecificMonthlyWindow() {
+    let selection = WidgetWindowSelector.select(from: [
+        window("session", "Session"),
+        window("opus-monthly", "Opus monthly"),
+        window("weekly", "Weekly"),
+    ])
+
+    #expect(selection.outer?.kind == "weekly")
+    #expect(selection.inner?.kind == "session")
+}
+
 @Test func normalizedLabelsCanExpressBillingAndShortWindows() {
     let selection = WidgetWindowSelector.select(from: [
         window("plan-cycle", " Billing cycle "),

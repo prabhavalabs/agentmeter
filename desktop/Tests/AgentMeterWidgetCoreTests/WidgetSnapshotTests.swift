@@ -206,6 +206,109 @@ import Testing
     #expect(history.map(\.consumedPercentPoints) == [175])
 }
 
+@Test func snapshotPreservesHostDerivedCycleStartEpoch() throws {
+    let snapshot = try buildHistory([
+        WidgetHistoryDay(
+            providerId: "provider-0",
+            windowKind: "window-0",
+            dayStartEpoch: 20_000,
+            consumedPercentPoints: 10,
+            latestUsedPercent: 25,
+            resetAtEpoch: 50_000,
+            cycleStartEpoch: 19_000
+        ),
+    ])
+
+    #expect(snapshot.map(\.cycleStartEpoch) == [19_000])
+}
+
+@Test func snapshotDeduplicatesWindowsBeforeApplyingTheEightWindowCap() throws {
+    let windows = [
+        ProviderWindow(kind: "window-0", label: "First", usedPercent: 1, resetAtEpoch: nil),
+        ProviderWindow(kind: "window-0", label: "Duplicate", usedPercent: 99, resetAtEpoch: nil),
+    ] + (1...7).map { (index: Int) in
+        ProviderWindow(
+            kind: "window-\(index)",
+            label: "Window \(index)",
+            usedPercent: index,
+            resetAtEpoch: nil
+        )
+    }
+    let state = ControlState(
+        revision: 1,
+        connection: ConnectionState(phase: .connected),
+        providers: [
+            ProviderSummary(
+                id: "codex",
+                name: "Codex",
+                status: "ready",
+                windows: windows,
+                updatedAtEpoch: 1_000
+            ),
+        ],
+        bridge: BridgeStatus(version: "1", running: true, configuredProviderIds: ["codex"])
+    )
+
+    let snapshot = try WidgetSnapshotBuilder().build(state: state, summaries: [:])
+
+    #expect(snapshot.providers[0].windows.map(\.kind) == (0...7).map { "window-\($0)" })
+    #expect(snapshot.providers[0].windows[0].label == "First")
+}
+
+@Test func snapshotDeduplicatesHistoryCellsWithAnOrderIndependentWinner() throws {
+    let lower = historyDay(dayStartEpoch: 20_000, consumedPercentPoints: 3, latestUsedPercent: 20)
+    let higher = WidgetHistoryDay(
+        providerId: "provider-0",
+        windowKind: "window-0",
+        dayStartEpoch: 20_000,
+        consumedPercentPoints: 7,
+        latestUsedPercent: 30,
+        resetAtEpoch: 50_000,
+        cycleStartEpoch: 10_000
+    )
+
+    let forward = try buildHistory([lower, higher])
+    let reversed = try buildHistory([higher, lower])
+
+    #expect(forward == [higher])
+    #expect(reversed == [higher])
+}
+
+@Test func snapshotRetainsThirtyNewestCellsIndependentlyForEachHistoryKind() throws {
+    let state = makeWidgetState(providerCount: 1, windowsPerProvider: 2)
+    let early = (0..<31).map { index in
+        WidgetHistoryDay(
+            providerId: "provider-0",
+            windowKind: "window-0",
+            dayStartEpoch: 20_000 + index * 86_400,
+            consumedPercentPoints: index,
+            latestUsedPercent: index,
+            resetAtEpoch: nil
+        )
+    }
+    let late = (0..<31).map { index in
+        WidgetHistoryDay(
+            providerId: "provider-0",
+            windowKind: "window-1",
+            dayStartEpoch: 20_000 + (100 + index) * 86_400,
+            consumedPercentPoints: index,
+            latestUsedPercent: index,
+            resetAtEpoch: nil
+        )
+    }
+
+    let snapshot = try WidgetSnapshotBuilder().build(
+        state: state,
+        summaries: [
+            "provider-0": WidgetHistorySummary(historyStartEpoch: 20_000, days: early + late),
+        ]
+    )
+
+    #expect(snapshot.providers[0].history.filter { $0.windowKind == "window-0" }.count == 30)
+    #expect(snapshot.providers[0].history.filter { $0.windowKind == "window-1" }.count == 30)
+    #expect(snapshot.providers[0].history.contains { $0.dayStartEpoch == 20_000 } == false)
+}
+
 private func buildHistory(_ days: [WidgetHistoryDay]) throws -> [WidgetHistoryDay] {
     let snapshot = try WidgetSnapshotBuilder().build(
         state: makeWidgetState(providerCount: 1, windowsPerProvider: 1),

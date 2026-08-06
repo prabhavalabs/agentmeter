@@ -110,6 +110,53 @@ import Testing
     #expect(cells.first?.hasData == false)
 }
 
+@Test func heatMapUsesTheProvidersSelectedOuterWindowInsteadOfSourceHistoryOrder() {
+    let end = 30 * 86_400
+    let provider = multiWindowHistoryProvider(
+        id: "codex",
+        windows: [("session", "Session"), ("weekly", "Weekly")],
+        values: [
+            ("session", end, 3),
+            ("weekly", end, 27),
+        ]
+    )
+
+    let cells = WidgetHistoryProjection.heatMap(
+        providers: [provider],
+        range: .days7,
+        scope: .singleProvider,
+        selectedProviderID: "codex",
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    )
+
+    #expect(cells.last?.value == 27)
+}
+
+@Test func combinedHeatMapResolvesEachProvidersOwnOuterWindowIndependently() {
+    let end = 30 * 86_400
+    let codex = multiWindowHistoryProvider(
+        id: "codex",
+        windows: [("session", "Session"), ("weekly", "Weekly")],
+        values: [("session", end, 2), ("weekly", end, 20)]
+    )
+    let claude = multiWindowHistoryProvider(
+        id: "claude",
+        windows: [("daily", "Daily"), ("billing", "Billing")],
+        values: [("daily", end, 4), ("billing", end, 40)]
+    )
+
+    let cells = WidgetHistoryProjection.heatMap(
+        providers: [codex, claude],
+        range: .days7,
+        scope: .combined,
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    )
+
+    #expect(cells.last?.value == 30)
+}
+
 @Test func heatMapUsesLocalMidnightsAcrossSpringDSTAndPreservesTheGap() {
     var berlin = Calendar(identifier: .gregorian)
     berlin.timeZone = TimeZone(identifier: "Europe/Berlin")!
@@ -135,7 +182,7 @@ import Testing
     #expect(cells.suffix(3).map(\.value) == [5, nil, 16])
 }
 
-@Test func trendUsesLatestPercentagePreservesGapsAndRejectsInvalidValues() {
+@Test func trendUsesLatestPercentagePreservesGapsAndRejectsInvalidValues() throws {
     let end = 50 * 86_400
     let provider = WidgetProviderSnapshot(
         id: "codex",
@@ -163,17 +210,101 @@ import Testing
         ]
     )
 
-    let points = WidgetHistoryProjection.trend(
+    let points = try #require(WidgetHistoryProjection.trend(
         provider: provider,
         range: .days7,
         windowKind: "weekly",
         endingAtDayEpoch: end,
         calendar: utcCalendar
-    )
+    ))
 
     #expect(points.count == 7)
     #expect(points.suffix(3).map(\.latestUsedPercent) == [42, nil, nil])
     #expect(points.last?.dayStartEpoch == end)
+}
+
+@Test func currentCycleTrendUsesOnlyTheObservedCycleSuffix() throws {
+    let end = 60 * 86_400
+    let cycleStart = end - 2 * 86_400 + 3_600
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: end,
+        windows: [WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 25, resetAtEpoch: nil)],
+        history: (0..<6).map { index in
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: end - (5 - index) * 86_400,
+                consumedPercentPoints: index,
+                latestUsedPercent: 10 + index,
+                resetAtEpoch: nil,
+                cycleStartEpoch: index >= 3 ? cycleStart : 1_000
+            )
+        }
+    )
+
+    let points = try #require(WidgetHistoryProjection.trend(
+        provider: provider,
+        range: .currentCycle,
+        windowKind: "weekly",
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    ))
+
+    #expect(points.count == 3)
+    #expect(points.map(\.dayStartEpoch) == [end - 2 * 86_400, end - 86_400, end])
+    #expect(points.map(\.latestUsedPercent) == [13, 14, 15])
+}
+
+@Test func currentCycleTrendIsUnavailableWithoutAnObservedBoundary() {
+    let end = 60 * 86_400
+    let provider = historyProvider(id: "codex", values: [(end, 10)])
+
+    let points = WidgetHistoryProjection.trend(
+        provider: provider,
+        range: .currentCycle,
+        windowKind: "weekly",
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    )
+
+    #expect(points == nil)
+}
+
+@Test func currentCycleTrendDoesNotInventLeadingGapsBeforeAvailableRows() throws {
+    let end = 60 * 86_400
+    let oldBoundary = end - 25 * 86_400
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: end,
+        windows: [WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 25, resetAtEpoch: nil)],
+        history: (0..<3).map { index in
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: end - (2 - index) * 86_400,
+                consumedPercentPoints: index,
+                latestUsedPercent: 20 + index,
+                resetAtEpoch: nil,
+                cycleStartEpoch: oldBoundary
+            )
+        }
+    )
+
+    let points = try #require(WidgetHistoryProjection.trend(
+        provider: provider,
+        range: .currentCycle,
+        windowKind: "weekly",
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    ))
+
+    #expect(points.count == 3)
+    #expect(points.allSatisfy { $0.latestUsedPercent != nil })
 }
 
 private let utcCalendar: Calendar = {
@@ -181,6 +312,11 @@ private let utcCalendar: Calendar = {
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!
     return calendar
 }()
+
+@Test func currentCycleHasAnExactLabelButNoFixedDayCount() {
+    #expect(WidgetHistoryPeriod.currentCycle.fixedDayCount == nil)
+    #expect(WidgetHistoryPeriod.currentCycle.displayLabel == "Current cycle")
+}
 
 private func historyProvider(
     id: String,
@@ -198,6 +334,37 @@ private func historyProvider(
                 windowKind: "weekly",
                 dayStartEpoch: value.epoch,
                 consumedPercentPoints: value.value,
+                latestUsedPercent: nil,
+                resetAtEpoch: nil
+            )
+        }
+    )
+}
+
+private func multiWindowHistoryProvider(
+    id: String,
+    windows: [(kind: String, label: String)],
+    values: [(kind: String, epoch: Int, value: Int)]
+) -> WidgetProviderSnapshot {
+    WidgetProviderSnapshot(
+        id: id,
+        name: id.capitalized,
+        status: "ready",
+        updatedAtEpoch: values.map(\.epoch).max(),
+        windows: windows.map {
+            WidgetWindowSnapshot(
+                kind: $0.kind,
+                label: $0.label,
+                usedPercent: 25,
+                resetAtEpoch: nil
+            )
+        },
+        history: values.map {
+            WidgetHistoryDay(
+                providerId: id,
+                windowKind: $0.kind,
+                dayStartEpoch: $0.epoch,
+                consumedPercentPoints: $0.value,
                 latestUsedPercent: nil,
                 resetAtEpoch: nil
             )

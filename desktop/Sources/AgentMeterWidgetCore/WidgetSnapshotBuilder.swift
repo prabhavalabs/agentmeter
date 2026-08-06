@@ -15,20 +15,23 @@ public struct WidgetSnapshotBuilder: Sendable {
         let providers = orderedProviders(in: state)
             .prefix(WidgetSnapshot.maximumProviderCount)
             .map { provider in
-                let windows = provider.windows
-                    .prefix(WidgetSnapshot.maximumWindowCountPerProvider)
-                    .map(makeWindowSnapshot)
+                let retainedWindows = retainedWindows(provider.windows)
+                let windows = retainedWindows.map(makeWindowSnapshot)
                 return WidgetProviderSnapshot(
                     id: provider.id,
                     name: provider.name,
                     status: provider.status,
                     updatedAtEpoch: provider.updatedAtEpoch,
                     windows: windows,
-                    history: history(for: provider, summary: summaries[provider.id])
+                    history: history(
+                        for: provider,
+                        retainedWindows: retainedWindows,
+                        summary: summaries[provider.id]
+                    )
                 )
             }
 
-        let snapshot = WidgetSnapshot(
+        let snapshot = try WidgetSnapshotCanonicalizer.canonicalize(WidgetSnapshot(
             generatedAtEpoch: generationEpoch(state: state),
             pollIntervalSeconds: state.bridge.pollIntervalSeconds,
             historyStartEpoch: historyStartEpoch(
@@ -36,8 +39,8 @@ public struct WidgetSnapshotBuilder: Sendable {
                 summaries: summaries
             ),
             providers: providers
-        )
-        guard try JSONEncoder().encode(snapshot).count <= WidgetSnapshot.maximumEncodedBytes else {
+        ))
+        guard try WidgetSnapshotCoding.encode(snapshot).count <= WidgetSnapshot.maximumEncodedBytes else {
             throw Error.encodedSizeExceedsLimit
         }
         return snapshot
@@ -74,8 +77,16 @@ public struct WidgetSnapshotBuilder: Sendable {
         )
     }
 
+    private func retainedWindows(_ windows: [ProviderWindow]) -> [ProviderWindow] {
+        var seen = Set<String>()
+        return Array(windows.compactMap { window in
+            seen.insert(window.kind).inserted ? window : nil
+        }.prefix(WidgetSnapshot.maximumWindowCountPerProvider))
+    }
+
     private func history(
         for provider: ProviderSummary,
+        retainedWindows: [ProviderWindow],
         summary: WidgetHistorySummary?
     ) -> [WidgetHistoryDay] {
         guard let summary else { return [] }
@@ -84,30 +95,29 @@ public struct WidgetSnapshotBuilder: Sendable {
             $0.providerId == provider.id && $0.consumedPercentPoints >= 0
         }
 
-        let currentWindows = Array(
-            provider.windows.prefix(WidgetSnapshot.maximumWindowCountPerProvider)
-        )
-        let selectedKinds = WidgetWindowSelector.historyEnabledKinds(from: currentWindows)
+        let selectedKinds = WidgetWindowSelector.historyEnabledKinds(from: retainedWindows)
         let kindOrder = Dictionary(uniqueKeysWithValues: selectedKinds.enumerated().map { ($1, $0) })
 
-        let recentDayEpochs = Set(
-            validDays.lazy
-                .filter { kindOrder[$0.windowKind] != nil }
-                .map(\.dayStartEpoch)
-                .sorted(by: >)
-                .reduce(into: [Int]()) { result, epoch in
-                    if result.last != epoch {
-                        result.append(epoch)
-                    }
+        var retained: [WidgetHistoryDay] = []
+        for kind in selectedKinds {
+            var byDay: [Int: WidgetHistoryDay] = [:]
+            for day in validDays where day.windowKind == kind {
+                let candidate = makeHistoryDaySnapshot(day)
+                if let existing = byDay[day.dayStartEpoch] {
+                    byDay[day.dayStartEpoch] = WidgetSnapshotCanonicalizer.preferredHistoryDay(
+                        existing,
+                        candidate
+                    )
+                } else {
+                    byDay[day.dayStartEpoch] = candidate
                 }
-                .prefix(WidgetSnapshot.maximumHistoryDayCount)
-        )
-
-        return validDays
-            .filter {
-                kindOrder[$0.windowKind] != nil
-                    && recentDayEpochs.contains($0.dayStartEpoch)
             }
+            retained.append(contentsOf: byDay.values
+                .sorted { $0.dayStartEpoch > $1.dayStartEpoch }
+                .prefix(WidgetSnapshot.maximumHistoryDayCount))
+        }
+
+        return retained
             .sorted {
                 if $0.dayStartEpoch != $1.dayStartEpoch {
                     return $0.dayStartEpoch < $1.dayStartEpoch
@@ -117,7 +127,6 @@ public struct WidgetSnapshotBuilder: Sendable {
                 if leftKind != rightKind { return leftKind < rightKind }
                 return $0.windowKind < $1.windowKind
             }
-            .map(makeHistoryDaySnapshot)
     }
 
     private func makeHistoryDaySnapshot(_ day: WidgetHistoryDay) -> WidgetHistoryDay {
@@ -127,7 +136,8 @@ public struct WidgetSnapshotBuilder: Sendable {
             dayStartEpoch: day.dayStartEpoch,
             consumedPercentPoints: day.consumedPercentPoints,
             latestUsedPercent: validatedPercent(day.latestUsedPercent),
-            resetAtEpoch: day.resetAtEpoch
+            resetAtEpoch: day.resetAtEpoch,
+            cycleStartEpoch: day.cycleStartEpoch
         )
     }
 

@@ -129,7 +129,208 @@ import Testing
     }
 }
 
-private func makeSnapshot(generatedAtEpoch: Int = 1_000) -> WidgetSnapshot {
+@Test func snapshotStoreRejectsSchemaOnePayloadsThatExceedStructuralCaps() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let tooManyProviders = WidgetSnapshot(
+            generatedAtEpoch: 1_000,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: nil,
+            providers: (0...WidgetSnapshot.maximumProviderCount).map { index in
+                WidgetProviderSnapshot(
+                    id: "provider-\(index)",
+                    name: "Provider \(index)",
+                    status: "ready",
+                    updatedAtEpoch: nil,
+                    windows: [],
+                    history: []
+                )
+            }
+        )
+        try JSONEncoder().encode(tooManyProviders).write(to: store.url)
+
+        #expect(throws: WidgetSnapshotValidationError.tooManyProviders) {
+            try store.load()
+        }
+    }
+}
+
+@Test func snapshotStoreRejectsTooManyHistoryCellsPerKind() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let history = (0...WidgetSnapshot.maximumHistoryDayCount).map { index in
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: 100 + index * 86_400,
+                consumedPercentPoints: index,
+                latestUsedPercent: index,
+                resetAtEpoch: nil
+            )
+        }
+        let snapshot = makeSnapshot(history: history)
+        try JSONEncoder().encode(snapshot).write(to: store.url)
+
+        #expect(throws: WidgetSnapshotValidationError.tooManyHistoryCells(
+            providerID: "codex",
+            kind: "weekly"
+        )) {
+            try store.load()
+        }
+    }
+}
+
+@Test func snapshotStoreRejectsTooManyWindowsAndHistoryKinds() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let windows = (0...WidgetSnapshot.maximumWindowCountPerProvider).map { index in
+            WidgetWindowSnapshot(
+                kind: "window-\(index)",
+                label: "Window \(index)",
+                usedPercent: index,
+                resetAtEpoch: nil
+            )
+        }
+        let tooManyWindows = WidgetSnapshot(
+            generatedAtEpoch: 1_000,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: nil,
+            providers: [
+                WidgetProviderSnapshot(
+                    id: "codex",
+                    name: "Codex",
+                    status: "ready",
+                    updatedAtEpoch: nil,
+                    windows: windows,
+                    history: []
+                ),
+            ]
+        )
+        try JSONEncoder().encode(tooManyWindows).write(to: store.url)
+        #expect(throws: WidgetSnapshotValidationError.tooManyWindows(providerID: "codex")) {
+            try store.load()
+        }
+
+        let retainedWindows = Array(windows.prefix(5))
+        let tooManyKinds = WidgetSnapshot(
+            generatedAtEpoch: 1_000,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: nil,
+            providers: [
+                WidgetProviderSnapshot(
+                    id: "codex",
+                    name: "Codex",
+                    status: "ready",
+                    updatedAtEpoch: nil,
+                    windows: retainedWindows,
+                    history: retainedWindows.enumerated().map { index, window in
+                        WidgetHistoryDay(
+                            providerId: "codex",
+                            windowKind: window.kind,
+                            dayStartEpoch: 100 + index * 86_400,
+                            consumedPercentPoints: index,
+                            latestUsedPercent: index,
+                            resetAtEpoch: nil
+                        )
+                    }
+                ),
+            ]
+        )
+        try JSONEncoder().encode(tooManyKinds).write(to: store.url)
+        #expect(throws: WidgetSnapshotValidationError.tooManyHistoryKinds(providerID: "codex")) {
+            try store.load()
+        }
+    }
+}
+
+@Test func snapshotStoreRejectsMismatchedAndUnknownHistoryRows() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let mismatch = makeSnapshot(history: [
+            WidgetHistoryDay(
+                providerId: "claude",
+                windowKind: "weekly",
+                dayStartEpoch: 100,
+                consumedPercentPoints: 1,
+                latestUsedPercent: 1,
+                resetAtEpoch: nil
+            ),
+        ])
+        try JSONEncoder().encode(mismatch).write(to: store.url)
+        #expect(throws: WidgetSnapshotValidationError.mismatchedHistoryProvider(
+            providerID: "codex"
+        )) {
+            try store.load()
+        }
+
+        let unknown = makeSnapshot(history: [
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "monthly",
+                dayStartEpoch: 100,
+                consumedPercentPoints: 1,
+                latestUsedPercent: 1,
+                resetAtEpoch: nil
+            ),
+        ])
+        try JSONEncoder().encode(unknown).write(to: store.url)
+        #expect(throws: WidgetSnapshotValidationError.unknownHistoryWindow(
+            providerID: "codex",
+            kind: "monthly"
+        )) {
+            try store.load()
+        }
+    }
+}
+
+@Test func snapshotStoreCanonicalizesDuplicateHistoryCellsAndStableBytes() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let low = storeHistoryDay(consumed: 3, latest: 20, reset: nil, cycleStart: nil)
+        let high = storeHistoryDay(consumed: 7, latest: 30, reset: 4_000, cycleStart: 90)
+        let first = makeSnapshot(history: [low, high])
+        let second = makeSnapshot(history: [high, low])
+
+        #expect(try store.writeIfChanged(first))
+        let firstBytes = try Data(contentsOf: store.url)
+        #expect(try store.load()?.providers[0].history == [high])
+        #expect(try store.writeIfChanged(second) == false)
+        #expect(try Data(contentsOf: store.url) == firstBytes)
+    }
+}
+
+@Test func snapshotStoreRejectsInvalidWritesWithoutReplacingTheCurrentSnapshot() throws {
+    try withTemporaryDirectory { directory in
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let original = makeSnapshot()
+        _ = try store.writeIfChanged(original)
+        let invalid = WidgetSnapshot(
+            generatedAtEpoch: 2_000,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: nil,
+            providers: original.providers + (1...WidgetSnapshot.maximumProviderCount).map { index in
+                WidgetProviderSnapshot(
+                    id: "provider-\(index)",
+                    name: "Provider \(index)",
+                    status: "ready",
+                    updatedAtEpoch: nil,
+                    windows: [],
+                    history: []
+                )
+            }
+        )
+
+        #expect(throws: WidgetSnapshotValidationError.tooManyProviders) {
+            try store.writeIfChanged(invalid)
+        }
+        #expect(try store.load() == original)
+    }
+}
+
+private func makeSnapshot(
+    generatedAtEpoch: Int = 1_000,
+    history: [WidgetHistoryDay]? = nil
+) -> WidgetSnapshot {
     WidgetSnapshot(
         generatedAtEpoch: generatedAtEpoch,
         pollIntervalSeconds: 300,
@@ -148,7 +349,7 @@ private func makeSnapshot(generatedAtEpoch: Int = 1_000) -> WidgetSnapshot {
                         resetAtEpoch: 4_000
                     ),
                 ],
-                history: [
+                history: history ?? [
                     WidgetHistoryDay(
                         providerId: "codex",
                         windowKind: "weekly",
@@ -160,6 +361,23 @@ private func makeSnapshot(generatedAtEpoch: Int = 1_000) -> WidgetSnapshot {
                 ]
             ),
         ]
+    )
+}
+
+private func storeHistoryDay(
+    consumed: Int,
+    latest: Int?,
+    reset: Int?,
+    cycleStart: Int?
+) -> WidgetHistoryDay {
+    WidgetHistoryDay(
+        providerId: "codex",
+        windowKind: "weekly",
+        dayStartEpoch: 100,
+        consumedPercentPoints: consumed,
+        latestUsedPercent: latest,
+        resetAtEpoch: reset,
+        cycleStartEpoch: cycleStart
     )
 }
 

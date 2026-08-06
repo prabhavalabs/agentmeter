@@ -123,7 +123,11 @@ private extension IntentHistoryStyleOption {
 
 private extension IntentHistoryRangeOption {
     var renderValue: WidgetHistoryPeriod {
-        switch self { case .days7: .days7; case .days30: .days30 }
+        switch self {
+        case .days7: .days7
+        case .days30: .days30
+        case .currentCycle: .currentCycle
+        }
     }
 }
 

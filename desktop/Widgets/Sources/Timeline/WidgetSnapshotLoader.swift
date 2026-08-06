@@ -187,7 +187,12 @@ enum WidgetTimelineFactory {
         }
 
         let nowEpoch = Int(now.timeIntervalSince1970)
-        let plan = WidgetTimelinePlanner.plan(snapshot: snapshot, nowEpoch: nowEpoch)
+        let plan = WidgetTimelinePlanner.plan(
+            snapshot: snapshot,
+            configuration: configuration,
+            family: family,
+            nowEpoch: nowEpoch
+        )
         let entries = ([plan.currentEpoch] + plan.checkpoints).map { epoch in
             resolvedEntry(
                 snapshot: snapshot,

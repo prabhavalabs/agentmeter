@@ -11,17 +11,22 @@ public struct WidgetTimelinePlan: Equatable, Sendable {
 }
 
 public enum WidgetTimelinePlanner {
-    public static func plan(snapshot: WidgetSnapshot, nowEpoch: Int) -> WidgetTimelinePlan {
+    public static func plan(
+        snapshot: WidgetSnapshot,
+        configuration: WidgetRenderConfiguration,
+        family: WidgetFamily,
+        nowEpoch: Int
+    ) -> WidgetTimelinePlan {
         let (candidateCeiling, overflow) = nowEpoch.addingReportingOverflow(86_400)
         let ceiling = overflow ? Int.max : candidateCeiling
         var checkpoints = Set<Int>()
 
-        if let reset = snapshot.providers
-            .lazy
-            .flatMap(\.windows)
-            .compactMap(\.resetAtEpoch)
-            .filter({ $0 > nowEpoch && $0 <= ceiling })
-            .min() {
+        for reset in renderedResetEpochs(
+            snapshot: snapshot,
+            configuration: configuration,
+            family: family,
+            nowEpoch: nowEpoch
+        ) where reset > nowEpoch && reset <= ceiling {
             checkpoints.insert(reset)
         }
 
@@ -38,5 +43,30 @@ public enum WidgetTimelinePlanner {
             checkpoints: checkpoints.sorted(),
             reloadAfterEpoch: ceiling
         )
+    }
+
+    private static func renderedResetEpochs(
+        snapshot: WidgetSnapshot,
+        configuration: WidgetRenderConfiguration,
+        family: WidgetFamily,
+        nowEpoch: Int
+    ) -> [Int] {
+        if configuration.kind == .focus,
+           let focusProviderID = configuration.focusProviderID,
+           snapshot.providers.contains(where: { $0.id == focusProviderID }) == false {
+            return []
+        }
+        let presentation = WidgetPresentationResolver.resolve(
+            configuration: configuration,
+            snapshot: snapshot,
+            family: family,
+            nowEpoch: nowEpoch
+        )
+        return presentation.providers.flatMap { provider in
+            (provider.rings + provider.additionalWindows).compactMap { ring in
+                guard case let .scheduled(epoch) = ring.resetState else { return nil }
+                return epoch
+            }
+        }
     }
 }

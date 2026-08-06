@@ -7,6 +7,7 @@ public struct WidgetHistoryDay: Codable, Equatable, Sendable {
     public let consumedPercentPoints: Int
     public let latestUsedPercent: Int?
     public let resetAtEpoch: Int?
+    public let cycleStartEpoch: Int?
 
     public init(
         providerId: String,
@@ -14,7 +15,8 @@ public struct WidgetHistoryDay: Codable, Equatable, Sendable {
         dayStartEpoch: Int,
         consumedPercentPoints: Int,
         latestUsedPercent: Int?,
-        resetAtEpoch: Int?
+        resetAtEpoch: Int?,
+        cycleStartEpoch: Int? = nil
     ) {
         self.providerId = providerId
         self.windowKind = windowKind
@@ -22,6 +24,7 @@ public struct WidgetHistoryDay: Codable, Equatable, Sendable {
         self.consumedPercentPoints = consumedPercentPoints
         self.latestUsedPercent = latestUsedPercent
         self.resetAtEpoch = resetAtEpoch
+        self.cycleStartEpoch = cycleStartEpoch
     }
 }
 

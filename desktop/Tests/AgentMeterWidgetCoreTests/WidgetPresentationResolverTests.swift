@@ -335,6 +335,71 @@ func focusTrendUsesConfiguredWindow(
     #expect(presentation.history?.cells.isEmpty == true)
 }
 
+@Test func currentCycleHistoryIsExplicitlyUnavailableWithoutATrendBoundary() {
+    let day = 86_400
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: day,
+        windows: [WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 25, resetAtEpoch: nil)],
+        history: [
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: day,
+                consumedPercentPoints: 5,
+                latestUsedPercent: 25,
+                resetAtEpoch: nil
+            ),
+        ]
+    )
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: day,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: day,
+        providers: [provider]
+    )
+    func configuration(style: WidgetHistoryStyle) -> WidgetRenderConfiguration {
+        WidgetRenderConfiguration(
+            kind: .focus,
+            providerIDs: ["codex"],
+            focusProviderID: "codex",
+            outerWindowKind: "weekly",
+            innerWindowKind: nil,
+            percentageMode: .used,
+            modules: [.usage, .primaryReset, .history],
+            historyStyle: style,
+            historyPeriod: .currentCycle,
+            heatMapScope: .singleProvider,
+            layout: .automatic,
+            density: .comfortable,
+            theme: .system,
+            tapDestination: .overview
+        )
+    }
+
+    let trend = WidgetPresentationResolver.resolve(
+        configuration: configuration(style: .trend),
+        snapshot: snapshot,
+        family: .large,
+        nowEpoch: day,
+        endingAtDayEpoch: day,
+        calendar: utcCalendarForResolver
+    )
+    let heatMap = WidgetPresentationResolver.resolve(
+        configuration: configuration(style: .heatMap),
+        snapshot: snapshot,
+        family: .large,
+        nowEpoch: day,
+        endingAtDayEpoch: day,
+        calendar: utcCalendarForResolver
+    )
+
+    #expect(trend.history?.availabilityMessage == "History unavailable for this window")
+    #expect(heatMap.history?.availabilityMessage == "History unavailable for this window")
+}
+
 @Test func noneHistoryStyleProducesNoProjectionEvenWhenModuleIsRequested() {
     let configuration = WidgetRenderConfiguration(
         kind: .focus,

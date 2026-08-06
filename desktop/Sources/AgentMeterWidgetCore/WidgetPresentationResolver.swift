@@ -266,18 +266,28 @@ public enum WidgetPresentationResolver {
             guard let firstProvider, let selectedWindow else {
                 return WidgetHistoryProjection(availabilityMessage: unavailableHistoryMessage)
             }
-            return WidgetHistoryProjection(
-                trendPoints: WidgetHistoryProjection.trend(
-                    provider: firstProvider,
-                    range: configuration.historyPeriod,
+            guard let trendPoints = WidgetHistoryProjection.trend(
+                provider: firstProvider,
+                range: configuration.historyPeriod,
+                windowKind: selectedWindow.kind,
+                endingAtDayEpoch: endingAtDayEpoch,
+                calendar: calendar
+            ) else {
+                return WidgetHistoryProjection(
                     windowKind: selectedWindow.kind,
-                    endingAtDayEpoch: endingAtDayEpoch,
-                    calendar: calendar
-                ),
+                    windowLabel: selectedWindow.label,
+                    availabilityMessage: unavailableHistoryMessage
+                )
+            }
+            return WidgetHistoryProjection(
+                trendPoints: trendPoints,
                 windowKind: selectedWindow.kind,
                 windowLabel: selectedWindow.label
             )
         case .heatMap, .bars:
+            guard configuration.historyPeriod != .currentCycle else {
+                return WidgetHistoryProjection(availabilityMessage: unavailableHistoryMessage)
+            }
             let focusWindowKind = configuration.kind == .focus ? selectedWindow?.kind : nil
             return WidgetHistoryProjection(
                 cells: WidgetHistoryProjection.heatMap(

@@ -102,3 +102,15 @@ private enum Fixture {
     #expect(day.latestUsedPercent == nil)
     #expect(day.resetAtEpoch == nil)
 }
+
+@Test func decodesWidgetHistoryCycleStartAndRemainsBackwardCompatibleWhenMissing() throws {
+    let withBoundary = Data(
+        #"{"providerId":"codex","windowKind":"weekly","dayStartEpoch":1000,"consumedPercentPoints":5,"latestUsedPercent":25,"resetAtEpoch":4000,"cycleStartEpoch":900}"#.utf8
+    )
+    let legacy = Data(
+        #"{"providerId":"codex","windowKind":"weekly","dayStartEpoch":1000,"consumedPercentPoints":5,"latestUsedPercent":25,"resetAtEpoch":4000}"#.utf8
+    )
+
+    #expect(try JSONDecoder().decode(WidgetHistoryDay.self, from: withBoundary).cycleStartEpoch == 900)
+    #expect(try JSONDecoder().decode(WidgetHistoryDay.self, from: legacy).cycleStartEpoch == nil)
+}

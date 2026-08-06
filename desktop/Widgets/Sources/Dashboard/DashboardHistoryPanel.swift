@@ -8,7 +8,7 @@ struct DashboardHistorySemantics: Equatable {
 
     init(presentation: WidgetPresentation) {
         style = presentation.configuration.historyStyle
-        rangeLabel = "Last \(presentation.configuration.historyPeriod.dayCount) days"
+        rangeLabel = presentation.configuration.historyPeriod.displayLabel
         switch presentation.configuration.historyStyle {
         case .heatMap, .bars:
             if presentation.configuration.heatMapScope == .combined {

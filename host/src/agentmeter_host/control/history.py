@@ -314,10 +314,25 @@ class HistoryStore:
     ) -> dict[str, object]:
         history_start_epoch = next((row[2] for row in rows if row[3] is not None), None)
         previous: dict[str, tuple[int | None, int | None]] = {}
+        known_resets: dict[str, int] = {}
+        known_percents: dict[str, int] = {}
+        cycle_starts: dict[str, int | None] = {}
         days: dict[tuple[str, int], dict[str, object]] = {}
 
         for provider_id, window_kind, sampled_at, used_percent, reset_at in rows:
             previous_percent, previous_reset_at = previous.get(window_kind, (None, None))
+            cycle_start = cycle_starts.get(window_kind)
+            known_reset = known_resets.get(window_kind)
+            if reset_at is not None:
+                if known_reset is None or reset_at != known_reset:
+                    cycle_start = sampled_at
+                known_resets[window_kind] = reset_at
+            if used_percent is not None:
+                known_percent = known_percents.get(window_kind)
+                if known_percent is not None and known_percent - used_percent >= 5:
+                    cycle_start = sampled_at
+                known_percents[window_kind] = used_percent
+            cycle_starts[window_kind] = cycle_start
             if sampled_at >= since_epoch and used_percent is not None:
                 local_date = datetime.fromtimestamp(sampled_at, zone).date()
                 day_start_epoch = int(
@@ -332,6 +347,7 @@ class HistoryStore:
                         "consumedPercentPoints": 0,
                         "latestUsedPercent": used_percent,
                         "resetAtEpoch": reset_at,
+                        "cycleStartEpoch": cycle_start,
                     },
                 )
                 if (
@@ -344,7 +360,11 @@ class HistoryStore:
                     day["consumedPercentPoints"] += used_percent - previous_percent
                 day["latestUsedPercent"] = used_percent
                 day["resetAtEpoch"] = reset_at
+                day["cycleStartEpoch"] = cycle_start
             previous[window_kind] = (used_percent, reset_at)
+
+        for (window_kind, _), day in days.items():
+            day["cycleStartEpoch"] = cycle_starts.get(window_kind)
 
         return {
             "historyStartEpoch": history_start_epoch,

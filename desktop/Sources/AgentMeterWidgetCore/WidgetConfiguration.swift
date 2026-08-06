@@ -42,11 +42,21 @@ public enum WidgetHistoryStyle: String, Codable, Equatable, Sendable, CaseIterab
 public enum WidgetHistoryPeriod: String, Codable, Equatable, Sendable, CaseIterable {
     case days7
     case days30
+    case currentCycle
 
-    public var dayCount: Int {
+    public var fixedDayCount: Int? {
         switch self {
         case .days7: 7
         case .days30: 30
+        case .currentCycle: nil
+        }
+    }
+
+    public var displayLabel: String {
+        switch self {
+        case .days7: "Last 7 days"
+        case .days30: "Last 30 days"
+        case .currentCycle: "Current cycle"
         }
     }
 }

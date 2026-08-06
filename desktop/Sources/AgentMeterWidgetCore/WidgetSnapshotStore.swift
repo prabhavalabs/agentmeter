@@ -8,7 +8,7 @@ public enum WidgetSnapshotStoreError: Error, Equatable, Sendable {
 
 public struct WidgetSnapshotStore: Sendable {
     public static let fileName = "widget-snapshot-v1.json"
-    public static let maximumBytes = 262_144
+    public static let maximumBytes = WidgetSnapshot.maximumEncodedBytes
 
     public let url: URL
 
@@ -20,11 +20,11 @@ public struct WidgetSnapshotStore: Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         if let byteCount = attributes[.size] as? NSNumber,
-           byteCount.intValue > Self.maximumBytes {
+           byteCount.uint64Value > UInt64(Self.maximumBytes) {
             throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
         }
 
-        let data = try Data(contentsOf: url)
+        let data = try boundedRead(from: url, maximumCount: Self.maximumBytes)
         guard data.count <= Self.maximumBytes else {
             throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
         }
@@ -32,18 +32,23 @@ public struct WidgetSnapshotStore: Sendable {
         guard header.schemaVersion == WidgetSnapshot.schemaVersion else {
             throw WidgetSnapshotStoreError.unsupportedSchema(header.schemaVersion)
         }
-        return try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        let snapshot = try JSONDecoder().decode(WidgetSnapshot.self, from: data)
+        return try WidgetSnapshotCanonicalizer.canonicalize(snapshot)
     }
 
     @discardableResult
     public func writeIfChanged(_ snapshot: WidgetSnapshot) throws -> Bool {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(snapshot)
+        let canonical = try WidgetSnapshotCanonicalizer.canonicalize(snapshot)
+        let data = try WidgetSnapshotCoding.encode(canonical)
         guard data.count <= Self.maximumBytes else {
             throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
         }
-        if let existing = try? Data(contentsOf: url), existing == data {
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let byteCount = attributes[.size] as? NSNumber,
+           byteCount.uint64Value == UInt64(data.count),
+           byteCount.uint64Value <= UInt64(Self.maximumBytes),
+           let existing = try? boundedRead(from: url, maximumCount: data.count),
+           existing == data {
             return false
         }
 
@@ -72,6 +77,16 @@ public struct WidgetSnapshotStore: Sendable {
 
     private func currentPOSIXError() -> POSIXError {
         POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+    }
+
+    private func boundedRead(from url: URL, maximumCount: Int) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        let data = try handle.read(upToCount: maximumCount + 1) ?? Data()
+        guard data.count <= maximumCount else {
+            throw WidgetSnapshotStoreError.encodedSizeExceedsLimit
+        }
+        return data
     }
 }
 

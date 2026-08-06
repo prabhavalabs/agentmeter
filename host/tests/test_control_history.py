@@ -30,6 +30,7 @@ def test_widget_summary_counts_positive_deltas_without_counting_resets(tmp_path)
             "consumedPercentPoints": 11,
             "latestUsedPercent": 8,
             "resetAtEpoch": 1_788_422_400,
+            "cycleStartEpoch": 1_788_256_800,
         }
     ]
     history.close()
@@ -54,6 +55,7 @@ def test_widget_summary_does_not_count_increases_without_known_reset_continuity(
             "consumedPercentPoints": 0,
             "latestUsedPercent": 20,
             "resetAtEpoch": None,
+            "cycleStartEpoch": None,
         }
     ]
     history.close()
@@ -75,6 +77,43 @@ def test_widget_summary_uses_local_day_starts_across_berlin_spring_dst(tmp_path)
 
     day_starts = [day["dayStartEpoch"] for day in result["days"]]
     assert day_starts[1] - day_starts[0] == 82_800
+    history.close()
+
+
+def test_widget_summary_derives_and_propagates_observed_cycle_starts(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    samples = (
+        (1_000, 10, 500_000),
+        (87_400, 20, 500_000),
+        (173_800, 25, 600_000),
+        (260_200, 30, 600_000),
+        (346_600, 3, 600_000),
+    )
+    for sampled_at, percent, reset_at in samples:
+        history.record_usage("claude", "weekly", sampled_at, percent, reset_at)
+
+    result = history.query_widget_summary(
+        since_epoch=0,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert [day["cycleStartEpoch"] for day in result["days"]] == [346_600] * 5
+    history.close()
+
+
+def test_widget_summary_leaves_cycle_start_unknown_without_boundary_evidence(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_000, 10, None)
+    history.record_usage("claude", "weekly", 87_400, 20, None)
+
+    result = history.query_widget_summary(
+        since_epoch=0,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert [day["cycleStartEpoch"] for day in result["days"]] == [None, None]
     history.close()
 
 
@@ -101,6 +140,7 @@ def test_widget_summary_uses_pre_boundary_baseline_and_omits_unknown_days(tmp_pa
                 "consumedPercentPoints": 5,
                 "latestUsedPercent": 25,
                 "resetAtEpoch": 1_788_336_000,
+                "cycleStartEpoch": 1_788_246_000,
             }
         ],
     }
@@ -127,6 +167,7 @@ def test_widget_summary_keeps_known_zero_days_private_and_provider_scoped(tmp_pa
             "consumedPercentPoints": 0,
             "latestUsedPercent": 10,
             "resetAtEpoch": 1_788_336_000,
+            "cycleStartEpoch": 1_788_249_600,
         }
     ]
     assert not {"name", "identity", "prompt", "rawValues"} & set(result["days"][0])

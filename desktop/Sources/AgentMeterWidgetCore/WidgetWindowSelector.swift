@@ -75,8 +75,9 @@ public enum WidgetWindowSelector {
         excluding excludedIndex: Int? = nil
     ) -> Int? {
         let remaining = windows.filter { $0.offset != excludedIndex }
-        return firstIndex(in: remaining, matching: isMonthlyOrBilling)
+        return firstIndex(in: remaining, matching: isExactMonthlyOrBilling)
             ?? firstIndex(in: remaining, matching: isExactWeekly)
+            ?? firstIndex(in: remaining, matching: isMonthlyBillingOrWeekly)
             ?? firstIndex(in: remaining) { isSessionLike($0) == false }
             ?? remaining.first?.offset
     }
@@ -98,9 +99,18 @@ public enum WidgetWindowSelector {
         windows.first { predicate($0.element) }?.offset
     }
 
-    private static func isMonthlyOrBilling(_ window: ProviderWindow) -> Bool {
+    private static func isExactMonthlyOrBilling(_ window: ProviderWindow) -> Bool {
+        let exactPhrases = [normalizedPhrase(window.kind), normalizedPhrase(window.label)]
+        return exactPhrases.contains { ["monthly", "month", "billing"].contains($0) }
+    }
+
+    private static func isMonthlyBillingOrWeekly(_ window: ProviderWindow) -> Bool {
         let tokens = normalizedTokens(window)
-        return tokens.contains("monthly") || tokens.contains("month") || tokens.contains("billing")
+        return tokens.contains("monthly")
+            || tokens.contains("month")
+            || tokens.contains("billing")
+            || tokens.contains("weekly")
+            || tokens.contains("week")
     }
 
     private static func isExactWeekly(_ window: ProviderWindow) -> Bool {

@@ -63,6 +63,7 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         endingAtDayEpoch: Int,
         calendar: Calendar = .current
     ) -> [WidgetHeatMapCell] {
+        guard let dayCount = range.fixedDayCount else { return [] }
         let selected = selectedProviders(
             providers,
             scope: scope,
@@ -72,7 +73,7 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
             valuesByDay(provider: provider, windowKind: windowKind)
         }
         let dayEpochs = dayEpochs(
-            count: range.dayCount,
+            count: dayCount,
             endingAtDayEpoch: endingAtDayEpoch,
             calendar: calendar
         )
@@ -93,8 +94,14 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         windowKind: String,
         endingAtDayEpoch: Int,
         calendar: Calendar = .current
-    ) -> [WidgetTrendPoint] {
-        let values = provider.history.reduce(into: [Int: Int]()) { result, day in
+    ) -> [WidgetTrendPoint]? {
+        let matchingDays = provider.history.filter { day in
+            day.providerId == provider.id && day.windowKind == windowKind
+        }
+        let validDays = matchingDays.filter { day in
+            day.latestUsedPercent.map { (0...100).contains($0) } == true
+        }
+        let values = validDays.reduce(into: [Int: Int]()) { result, day in
             guard day.providerId == provider.id,
                   day.windowKind == windowKind,
                   let latestUsedPercent = day.latestUsedPercent,
@@ -102,11 +109,46 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
             result[day.dayStartEpoch] = latestUsedPercent
         }
 
-        return dayEpochs(
-            count: range.dayCount,
-            endingAtDayEpoch: endingAtDayEpoch,
-            calendar: calendar
-        ).map {
+        let epochs: [Int]
+        if let count = range.fixedDayCount {
+            epochs = dayEpochs(
+                count: count,
+                endingAtDayEpoch: endingAtDayEpoch,
+                calendar: calendar
+            )
+        } else {
+            guard let cycleStartEpoch = matchingDays.compactMap(\.cycleStartEpoch).max() else {
+                return nil
+            }
+            let endingDay = calendar.startOfDay(
+                for: Date(timeIntervalSince1970: TimeInterval(endingAtDayEpoch))
+            )
+            let cycleStartDay = calendar.startOfDay(
+                for: Date(timeIntervalSince1970: TimeInterval(cycleStartEpoch))
+            )
+            guard cycleStartDay <= endingDay,
+                  let earliestAvailableEpoch = matchingDays
+                      .map(\.dayStartEpoch)
+                      .filter({ $0 >= Int(cycleStartDay.timeIntervalSince1970) })
+                      .min(),
+                  let retainedBoundary = calendar.date(
+                      byAdding: .day,
+                      value: -(WidgetSnapshot.maximumHistoryDayCount - 1),
+                      to: endingDay
+                  ) else { return nil }
+            let earliestAvailableDay = calendar.startOfDay(
+                for: Date(timeIntervalSince1970: TimeInterval(earliestAvailableEpoch))
+            )
+            let boundedStart = max(max(cycleStartDay, retainedBoundary), earliestAvailableDay)
+            guard boundedStart <= endingDay else { return nil }
+            epochs = dayEpochs(
+                from: boundedStart,
+                through: endingDay,
+                calendar: calendar
+            )
+        }
+
+        return epochs.map {
             WidgetTrendPoint(dayStartEpoch: $0, latestUsedPercent: values[$0])
         }
     }
@@ -129,6 +171,21 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         return dates.map { Int($0.timeIntervalSince1970) }
     }
 
+    private static func dayEpochs(
+        from firstDay: Date,
+        through endingDay: Date,
+        calendar: Calendar
+    ) -> [Int] {
+        var dates: [Date] = []
+        var date = firstDay
+        while date <= endingDay, dates.count < WidgetSnapshot.maximumHistoryDayCount {
+            dates.append(date)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: date) else { return [] }
+            date = next
+        }
+        return dates.map { Int($0.timeIntervalSince1970) }
+    }
+
     private static func selectedProviders(
         _ providers: [WidgetProviderSnapshot],
         scope: WidgetHeatMapScope,
@@ -147,9 +204,16 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         provider: WidgetProviderSnapshot,
         windowKind: String?
     ) -> [Int: Double] {
-        let resolvedKind = windowKind ?? provider.windows.lazy
-            .map(\.kind)
-            .first { kind in provider.history.contains { $0.windowKind == kind } }
+        let resolvedKind = windowKind ?? WidgetWindowSelector.select(
+            from: provider.windows.map {
+                ProviderWindow(
+                    kind: $0.kind,
+                    label: $0.label,
+                    usedPercent: $0.usedPercent,
+                    resetAtEpoch: $0.resetAtEpoch
+                )
+            }
+        ).outer?.kind
         guard let resolvedKind else { return [:] }
 
         return provider.history.reduce(into: [:]) { values, day in
