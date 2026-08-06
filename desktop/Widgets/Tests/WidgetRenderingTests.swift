@@ -57,6 +57,81 @@ func everyTimelineFailureStateHasSubstantiveAccessibleRendering(state: WidgetTim
 }
 
 @MainActor
+@Test func dashboardScheduledResetUsesDynamicTimerContentAndPendingStaysExact() {
+    let resetDate = Date(timeIntervalSince1970: 1_800_000_000)
+    let scheduled = WidgetRingPresentation(
+        windowKind: "weekly",
+        label: "Weekly",
+        usedPercent: 42,
+        displayedPercent: 42,
+        resetState: .scheduled(epoch: Int(resetDate.timeIntervalSince1970))
+    )
+    let pending = WidgetRingPresentation(
+        windowKind: "weekly",
+        label: "Weekly",
+        usedPercent: 42,
+        displayedPercent: 42,
+        resetState: .pending
+    )
+
+    #expect(ResetSummarySemantics(
+        presentation: scheduled,
+        showsCountdown: true,
+        showsAbsoluteDate: false
+    ).content == [.timer(resetDate)])
+    #expect(ResetSummarySemantics(
+        presentation: pending,
+        showsCountdown: true,
+        showsAbsoluteDate: true
+    ).content == [.text("Refresh pending")])
+    assertVisibleRender(
+        ResetSummary(
+            presentation: scheduled,
+            showsCountdown: true,
+            showsAbsoluteDate: false,
+            showsLabel: false,
+            compact: true
+        ),
+        size: CGSize(width: 170, height: 55),
+        colorScheme: .dark
+    )
+}
+
+@Test(arguments: [
+    AgentMeterWidgetCore.WidgetFamily.medium,
+    .large,
+    .extraLarge,
+])
+func dashboardInteractionPlanUsesDistinctValidatedProviderLinksOutsideSmall(
+    family: AgentMeterWidgetCore.WidgetFamily
+) {
+    let presentation = FictionalDashboardPresentationSource.presentation(
+        for: configuredDashboardIntent(),
+        family: family
+    )
+    let interactions = DashboardWidgetInteractions(presentation: presentation)
+
+    #expect(interactions.widgetURL == nil)
+    #expect(interactions.providerURLs.count == presentation.providers.count)
+    #expect(interactions.providerURLs.values.allSatisfy {
+        if case .provider = AgentMeterRoute(url: $0) { return true }
+        return false
+    })
+    #expect(Set(interactions.providerURLs.values).count == presentation.providers.count)
+}
+
+@Test func smallDashboardKeepsOneWidgetURLAndNoNestedProviderLinks() {
+    let presentation = FictionalDashboardPresentationSource.presentation(
+        for: configuredDashboardIntent(),
+        family: .small
+    )
+    let interactions = DashboardWidgetInteractions(presentation: presentation)
+
+    #expect(interactions.widgetURL == DashboardWidgetDestination.url(for: presentation))
+    #expect(interactions.providerURLs.isEmpty)
+}
+
+@MainActor
 @Test(arguments: [ColorScheme.light, .dark])
 func dashboardUnavailableHistoryStateHasSubstantiveRendering(colorScheme: ColorScheme) {
     let intent = configuredDashboardIntent()
@@ -788,4 +863,32 @@ private func assertSubstantiveRender<V: View>(
 
     #expect(Double(nontransparentCount) / Double(max(sampleCount, 1)) >= 0.05)
     #expect(colors.count >= 6)
+}
+
+@MainActor
+private func assertVisibleRender<V: View>(
+    _ view: V,
+    size: CGSize,
+    colorScheme: ColorScheme
+) {
+    let renderer = ImageRenderer(
+        content: view
+            .frame(width: size.width, height: size.height)
+            .environment(\.colorScheme, colorScheme)
+    )
+    renderer.proposedSize = ProposedViewSize(size)
+    renderer.scale = 1
+
+    let image = renderer.nsImage
+    #expect(image != nil)
+    guard let image,
+          let data = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: data) else { return }
+
+    let hasVisiblePixel = (0..<bitmap.pixelsHigh).contains { y in
+        (0..<bitmap.pixelsWide).contains { x in
+            bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0 >= 0.05
+        }
+    }
+    #expect(hasVisiblePixel)
 }

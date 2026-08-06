@@ -22,6 +22,13 @@ private let fixedCalendar: Calendar = {
 
     try Data("not json".utf8).write(to: store.url)
     #expect(loader.load() == .unavailable)
+    let corruptEntry = DashboardTimelineProvider(
+        loader: loader,
+        now: { fixedNow },
+        calendar: fixedCalendar
+    ).snapshotEntry(for: DashboardWidgetIntent(), family: .small)
+    #expect(corruptEntry.state == .unavailable)
+    #expect(corruptEntry.state?.message == "Agent unavailable")
 
     try Data("""
     {"schemaVersion":2}
@@ -38,13 +45,17 @@ private let fixedCalendar: Calendar = {
         generatedAt: 18_000,
         providers: [provider(resetAt: 20_600)]
     ))
-    let provider = DashboardTimelineProvider(
+    let timelineProvider = DashboardTimelineProvider(
         loader: WidgetSnapshotLoader(store: store),
         now: { fixedNow },
         calendar: fixedCalendar
     )
 
-    let timeline = provider.widgetTimeline(
+    let timeline = timelineProvider.widgetTimeline(
+        for: DashboardWidgetIntent(),
+        family: .large
+    )
+    let schedule = timelineProvider.widgetSchedule(
         for: DashboardWidgetIntent(),
         family: .large
     )
@@ -54,6 +65,16 @@ private let fixedCalendar: Calendar = {
     #expect(timeline.entries.first?.presentation?.providers.first?.rings.first?.resetState == .scheduled(epoch: 20_600))
     #expect(timeline.entries[1].presentation?.providers.first?.rings.first?.resetState == .pending)
     #expect(timeline.entries[1].presentation?.providers.first?.rings.first?.resetText == "Refresh pending")
+    #expect(schedule.reloadPolicy == .after(Date(timeIntervalSince1970: 106_400)))
+
+    try store.writeIfChanged(snapshot(
+        generatedAt: 19_900,
+        providers: [provider(resetAt: 20_600)]
+    ))
+    #expect(timelineProvider.snapshotEntry(
+        for: DashboardWidgetIntent(),
+        family: .large
+    ).presentation?.freshness == .fresh)
 }
 
 @Test func focusSnapshotReportsSelectedProviderAbsenceWithoutFallingBack() throws {

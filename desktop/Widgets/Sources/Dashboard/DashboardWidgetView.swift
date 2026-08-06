@@ -163,6 +163,25 @@ enum DashboardWidgetDestination {
     }
 }
 
+struct DashboardWidgetInteractions: Equatable {
+    let widgetURL: URL?
+    let providerURLs: [String: URL]
+
+    init(presentation: WidgetPresentation) {
+        if presentation.family == .small {
+            widgetURL = DashboardWidgetDestination.url(for: presentation)
+            providerURLs = [:]
+            return
+        }
+
+        widgetURL = nil
+        providerURLs = presentation.providers.reduce(into: [:]) { result, provider in
+            guard AgentMeterRoute.isValidProviderID(provider.id) else { return }
+            result[provider.id] = AgentMeterRoute.provider(provider.id).url
+        }
+    }
+}
+
 struct DashboardWidgetView: View {
     let presentation: WidgetPresentation
     @Environment(\.colorScheme) private var colorScheme
@@ -183,7 +202,22 @@ struct DashboardWidgetView: View {
         )
     }
 
+    private var interactions: DashboardWidgetInteractions {
+        DashboardWidgetInteractions(presentation: presentation)
+    }
+
     var body: some View {
+        Group {
+            if let widgetURL = interactions.widgetURL {
+                widgetContent.widgetURL(widgetURL)
+            } else {
+                widgetContent
+            }
+        }
+        .privacySensitive()
+    }
+
+    private var widgetContent: some View {
         Group {
             if presentation.providers.isEmpty {
                 WidgetStateView(title: "Providers unavailable", systemImage: "person.2.badge.gearshape")
@@ -196,8 +230,6 @@ struct DashboardWidgetView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .containerBackground(for: .widget) { palette.background }
         .preferredColorScheme(palette.preferredColorScheme)
-        .widgetURL(DashboardWidgetDestination.url(for: presentation))
-        .privacySensitive()
     }
 
     @ViewBuilder
@@ -273,20 +305,36 @@ struct DashboardWidgetView: View {
             spacing: layoutPlan.spacing
         ) {
             ForEach(presentation.providers, id: \.id) { provider in
-                DashboardProviderRow(
-                    provider: provider,
-                    percentageMode: presentation.configuration.percentageMode,
-                    modules: presentation.modules,
-                    freshness: presentation.freshness,
-                    showsResetCountdown: presentation.configuration.showsResetCountdown,
-                    showsAbsoluteResetDate: presentation.configuration.showsAbsoluteResetDate,
-                    theme: presentation.configuration.theme,
-                    style: layoutPlan.rowStyle,
-                    additionalWindowLimit: semantics.additionalWindowLimit,
-                    showsMetadata: layoutPlan.showsMetadata
-                )
+                if let destination = interactions.providerURLs[provider.id] {
+                    Link(destination: destination) {
+                        providerRow(provider)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        palette.track.opacity(0.45),
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
+                } else {
+                    providerRow(provider)
+                }
             }
         }
+    }
+
+    private func providerRow(_ provider: WidgetProviderPresentation) -> some View {
+        DashboardProviderRow(
+            provider: provider,
+            percentageMode: presentation.configuration.percentageMode,
+            modules: presentation.modules,
+            freshness: presentation.freshness,
+            showsResetCountdown: presentation.configuration.showsResetCountdown,
+            showsAbsoluteResetDate: presentation.configuration.showsAbsoluteResetDate,
+            theme: presentation.configuration.theme,
+            style: layoutPlan.rowStyle,
+            additionalWindowLimit: semantics.additionalWindowLimit,
+            showsMetadata: layoutPlan.showsMetadata
+        )
     }
 
     @ViewBuilder

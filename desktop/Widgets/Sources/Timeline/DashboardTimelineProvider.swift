@@ -69,7 +69,14 @@ struct DashboardTimelineProvider: AppIntentTimelineProvider {
         for configuration: DashboardWidgetIntent,
         family: AgentMeterWidgetCore.WidgetFamily
     ) -> Timeline<WidgetTimelineEntry> {
-        WidgetTimelineFactory.timeline(
+        widgetSchedule(for: configuration, family: family).timeline
+    }
+
+    func widgetSchedule(
+        for configuration: DashboardWidgetIntent,
+        family: AgentMeterWidgetCore.WidgetFamily
+    ) -> WidgetTimelineSchedule {
+        WidgetTimelineFactory.schedule(
             loadResult: loader.load(),
             configuration: IntentConfigurationAdapter.dashboard(configuration),
             family: family,

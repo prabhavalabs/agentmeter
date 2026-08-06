@@ -70,7 +70,7 @@ enum WidgetTimelineViewState: CaseIterable, Equatable, Sendable {
     }
 }
 
-struct WidgetTimelineEntry: TimelineEntry, Equatable {
+struct WidgetTimelineEntry: TimelineEntry, Equatable, Sendable {
     let date: Date
     let presentation: WidgetPresentation?
     let state: WidgetTimelineViewState?
@@ -99,6 +99,25 @@ struct WidgetTimelineEntry: TimelineEntry, Equatable {
 }
 
 typealias FictionalUsageEntry = WidgetTimelineEntry
+
+enum AgentMeterTimelineReloadPolicy: Equatable, Sendable {
+    case after(Date)
+
+    var widgetKitPolicy: TimelineReloadPolicy {
+        switch self {
+        case let .after(date): .after(date)
+        }
+    }
+}
+
+struct WidgetTimelineSchedule: Equatable, Sendable {
+    let entries: [WidgetTimelineEntry]
+    let reloadPolicy: AgentMeterTimelineReloadPolicy
+
+    var timeline: Timeline<WidgetTimelineEntry> {
+        Timeline(entries: entries, policy: reloadPolicy.widgetKitPolicy)
+    }
+}
 
 struct WidgetTimelineStateView: View {
     let state: WidgetTimelineViewState
@@ -147,15 +166,15 @@ enum WidgetTimelineFactory {
         }
     }
 
-    static func timeline(
+    static func schedule(
         loadResult: WidgetSnapshotLoadResult,
         configuration: WidgetRenderConfiguration,
         family: AgentMeterWidgetCore.WidgetFamily,
         now: Date,
         calendar: Calendar
-    ) -> Timeline<WidgetTimelineEntry> {
+    ) -> WidgetTimelineSchedule {
         guard case let .snapshot(snapshot) = loadResult else {
-            return Timeline(
+            return WidgetTimelineSchedule(
                 entries: [snapshotEntry(
                     loadResult: loadResult,
                     configuration: configuration,
@@ -163,7 +182,7 @@ enum WidgetTimelineFactory {
                     date: now,
                     calendar: calendar
                 )],
-                policy: .after(now.addingTimeInterval(unavailableRetryInterval))
+                reloadPolicy: .after(now.addingTimeInterval(unavailableRetryInterval))
             )
         }
 
@@ -178,9 +197,9 @@ enum WidgetTimelineFactory {
                 calendar: calendar
             )
         }
-        return Timeline(
+        return WidgetTimelineSchedule(
             entries: entries,
-            policy: .after(Date(timeIntervalSince1970: TimeInterval(plan.reloadAfterEpoch)))
+            reloadPolicy: .after(Date(timeIntervalSince1970: TimeInterval(plan.reloadAfterEpoch)))
         )
     }
 

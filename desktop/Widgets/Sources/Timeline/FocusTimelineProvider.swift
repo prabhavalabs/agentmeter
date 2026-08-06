@@ -69,7 +69,14 @@ struct FocusTimelineProvider: AppIntentTimelineProvider {
         for configuration: FocusWidgetIntent,
         family: AgentMeterWidgetCore.WidgetFamily
     ) -> Timeline<WidgetTimelineEntry> {
-        WidgetTimelineFactory.timeline(
+        widgetSchedule(for: configuration, family: family).timeline
+    }
+
+    func widgetSchedule(
+        for configuration: FocusWidgetIntent,
+        family: AgentMeterWidgetCore.WidgetFamily
+    ) -> WidgetTimelineSchedule {
+        WidgetTimelineFactory.schedule(
             loadResult: loader.load(),
             configuration: IntentConfigurationAdapter.focus(configuration),
             family: family,

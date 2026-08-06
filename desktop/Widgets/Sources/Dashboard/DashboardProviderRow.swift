@@ -41,45 +41,11 @@ struct DashboardResetPresentation: Equatable {
         showsAbsoluteDate: Bool,
         relativeTo referenceDate: Date = .now
     ) {
-        guard case let .scheduled(epoch) = ring.resetState else {
-            lines = [DashboardProviderCopy.reset(ring)]
-            return
-        }
-
-        let resetDate = Date(timeIntervalSince1970: TimeInterval(epoch))
-        var scheduledLines: [String] = []
-        if showsCountdown {
-            scheduledLines.append("Reset countdown \(Self.countdown(from: referenceDate, to: resetDate))")
-        }
-        if showsAbsoluteDate {
-            scheduledLines.append(
-                "Reset date \(resetDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
-            )
-        }
-        lines = scheduledLines.isEmpty ? ["Reset scheduled"] : scheduledLines
-    }
-
-    private static func countdown(from referenceDate: Date, to resetDate: Date) -> String {
-        let seconds = Int(resetDate.timeIntervalSince(referenceDate).rounded())
-        let magnitude = abs(seconds)
-        let value: Int
-        let unit: String
-
-        if magnitude >= 86_400 {
-            value = max(1, magnitude / 86_400)
-            unit = value == 1 ? "day" : "days"
-        } else if magnitude >= 3_600 {
-            value = max(1, magnitude / 3_600)
-            unit = value == 1 ? "hour" : "hours"
-        } else if magnitude >= 60 {
-            value = max(1, magnitude / 60)
-            unit = value == 1 ? "minute" : "minutes"
-        } else {
-            value = magnitude
-            unit = value == 1 ? "second" : "seconds"
-        }
-
-        return seconds >= 0 ? "in \(value) \(unit)" : "\(value) \(unit) ago"
+        lines = ResetSummarySemantics(
+            presentation: ring,
+            showsCountdown: showsCountdown,
+            showsAbsoluteDate: showsAbsoluteDate
+        ).accessibilityLines(relativeTo: referenceDate)
     }
 }
 
@@ -269,17 +235,13 @@ struct DashboardProviderRow: View {
     }
 
     private func resetDetails(_ ring: WidgetRingPresentation) -> some View {
-        let presentation = DashboardResetPresentation(
-            ring: ring,
+        ResetSummary(
+            presentation: ring,
             showsCountdown: showsResetCountdown,
-            showsAbsoluteDate: showsAbsoluteResetDate
+            showsAbsoluteDate: showsAbsoluteResetDate,
+            showsLabel: false,
+            compact: true
         )
-        return VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(presentation.lines.enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .lineLimit(1)
-            }
-        }
         .foregroundStyle(palette.secondaryText)
     }
 
