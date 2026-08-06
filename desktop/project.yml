@@ -147,6 +147,9 @@ targets:
       - path: Widgets/Sources/Focus
         excludes:
           - FocusWidgetPreviews.swift
+      - path: Widgets/Sources/Dashboard
+        excludes:
+          - DashboardWidgetPreviews.swift
     dependencies:
       - package: AgentMeterDesktop
         product: AgentMeterCore

@@ -14,6 +14,9 @@ import Testing
         "Sources/Components/UsageTrendChart.swift",
         "Sources/Components/WidgetProviderMark.swift",
         "Sources/Focus/FocusWidgetView.swift",
+        "Sources/Dashboard/DashboardWidgetView.swift",
+        "Sources/Dashboard/DashboardProviderRow.swift",
+        "Sources/Dashboard/DashboardHistoryPanel.swift",
     ]
     let opacityPattern = try NSRegularExpression(
         pattern: #"(?:\b(?:accent|color|[A-Za-z0-9_]*Accent)\b|dataAccent\([^)]*\))\s*\.\s*opacity\s*\("#

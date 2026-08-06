@@ -7,16 +7,19 @@ struct UsageHeatMap: View {
     let moderateAccent: Color
     let highAccent: Color
     let veryHighAccent: Color
+    var showsHeader = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Label("Allowance consumption", systemImage: "square.grid.3x3.fill")
-                    .font(.caption.weight(.semibold))
-                Spacer()
-                Text(periodLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            if showsHeader {
+                HStack {
+                    Label("Allowance consumption", systemImage: "square.grid.3x3.fill")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(periodLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if projection.cells.isEmpty {

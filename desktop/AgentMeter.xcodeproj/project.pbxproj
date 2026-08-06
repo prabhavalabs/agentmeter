@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00DFF7236F53C66669AED854 /* DashboardWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05658DC367B0D76481945762 /* DashboardWidgetView.swift */; };
 		014918B5180A3AAF4B874F53 /* WidgetProviderMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217F450DE57448F2A4DAE61D /* WidgetProviderMark.swift */; };
 		065A134909B7C5D408E0547B /* WidgetTimelinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FA3318F9F210BCD7B23736 /* WidgetTimelinePlannerTests.swift */; };
 		078495905FB8F613E38321FD /* ModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFCBB242FB66501228665201 /* ModelDecodingTests.swift */; };
@@ -14,6 +15,7 @@
 		0BE7B0EE848ABCCB96125535 /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5863C51B35CD07EB29ACAF19 /* AgentMeterCore */; };
 		0E086006064B8E265394673D /* DualUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAAF3043A988574588FE6408 /* DualUsageRing.swift */; };
 		1585EFB283E9FA601FD9937F /* JsonLineDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3877C43A7260CDD43E8DD2F /* JsonLineDecoderTests.swift */; };
+		186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
 		1C54823D1578345A395D9FCA /* WidgetStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA66ED3180281C864B89381B /* WidgetStateView.swift */; };
 		1DC79AA66ABD329092045169 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
 		217C39145DC5D1F9F9F32E8B /* BridgeDistributionModeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F9F0FA5846787D50560BBB7 /* BridgeDistributionModeTests.swift */; };
@@ -26,13 +28,17 @@
 		2BF3A08175781732EFC0EDA3 /* ResetSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003F811271504D138EE2A5 /* ResetSummary.swift */; };
 		3358B769518D74382D329342 /* UsageHistoryRangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6755288048AEAE724C5A68D /* UsageHistoryRangeTests.swift */; };
 		35318CE9F148AB4D7B954553 /* WidgetHistoryAccessibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB43D81CBA6586FC4F0F7D76 /* WidgetHistoryAccessibility.swift */; };
+		35F1ABB2F2137947391E1436 /* DashboardHistoryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E543E3001B33FDF33AFB0DA /* DashboardHistoryPanel.swift */; };
 		38E62E4FCAFB126DA80EFA7A /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 60A8AC82D088ECCE973FA9DE /* AgentMeterCore */; };
 		3A51611A341D0CE357F70B77 /* ApplicationPresentationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852F8F27784C5F61DC4B1659 /* ApplicationPresentationControllerTests.swift */; };
 		3B01A3F52D9592993AF7390B /* AgentMeterIPC in Frameworks */ = {isa = PBXBuildFile; productRef = 20A743070A7FE719F2D00E07 /* AgentMeterIPC */; };
 		3BEA4AA7D5171BB9F9BF73F6 /* MenuBarPanelViewportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76F177E3765BC7131F98A53 /* MenuBarPanelViewportTests.swift */; };
 		45DED249BA987AED6E3B12C4 /* AppPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9758172F3B7C809F3EBF7AB /* AppPreferencesTests.swift */; };
+		46D8BEB854BB8FCCA8B71A9C /* FictionalDashboardPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D5F8E2A76AB75009241ECD /* FictionalDashboardPresentationSource.swift */; };
+		4A67FFB071554B8A7722AC38 /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
 		4F520D7E5E4F04AAE62E41CE /* DisplaySettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B425590ADBC293AA842B6E /* DisplaySettingsTests.swift */; };
 		6204D558B92C094A401A83E4 /* WidgetSnapshotCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEA3A95DCD61DDB08963A5F /* WidgetSnapshotCoordinatorTests.swift */; };
+		625E8E27279DE8F71E7CC10E /* DashboardWidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5D85D380E7FB0C4FA14A73 /* DashboardWidgetPreviews.swift */; };
 		62754311310BA82DEEB16722 /* FocusWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A46648A8519DC4FEE921AE2 /* FocusWidgetView.swift */; };
 		6865E54D0053877B9B8B079D /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = A5CA30D375E2693BCFF620C1 /* Fixtures */; };
 		6B1F713DDCB6A396ADAEF3D8 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F97E03D6B10AA2E41F0AC4F /* WidgetTheme.swift */; };
@@ -59,8 +65,10 @@
 		AEA8C3A6B0D4CCD1E1E29A61 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
 		AEF22BCF9DA0F2BA6AD5FE54 /* AgentMeterApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EEB34CD5DF4C166624B6AF /* AgentMeterApplication.swift */; };
 		B59D1DEC169DE8AE13AA2BED /* FictionalFocusPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */; };
+		B5C957AED268409CDDFC0ED7 /* WidgetRenderingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA39D3AEBBB2DBE363A85A55 /* WidgetRenderingTests.swift */; };
 		B7804E5B7FC9072D3463CC0A /* AgentMeterIPC in Frameworks */ = {isa = PBXBuildFile; productRef = D404C475DFAD1AB50297A0EA /* AgentMeterIPC */; };
 		BE9E6B42E29A3EA812476A73 /* AgentMeterWidgetCore in Frameworks */ = {isa = PBXBuildFile; productRef = DE7401BC752C31C8EFAFD8CD /* AgentMeterWidgetCore */; };
+		C1950A820CF460095F05FD9E /* DashboardWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05658DC367B0D76481945762 /* DashboardWidgetView.swift */; };
 		C371CE66287CBB1A45917788 /* DeviceScannerPresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFA26D0ED2F597525BA6880C /* DeviceScannerPresentationTests.swift */; };
 		C3DCB17E2F2D71D470DBDE8A /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F97E03D6B10AA2E41F0AC4F /* WidgetTheme.swift */; };
 		CA83694A5221EE5499D5DCC4 /* WidgetSnapshotStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FDF1585B479FACF779FEA4E /* WidgetSnapshotStoreTests.swift */; };
@@ -72,6 +80,7 @@
 		D5682B129D099CD4927E8142 /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9DB2157B0EE24FF530488444 /* AgentMeterCore */; };
 		D6E0355A2AAB80303F2B8F0A /* AgentMeterWidgetCore in Frameworks */ = {isa = PBXBuildFile; productRef = 59C3602D25452BE409C9AC20 /* AgentMeterWidgetCore */; };
 		D73494C15E937C6742A0F0B5 /* FocusWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A46648A8519DC4FEE921AE2 /* FocusWidgetView.swift */; };
+		D7A1F9E1DB470B2D1814B2C4 /* FictionalDashboardPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D5F8E2A76AB75009241ECD /* FictionalDashboardPresentationSource.swift */; };
 		D813CF16BA480F4BF50073AC /* WidgetProviderMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217F450DE57448F2A4DAE61D /* WidgetProviderMark.swift */; };
 		D94563EF2D0A365E559943E7 /* WidgetStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA66ED3180281C864B89381B /* WidgetStateView.swift */; };
 		DB13958ABD51B182979087CF /* FakeBridgeAPITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF805B05C5FBDF3855AF432 /* FakeBridgeAPITests.swift */; };
@@ -83,6 +92,7 @@
 		E13AFE006C01FEF22C3EFF57 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = B10AEEC4278BA59CFCCC75D3 /* AppIcon-1024.png */; };
 		E3A096550481D2DA737A6D2B /* FormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F0045ED6F2F4AABEA97B00 /* FormattingTests.swift */; };
 		F09D327749401CDCA2EA49C6 /* DualUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAAF3043A988574588FE6408 /* DualUsageRing.swift */; };
+		F52003EF03931C249D5A1CDB /* DashboardHistoryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E543E3001B33FDF33AFB0DA /* DashboardHistoryPanel.swift */; };
 		F984CCCF0E7258BBDDEEE21A /* WidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DCDD224CB044A3B7C37E75B /* WidgetIntents.swift */; };
 		FD716A3B45EB0D32CB5F9C3A /* UsageHeatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB1017B8B9694012907C61E /* UsageHeatMap.swift */; };
 /* End PBXBuildFile section */
@@ -112,6 +122,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardProviderRow.swift; sourceTree = "<group>"; };
+		05658DC367B0D76481945762 /* DashboardWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetView.swift; sourceTree = "<group>"; };
 		09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FictionalFocusPresentationSource.swift; sourceTree = "<group>"; };
 		09D518E9D78EC1CFD9BAE036 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		0FDF1585B479FACF779FEA4E /* WidgetSnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStoreTests.swift; sourceTree = "<group>"; };
@@ -141,15 +153,19 @@
 		8CE8E3A70A6761C9B8438227 /* AgentMeter.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AgentMeter.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8D1444B7F608673CCF964152 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		8D231C42D29B354A81B008F8 /* WidgetIntentAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetIntentAdapterTests.swift; sourceTree = "<group>"; };
+		8E543E3001B33FDF33AFB0DA /* DashboardHistoryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardHistoryPanel.swift; sourceTree = "<group>"; };
 		917B39DE8880DC9107BAFE0C /* WidgetAccentContrastTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetAccentContrastTests.swift; sourceTree = "<group>"; };
 		99F0045ED6F2F4AABEA97B00 /* FormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingTests.swift; sourceTree = "<group>"; };
 		A1B425590ADBC293AA842B6E /* DisplaySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettingsTests.swift; sourceTree = "<group>"; };
 		A5CA30D375E2693BCFF620C1 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = Tests/AgentMeterCoreTests/Fixtures; sourceTree = SOURCE_ROOT; };
 		A6755288048AEAE724C5A68D /* UsageHistoryRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryRangeTests.swift; sourceTree = "<group>"; };
+		AA39D3AEBBB2DBE363A85A55 /* WidgetRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRenderingTests.swift; sourceTree = "<group>"; };
 		AA66ED3180281C864B89381B /* WidgetStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStateView.swift; sourceTree = "<group>"; };
 		B10AEEC4278BA59CFCCC75D3 /* AppIcon-1024.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "AppIcon-1024.png"; sourceTree = "<group>"; };
 		B1E4A641B6817E0301B06A92 /* WidgetSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotTests.swift; sourceTree = "<group>"; };
+		B3D5F8E2A76AB75009241ECD /* FictionalDashboardPresentationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FictionalDashboardPresentationSource.swift; sourceTree = "<group>"; };
 		BB43D81CBA6586FC4F0F7D76 /* WidgetHistoryAccessibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetHistoryAccessibility.swift; sourceTree = "<group>"; };
+		BD5D85D380E7FB0C4FA14A73 /* DashboardWidgetPreviews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetPreviews.swift; sourceTree = "<group>"; };
 		BEF805B05C5FBDF3855AF432 /* FakeBridgeAPITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakeBridgeAPITests.swift; sourceTree = "<group>"; };
 		BFCBB242FB66501228665201 /* ModelDecodingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDecodingTests.swift; sourceTree = "<group>"; };
 		BFEA3A95DCD61DDB08963A5F /* WidgetSnapshotCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotCoordinatorTests.swift; sourceTree = "<group>"; };
@@ -245,8 +261,21 @@
 				917B39DE8880DC9107BAFE0C /* WidgetAccentContrastTests.swift */,
 				54E63E3C7DC4F9187A7D37C5 /* WidgetComponentRenderingTests.swift */,
 				8D231C42D29B354A81B008F8 /* WidgetIntentAdapterTests.swift */,
+				AA39D3AEBBB2DBE363A85A55 /* WidgetRenderingTests.swift */,
 			);
 			path = Tests;
+			sourceTree = "<group>";
+		};
+		416F5D01E80CCDFAD69DF32D /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				8E543E3001B33FDF33AFB0DA /* DashboardHistoryPanel.swift */,
+				0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */,
+				BD5D85D380E7FB0C4FA14A73 /* DashboardWidgetPreviews.swift */,
+				05658DC367B0D76481945762 /* DashboardWidgetView.swift */,
+				B3D5F8E2A76AB75009241ECD /* FictionalDashboardPresentationSource.swift */,
+			);
+			path = Dashboard;
 			sourceTree = "<group>";
 		};
 		44830A8DC9E60DC2452C6309 /* Resources */ = {
@@ -348,6 +377,7 @@
 			children = (
 				BAD05300E067377968E675B9 /* Components */,
 				4E80311CB39B0D60D404BB81 /* Configuration */,
+				416F5D01E80CCDFAD69DF32D /* Dashboard */,
 				6F844B9B69D3D690FE45B9EB /* Focus */,
 				D17A818060E897F6B6184769 /* Timeline */,
 				ED5E31E9B3E09332E93259A8 /* AgentMeterWidgetBundle.swift */,
@@ -664,7 +694,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				7F1665A78DB4B63BF5464AE5 /* AgentMeterWidgetBundle.swift in Sources */,
+				F52003EF03931C249D5A1CDB /* DashboardHistoryPanel.swift in Sources */,
+				4A67FFB071554B8A7722AC38 /* DashboardProviderRow.swift in Sources */,
+				625E8E27279DE8F71E7CC10E /* DashboardWidgetPreviews.swift in Sources */,
+				00DFF7236F53C66669AED854 /* DashboardWidgetView.swift in Sources */,
 				0E086006064B8E265394673D /* DualUsageRing.swift in Sources */,
+				46D8BEB854BB8FCCA8B71A9C /* FictionalDashboardPresentationSource.swift in Sources */,
 				776168455B8CF6B7B4273AE2 /* FictionalFocusPresentationSource.swift in Sources */,
 				E0D2940E3CF48A09DBBD5035 /* FocusWidgetPreviews.swift in Sources */,
 				62754311310BA82DEEB16722 /* FocusWidgetView.swift in Sources */,
@@ -733,7 +768,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				35F1ABB2F2137947391E1436 /* DashboardHistoryPanel.swift in Sources */,
+				186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */,
+				C1950A820CF460095F05FD9E /* DashboardWidgetView.swift in Sources */,
 				F09D327749401CDCA2EA49C6 /* DualUsageRing.swift in Sources */,
+				D7A1F9E1DB470B2D1814B2C4 /* FictionalDashboardPresentationSource.swift in Sources */,
 				B59D1DEC169DE8AE13AA2BED /* FictionalFocusPresentationSource.swift in Sources */,
 				D73494C15E937C6742A0F0B5 /* FocusWidgetView.swift in Sources */,
 				CD2A26DCC7502BE27A8C8016 /* IntentConfigurationAdapter.swift in Sources */,
@@ -747,6 +786,7 @@
 				8459679050090141D921A673 /* WidgetIntentAdapterTests.swift in Sources */,
 				6E3E059524392191F5369C91 /* WidgetIntents.swift in Sources */,
 				014918B5180A3AAF4B874F53 /* WidgetProviderMark.swift in Sources */,
+				B5C957AED268409CDDFC0ED7 /* WidgetRenderingTests.swift in Sources */,
 				D94563EF2D0A365E559943E7 /* WidgetStateView.swift in Sources */,
 				6B1F713DDCB6A396ADAEF3D8 /* WidgetTheme.swift in Sources */,
 			);

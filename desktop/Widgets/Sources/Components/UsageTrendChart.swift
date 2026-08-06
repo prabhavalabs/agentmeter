@@ -6,16 +6,19 @@ struct UsageTrendChart: View {
     let projection: WidgetHistoryProjection
     let lineAccent: Color
     let pointAccent: Color
+    var showsHeader = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Label("Allowance consumption trend", systemImage: "chart.xyaxis.line")
-                    .font(.caption.weight(.semibold))
-                Spacer()
-                Text(windowPeriodLabel)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            if showsHeader {
+                HStack {
+                    Label("Allowance consumption trend", systemImage: "chart.xyaxis.line")
+                        .font(.caption.weight(.semibold))
+                    Spacer()
+                    Text(windowPeriodLabel)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if projection.trendPoints.isEmpty {

@@ -5,11 +5,44 @@ import WidgetKit
 
 struct FictionalUsageEntry: TimelineEntry {
     let date: Date
+    let dashboardPresentation: WidgetPresentation?
     let focusPresentation: WidgetPresentation?
 
-    init(date: Date, focusPresentation: WidgetPresentation? = nil) {
+    init(
+        date: Date,
+        dashboardPresentation: WidgetPresentation? = nil,
+        focusPresentation: WidgetPresentation? = nil
+    ) {
         self.date = date
+        self.dashboardPresentation = dashboardPresentation
         self.focusPresentation = focusPresentation
+    }
+}
+
+private struct FictionalDashboardProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> FictionalUsageEntry {
+        entry(configuration: DashboardWidgetIntent(), family: context.family)
+    }
+
+    func snapshot(for configuration: DashboardWidgetIntent, in context: Context) async -> FictionalUsageEntry {
+        entry(configuration: configuration, family: context.family)
+    }
+
+    func timeline(for configuration: DashboardWidgetIntent, in context: Context) async -> Timeline<FictionalUsageEntry> {
+        Timeline(entries: [entry(configuration: configuration, family: context.family)], policy: .never)
+    }
+
+    private func entry(
+        configuration: DashboardWidgetIntent,
+        family: WidgetKit.WidgetFamily
+    ) -> FictionalUsageEntry {
+        FictionalUsageEntry(
+            date: Date(),
+            dashboardPresentation: FictionalDashboardPresentationSource.presentation(
+                for: configuration,
+                family: family.presentationFamily
+            )
+        )
     }
 }
 
@@ -40,41 +73,21 @@ private struct FictionalFocusProvider: AppIntentTimelineProvider {
     }
 }
 
-private struct FictionalUsageProvider<Intent: WidgetConfigurationIntent>: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> FictionalUsageEntry {
-        FictionalUsageEntry(date: Date())
-    }
-
-    func snapshot(for configuration: Intent, in context: Context) async -> FictionalUsageEntry {
-        FictionalUsageEntry(date: Date())
-    }
-
-    func timeline(for configuration: Intent, in context: Context) async -> Timeline<FictionalUsageEntry> {
-        Timeline(entries: [FictionalUsageEntry(date: Date())], policy: .never)
-    }
-}
-
-private struct DashboardPlaceholderView: View {
-    var entry: FictionalUsageProvider.Entry
+private struct DashboardContentView: View {
+    let entry: FictionalUsageEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("AgentMeter", systemImage: "gauge.with.dots.needle.67percent")
-                .font(.headline)
-            Text("Example usage")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("42%")
-                .font(.system(.title, design: .rounded, weight: .semibold))
-            ProgressView(value: 0.42)
+        if let presentation = entry.dashboardPresentation {
+            DashboardWidgetView(presentation: presentation)
+        } else {
+            WidgetStateView(title: "Fictional preview unavailable", systemImage: "sparkles")
+                .containerBackground(.fill.tertiary, for: .widget)
         }
-        .padding()
-        .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 
-private struct FocusPlaceholderView: View {
-    var entry: FictionalUsageProvider.Entry
+private struct FocusContentView: View {
+    let entry: FictionalUsageEntry
 
     var body: some View {
         if let presentation = entry.focusPresentation {
@@ -93,9 +106,9 @@ struct AgentMeterDashboardWidget: Widget {
         AppIntentConfiguration(
             kind: kind,
             intent: DashboardWidgetIntent.self,
-            provider: FictionalUsageProvider<DashboardWidgetIntent>()
+            provider: FictionalDashboardProvider()
         ) { entry in
-            DashboardPlaceholderView(entry: entry)
+            DashboardContentView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Dashboard")
         .description("Overall agent allowance usage.")
@@ -112,7 +125,7 @@ struct AgentMeterFocusWidget: Widget {
             intent: FocusWidgetIntent.self,
             provider: FictionalFocusProvider()
         ) { entry in
-            FocusPlaceholderView(entry: entry)
+            FocusContentView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Focus")
         .description("Focused agent allowance limits.")
