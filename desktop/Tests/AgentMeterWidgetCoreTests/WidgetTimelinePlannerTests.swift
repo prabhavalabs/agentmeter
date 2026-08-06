@@ -65,6 +65,42 @@ import Testing
     #expect(plan.checkpoints == [10_700, 30_000, now + 86_400])
 }
 
+@Test func timelineOmitsTruncatedAdditionalResetsButKeepsBothVisibleFocusRings() {
+    let now = 10_000
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: now,
+        pollIntervalSeconds: 10_000,
+        historyStartEpoch: nil,
+        providers: [
+            WidgetProviderSnapshot(
+                id: "codex",
+                name: "Codex",
+                status: "ready",
+                updatedAtEpoch: now,
+                windows: [
+                    WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 30, resetAtEpoch: 10_300),
+                    WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: 10, resetAtEpoch: 10_400),
+                    WidgetWindowSnapshot(kind: "daily", label: "Daily", usedPercent: 5, resetAtEpoch: 10_500),
+                ],
+                history: []
+            ),
+        ]
+    )
+
+    let plan = WidgetTimelinePlanner.plan(
+        snapshot: snapshot,
+        configuration: timelineConfiguration(
+            kind: .focus,
+            providerIDs: ["codex"],
+            focusProviderID: "codex"
+        ),
+        family: .small,
+        nowEpoch: now
+    )
+
+    #expect(plan.checkpoints == [10_300, 10_400, 30_000, now + 86_400])
+}
+
 @Test func timelineOmitsPastStaleTransitionAndFallsBackForInvalidPolling() {
     let now = 10_000
     let staleSnapshot = timelineSnapshot(

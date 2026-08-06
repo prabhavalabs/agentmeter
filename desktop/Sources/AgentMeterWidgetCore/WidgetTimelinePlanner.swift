@@ -62,11 +62,34 @@ public enum WidgetTimelinePlanner {
             family: family,
             nowEpoch: nowEpoch
         )
+        let limits = renderedWindowLimits(configuration: configuration, family: family)
         return presentation.providers.flatMap { provider in
-            (provider.rings + provider.additionalWindows).compactMap { ring in
+            let windows: [WidgetRingPresentation] = Array(
+                provider.rings.prefix(limits.rings)
+            ) + Array(provider.additionalWindows.prefix(limits.additional))
+            return windows.compactMap { ring -> Int? in
                 guard case let .scheduled(epoch) = ring.resetState else { return nil }
                 return epoch
             }
+        }
+    }
+
+    private static func renderedWindowLimits(
+        configuration: WidgetRenderConfiguration,
+        family: WidgetFamily
+    ) -> (rings: Int, additional: Int) {
+        switch configuration.kind {
+        case .focus:
+            let additional = switch family {
+            case .small: 0
+            case .medium, .large: 2
+            case .extraLarge: 4
+            }
+            return (2, additional)
+        case .dashboard:
+            let rings = configuration.layout == .compact || family == .small ? 1 : 2
+            let additional = family == .extraLarge && configuration.layout != .compact ? 2 : 0
+            return (rings, additional)
         }
     }
 }
