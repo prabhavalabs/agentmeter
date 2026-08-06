@@ -2,10 +2,20 @@ import Foundation
 import Testing
 @testable import AgentMeterCore
 
+private final class AgentMeterCoreTestsBundleMarker {}
+
 private enum Fixture {
+    private static var bundle: Bundle {
+        #if SWIFT_PACKAGE
+        Bundle.module
+        #else
+        Bundle(for: AgentMeterCoreTestsBundleMarker.self)
+        #endif
+    }
+
     static func data(named name: String) throws -> Data {
         let url = try #require(
-            Bundle.module.url(
+            bundle.url(
                 forResource: name,
                 withExtension: "json",
                 subdirectory: "Fixtures"

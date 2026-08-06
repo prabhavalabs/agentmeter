@@ -1,0 +1,151 @@
+name: AgentMeter
+
+options:
+  minimumXcodeGenVersion: 2.45.4
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  AgentMeterDesktop:
+    path: .
+
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    SWIFT_VERSION: "6.0"
+
+targets:
+  AgentMeter:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/AgentMeterApp
+      - path: Resources/AppIcon-1024.png
+        buildPhase: resources
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterIPC
+      - package: AgentMeterDesktop
+        product: AgentMeterUI
+      - package: AgentMeterDesktop
+        product: AgentMeterWidgetCore
+      - target: AgentMeterWidgets
+        embed: true
+    settings:
+      base:
+        CODE_SIGN_ENTITLEMENTS: Resources/AgentMeter.entitlements
+        INFOPLIST_FILE: Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop
+        PRODUCT_NAME: AgentMeter
+        GENERATE_INFOPLIST_FILE: NO
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+
+  AgentMeterWidgets:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Widgets/Sources
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterWidgetCore
+    settings:
+      base:
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ENTITLEMENTS: Widgets/Resources/AgentMeterWidget.entitlements
+        INFOPLIST_FILE: Widgets/Resources/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.widget
+        PRODUCT_NAME: AgentMeterWidgets
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS:
+          - "$(inherited)"
+          - "@executable_path/../Frameworks"
+          - "@executable_path/../../../../Frameworks"
+
+  AgentMeterCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AgentMeterCoreTests
+        excludes:
+          - Fixtures
+      - path: Tests/AgentMeterCoreTests/Fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.core-tests
+
+  AgentMeterIPCTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AgentMeterIPCTests
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterIPC
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.ipc-tests
+
+  AgentMeterUITests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AgentMeterUITests
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterIPC
+      - package: AgentMeterDesktop
+        product: AgentMeterUI
+      - package: AgentMeterDesktop
+        product: AgentMeterWidgetCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.ui-tests
+
+  AgentMeterWidgetCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AgentMeterWidgetCoreTests
+    dependencies:
+      - package: AgentMeterDesktop
+        product: AgentMeterCore
+      - package: AgentMeterDesktop
+        product: AgentMeterWidgetCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.prabhavalabs.agentmeter.desktop.widget-core-tests
+
+schemes:
+  AgentMeter:
+    build:
+      targets:
+        AgentMeter: all
+    test:
+      gatherCoverageData: true
+      targets:
+        - AgentMeterCoreTests
+        - AgentMeterIPCTests
+        - AgentMeterUITests
+        - AgentMeterWidgetCoreTests
