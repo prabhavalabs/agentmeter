@@ -46,6 +46,26 @@ import Testing
     #expect(selection.inner?.kind == "rolling-limit")
 }
 
+@Test func sessionLikeNormalizedLongCandidatesDoNotDisplaceANonSessionOuterFallback() {
+    let candidates = [
+        window("weekly-session", "Session weekly"),
+        window("session-cycle", "Monthly allowance"),
+        window("billing-session", "Model billing window"),
+    ]
+
+    for candidate in candidates {
+        let selection = WidgetWindowSelector.select(from: [
+            candidate,
+            window("plan-cycle", "Monthly allowance"),
+            window("session", "Session"),
+        ])
+
+        #expect(selection.outer?.kind == "plan-cycle")
+        #expect(selection.inner?.kind == "session")
+        #expect(selection.additional.map(\.kind) == [candidate.kind])
+    }
+}
+
 @Test func oneWindowFallbackKeepsRingsDistinct() {
     let selection = WidgetWindowSelector.select(from: [window("daily", "Daily")])
 

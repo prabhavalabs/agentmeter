@@ -77,7 +77,9 @@ public enum WidgetWindowSelector {
         let remaining = windows.filter { $0.offset != excludedIndex }
         return firstIndex(in: remaining, matching: isExactMonthlyOrBilling)
             ?? firstIndex(in: remaining, matching: isExactWeekly)
-            ?? firstIndex(in: remaining, matching: isMonthlyBillingOrWeekly)
+            ?? firstIndex(in: remaining) {
+                isSessionLike($0) == false && isMonthlyBillingOrWeekly($0)
+            }
             ?? firstIndex(in: remaining) { isSessionLike($0) == false }
             ?? remaining.first?.offset
     }
