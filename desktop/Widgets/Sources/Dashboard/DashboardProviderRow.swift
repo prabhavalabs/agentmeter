@@ -237,12 +237,19 @@ struct DashboardProviderRow: View {
     private func resetDetails(_ ring: WidgetRingPresentation) -> some View {
         ResetSummary(
             presentation: ring,
-            showsCountdown: showsResetCountdown,
-            showsAbsoluteDate: showsAbsoluteResetDate,
+            semantics: resetComposition(for: ring),
             showsLabel: false,
             compact: true
         )
         .foregroundStyle(palette.secondaryText)
+    }
+
+    func resetComposition(for ring: WidgetRingPresentation) -> ResetSummarySemantics {
+        ResetSummarySemantics(
+            presentation: ring,
+            showsCountdown: showsResetCountdown,
+            showsAbsoluteDate: showsAbsoluteResetDate
+        )
     }
 
     @ViewBuilder

@@ -71,10 +71,14 @@ private let fixedCalendar: Calendar = {
         generatedAt: 19_900,
         providers: [provider(resetAt: 20_600)]
     ))
-    #expect(timelineProvider.snapshotEntry(
+    let freshSchedule = timelineProvider.widgetSchedule(
         for: DashboardWidgetIntent(),
         family: .large
-    ).presentation?.freshness == .fresh)
+    )
+    #expect(freshSchedule.entries.first?.presentation?.freshness == .fresh)
+    #expect(freshSchedule.entries.first?.state == nil)
+    #expect(freshSchedule.entries.map { Int($0.date.timeIntervalSince1970) } == [20_000, 20_600, 20_800, 106_400])
+    #expect(freshSchedule.reloadPolicy == .after(Date(timeIntervalSince1970: 106_400)))
 }
 
 @Test func focusSnapshotReportsSelectedProviderAbsenceWithoutFallingBack() throws {

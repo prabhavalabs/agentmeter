@@ -202,13 +202,13 @@ struct DashboardWidgetView: View {
         )
     }
 
-    private var interactions: DashboardWidgetInteractions {
+    var interactionComposition: DashboardWidgetInteractions {
         DashboardWidgetInteractions(presentation: presentation)
     }
 
     var body: some View {
         Group {
-            if let widgetURL = interactions.widgetURL {
+            if let widgetURL = interactionComposition.widgetURL {
                 widgetContent.widgetURL(widgetURL)
             } else {
                 widgetContent
@@ -305,7 +305,7 @@ struct DashboardWidgetView: View {
             spacing: layoutPlan.spacing
         ) {
             ForEach(presentation.providers, id: \.id) { provider in
-                if let destination = interactions.providerURLs[provider.id] {
+                if let destination = interactionComposition.providerURLs[provider.id] {
                     Link(destination: destination) {
                         providerRow(provider)
                     }

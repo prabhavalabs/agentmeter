@@ -68,17 +68,37 @@ struct ResetSummarySemantics: Equatable {
 
 struct ResetSummary: View {
     let presentation: WidgetRingPresentation
-    let showsCountdown: Bool
-    let showsAbsoluteDate: Bool
+    let semantics: ResetSummarySemantics
     var showsLabel = true
     var compact = false
 
-    private var semantics: ResetSummarySemantics {
-        ResetSummarySemantics(
+    init(
+        presentation: WidgetRingPresentation,
+        showsCountdown: Bool,
+        showsAbsoluteDate: Bool,
+        showsLabel: Bool = true,
+        compact: Bool = false
+    ) {
+        self.presentation = presentation
+        semantics = ResetSummarySemantics(
             presentation: presentation,
             showsCountdown: showsCountdown,
             showsAbsoluteDate: showsAbsoluteDate
         )
+        self.showsLabel = showsLabel
+        self.compact = compact
+    }
+
+    init(
+        presentation: WidgetRingPresentation,
+        semantics: ResetSummarySemantics,
+        showsLabel: Bool = true,
+        compact: Bool = false
+    ) {
+        self.presentation = presentation
+        self.semantics = semantics
+        self.showsLabel = showsLabel
+        self.compact = compact
     }
 
     var body: some View {
