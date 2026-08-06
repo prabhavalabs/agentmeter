@@ -9,14 +9,16 @@ let package = Package(
         .library(name: "AgentMeterCore", targets: ["AgentMeterCore"]),
         .library(name: "AgentMeterIPC", targets: ["AgentMeterIPC"]),
         .library(name: "AgentMeterUI", targets: ["AgentMeterUI"]),
+        .library(name: "AgentMeterWidgetCore", targets: ["AgentMeterWidgetCore"]),
     ],
     targets: [
         .target(name: "AgentMeterCore"),
         .target(name: "AgentMeterIPC", dependencies: ["AgentMeterCore"]),
         .target(
             name: "AgentMeterUI",
-            dependencies: ["AgentMeterCore", "AgentMeterIPC"]
+            dependencies: ["AgentMeterCore", "AgentMeterIPC", "AgentMeterWidgetCore"]
         ),
+        .target(name: "AgentMeterWidgetCore", dependencies: ["AgentMeterCore"]),
         .executableTarget(
             name: "AgentMeterApp",
             dependencies: ["AgentMeterCore", "AgentMeterIPC", "AgentMeterUI"]
@@ -33,6 +35,10 @@ let package = Package(
         .testTarget(
             name: "AgentMeterUITests",
             dependencies: ["AgentMeterCore", "AgentMeterIPC", "AgentMeterUI"]
+        ),
+        .testTarget(
+            name: "AgentMeterWidgetCoreTests",
+            dependencies: ["AgentMeterCore", "AgentMeterWidgetCore"]
         ),
     ]
 )
