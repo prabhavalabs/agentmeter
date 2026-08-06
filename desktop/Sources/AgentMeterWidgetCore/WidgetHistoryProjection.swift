@@ -1,4 +1,5 @@
 import AgentMeterCore
+import Foundation
 
 public enum WidgetHeatBand: String, Codable, Equatable, Sendable, CaseIterable {
     case zero
@@ -37,7 +38,8 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         scope: WidgetHeatMapScope,
         selectedProviderID: String? = nil,
         windowKind: String? = nil,
-        endingAtDayEpoch: Int
+        endingAtDayEpoch: Int,
+        calendar: Calendar = .current
     ) -> [WidgetHeatMapCell] {
         let selected = selectedProviders(
             providers,
@@ -47,10 +49,13 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         let valuesByProvider = selected.map { provider in
             valuesByDay(provider: provider, windowKind: windowKind)
         }
-        let start = endingAtDayEpoch - (range.dayCount - 1) * secondsPerDay
+        let dayEpochs = dayEpochs(
+            count: range.dayCount,
+            endingAtDayEpoch: endingAtDayEpoch,
+            calendar: calendar
+        )
 
-        return (0..<range.dayCount).map { offset in
-            let epoch = start + offset * secondsPerDay
+        return dayEpochs.map { epoch in
             let available = valuesByProvider.compactMap { $0[epoch] }
             guard available.isEmpty == false else {
                 return WidgetHeatMapCell(dayStartEpoch: epoch, value: nil, band: nil)
@@ -60,7 +65,23 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
         }
     }
 
-    private static let secondsPerDay = 86_400
+    private static func dayEpochs(
+        count: Int,
+        endingAtDayEpoch: Int,
+        calendar: Calendar
+    ) -> [Int] {
+        let endingDay = calendar.startOfDay(
+            for: Date(timeIntervalSince1970: TimeInterval(endingAtDayEpoch))
+        )
+        var dates = [endingDay]
+        while dates.count < count {
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: dates[0]) else {
+                return []
+            }
+            dates.insert(previous, at: 0)
+        }
+        return dates.map { Int($0.timeIntervalSince1970) }
+    }
 
     private static func selectedProviders(
         _ providers: [WidgetProviderSnapshot],

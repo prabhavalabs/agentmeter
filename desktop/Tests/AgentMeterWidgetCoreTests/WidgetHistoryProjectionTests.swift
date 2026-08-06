@@ -1,4 +1,5 @@
 import AgentMeterCore
+import Foundation
 import Testing
 @testable import AgentMeterWidgetCore
 
@@ -22,7 +23,8 @@ import Testing
         range: .days7,
         scope: .singleProvider,
         selectedProviderID: "codex",
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
 
     #expect(cells.map(\.band) == [.zero, .low, .low, .moderate, .moderate, .high, .veryHigh])
@@ -33,7 +35,8 @@ import Testing
         range: .days7,
         scope: .singleProvider,
         selectedProviderID: "codex",
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
     #expect(withGap.count == 7)
     #expect(withGap.dropLast().allSatisfy { $0.band == nil && $0.hasData == false })
@@ -50,14 +53,16 @@ import Testing
         range: .days7,
         scope: .singleProvider,
         selectedProviderID: "codex",
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
     let thirty = WidgetHistoryProjection.heatMap(
         providers: [provider],
         range: .days30,
         scope: .singleProvider,
         selectedProviderID: "codex",
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
 
     #expect(seven.count == 7)
@@ -77,7 +82,8 @@ import Testing
         range: .days7,
         scope: .singleProvider,
         selectedProviderID: "claude",
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
 
     #expect(cells.last?.value == 1)
@@ -93,7 +99,8 @@ import Testing
         ],
         range: .days7,
         scope: .combined,
-        endingAtDayEpoch: end
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
     )
 
     #expect(cells[cells.count - 2].value == 5.5)
@@ -102,6 +109,37 @@ import Testing
     #expect(cells.last?.band == .low)
     #expect(cells.first?.hasData == false)
 }
+
+@Test func heatMapUsesLocalMidnightsAcrossSpringDSTAndPreservesTheGap() {
+    var berlin = Calendar(identifier: .gregorian)
+    berlin.timeZone = TimeZone(identifier: "Europe/Berlin")!
+    let march29 = 1_774_738_800
+    let march30 = 1_774_821_600
+    let march31 = 1_774_908_000
+    let provider = historyProvider(
+        id: "codex",
+        values: [(march29, 5), (march31, 16)]
+    )
+
+    let cells = WidgetHistoryProjection.heatMap(
+        providers: [provider],
+        range: .days7,
+        scope: .singleProvider,
+        selectedProviderID: "codex",
+        endingAtDayEpoch: march31,
+        calendar: berlin
+    )
+
+    #expect(cells.suffix(3).map(\.dayStartEpoch) == [march29, march30, march31])
+    #expect(cells[cells.count - 2].dayStartEpoch - cells[cells.count - 3].dayStartEpoch == 82_800)
+    #expect(cells.suffix(3).map(\.value) == [5, nil, 16])
+}
+
+private let utcCalendar: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar
+}()
 
 private func historyProvider(
     id: String,

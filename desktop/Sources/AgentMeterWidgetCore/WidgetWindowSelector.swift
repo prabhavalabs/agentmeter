@@ -14,6 +14,15 @@ public struct WidgetWindowSelection: Equatable, Sendable {
 }
 
 public enum WidgetWindowSelector {
+    public static func historyEnabledKinds(from windows: [ProviderWindow]) -> [String] {
+        let selection = select(from: windows)
+        let prioritized = [selection.outer, selection.inner].compactMap { $0 } + selection.additional
+        var seen = Set<String>()
+        return Array(prioritized.compactMap { window in
+            seen.insert(window.kind).inserted ? window.kind : nil
+        }.prefix(WidgetSnapshot.maximumHistoryWindowCountPerProvider))
+    }
+
     public static func select(
         from windows: [ProviderWindow],
         focusOuterKind: String? = nil,

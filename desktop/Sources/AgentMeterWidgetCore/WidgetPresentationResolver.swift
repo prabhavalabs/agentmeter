@@ -1,4 +1,5 @@
 import AgentMeterCore
+import Foundation
 
 public enum WidgetFreshnessState: Equatable, Sendable {
     case fresh
@@ -91,7 +92,8 @@ public enum WidgetPresentationResolver {
         snapshot: WidgetSnapshot,
         family: WidgetFamily,
         nowEpoch: Int,
-        endingAtDayEpoch: Int? = nil
+        endingAtDayEpoch: Int? = nil,
+        calendar: Calendar = .current
     ) -> WidgetPresentation {
         let candidates = selectedProviders(configuration: configuration, snapshot: snapshot)
         let maximum = configuration.kind == .focus ? 1 : family.maximumDashboardProviders
@@ -105,7 +107,8 @@ public enum WidgetPresentationResolver {
             configuration: configuration,
             providers: resolvedSnapshots,
             modules: modules,
-            endingAtDayEpoch: endingAtDayEpoch ?? dayEpoch(containing: nowEpoch)
+            endingAtDayEpoch: endingAtDayEpoch ?? dayEpoch(containing: nowEpoch, calendar: calendar),
+            calendar: calendar
         )
 
         return WidgetPresentation(
@@ -161,6 +164,9 @@ public enum WidgetPresentationResolver {
         family: WidgetFamily
     ) -> Set<WidgetModule> {
         var result = requested.union([.usage, .primaryReset])
+        if family == .small || family == .medium {
+            result.remove(.history)
+        }
         let capacity: Int
         switch family {
         case .small: capacity = 2
@@ -180,14 +186,7 @@ public enum WidgetPresentationResolver {
         nowEpoch: Int
     ) -> WidgetProviderPresentation {
         let selection = WidgetWindowSelector.select(
-            from: provider.windows.map {
-                ProviderWindow(
-                    kind: $0.kind,
-                    label: $0.label,
-                    usedPercent: $0.usedPercent,
-                    resetAtEpoch: $0.resetAtEpoch
-                )
-            },
+            from: providerWindows(provider),
             focusOuterKind: configuration.kind == .focus ? configuration.outerWindowKind : nil,
             focusInnerKind: configuration.kind == .focus ? configuration.innerWindowKind : nil
         )
@@ -229,16 +228,24 @@ public enum WidgetPresentationResolver {
         configuration: WidgetRenderConfiguration,
         providers: [WidgetProviderSnapshot],
         modules: Set<WidgetModule>,
-        endingAtDayEpoch: Int
+        endingAtDayEpoch: Int,
+        calendar: Calendar
     ) -> WidgetHistoryProjection? {
         guard modules.contains(.history) else { return nil }
 
         let focusWindowKind = configuration.kind == .focus
-            ? configuration.outerWindowKind
+            ? providers.first.flatMap {
+                WidgetWindowSelector.select(
+                    from: providerWindows($0),
+                    focusOuterKind: configuration.outerWindowKind,
+                    focusInnerKind: configuration.innerWindowKind
+                ).outer?.kind
+            }
             : nil
         if let provider = providers.first,
            let focusWindowKind,
-           provider.history.contains(where: { $0.windowKind == focusWindowKind }) == false {
+           WidgetWindowSelector.historyEnabledKinds(from: providerWindows(provider))
+            .contains(focusWindowKind) == false {
             return WidgetHistoryProjection(cells: [], availabilityMessage: unavailableHistoryMessage)
         }
         return WidgetHistoryProjection(
@@ -248,12 +255,26 @@ public enum WidgetPresentationResolver {
                 scope: configuration.heatMapScope,
                 selectedProviderID: configuration.focusProviderID ?? providers.first?.id,
                 windowKind: focusWindowKind,
-                endingAtDayEpoch: endingAtDayEpoch
+                endingAtDayEpoch: endingAtDayEpoch,
+                calendar: calendar
             )
         )
     }
 
-    private static func dayEpoch(containing epoch: Int) -> Int {
-        epoch - epoch % 86_400
+    private static func dayEpoch(containing epoch: Int, calendar: Calendar) -> Int {
+        Int(calendar.startOfDay(
+            for: Date(timeIntervalSince1970: TimeInterval(epoch))
+        ).timeIntervalSince1970)
+    }
+
+    private static func providerWindows(_ provider: WidgetProviderSnapshot) -> [ProviderWindow] {
+        provider.windows.map {
+            ProviderWindow(
+                kind: $0.kind,
+                label: $0.label,
+                usedPercent: $0.usedPercent,
+                resetAtEpoch: $0.resetAtEpoch
+            )
+        }
     }
 }

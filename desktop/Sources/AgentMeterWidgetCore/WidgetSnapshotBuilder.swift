@@ -84,19 +84,10 @@ public struct WidgetSnapshotBuilder: Sendable {
             $0.providerId == provider.id && $0.consumedPercentPoints >= 0
         }
 
-        let availableKinds = Set(
-            validDays.lazy.map(\.windowKind)
+        let currentWindows = Array(
+            provider.windows.prefix(WidgetSnapshot.maximumWindowCountPerProvider)
         )
-        var seenKinds = Set<String>()
-        let selectedKinds = provider.windows
-            .prefix(WidgetSnapshot.maximumWindowCountPerProvider)
-            .compactMap { window -> String? in
-                guard availableKinds.contains(window.kind), seenKinds.insert(window.kind).inserted else {
-                    return nil
-                }
-                return window.kind
-            }
-            .prefix(WidgetSnapshot.maximumHistoryWindowCountPerProvider)
+        let selectedKinds = WidgetWindowSelector.historyEnabledKinds(from: currentWindows)
         let kindOrder = Dictionary(uniqueKeysWithValues: selectedKinds.enumerated().map { ($1, $0) })
 
         let recentDayEpochs = Set(

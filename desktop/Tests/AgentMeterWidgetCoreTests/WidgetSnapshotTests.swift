@@ -153,6 +153,30 @@ import Testing
     #expect(snapshot.providers[0].history.isEmpty)
 }
 
+@Test func snapshotOmitsStrayRowsOutsideTheFourPriorityHistoryWindows() throws {
+    let state = makeWidgetState(providerCount: 1, windowsPerProvider: 5)
+    let summary = WidgetHistorySummary(
+        historyStartEpoch: 20_000,
+        days: [
+            WidgetHistoryDay(
+                providerId: "provider-0",
+                windowKind: "window-4",
+                dayStartEpoch: 20_000,
+                consumedPercentPoints: 10,
+                latestUsedPercent: nil,
+                resetAtEpoch: nil
+            ),
+        ]
+    )
+
+    let snapshot = try WidgetSnapshotBuilder().build(
+        state: state,
+        summaries: ["provider-0": summary]
+    )
+
+    #expect(snapshot.providers[0].history.isEmpty)
+}
+
 @Test func snapshotConvertsInvalidHistoricalLatestPercentagesToUnknown() throws {
     let history = try buildHistory([
         historyDay(dayStartEpoch: 20_000, consumedPercentPoints: 10, latestUsedPercent: -1),

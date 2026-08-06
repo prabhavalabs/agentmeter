@@ -46,6 +46,24 @@ func dashboardProviderMaximaAndOverflow(family: WidgetFamily, maximum: Int) {
     #expect(small.modules.contains(.primaryReset))
 }
 
+@Test func mediumAlwaysRemovesHistoryFromASparseRequest() {
+    let snapshot = presentationSnapshot(providerCount: 1)
+    let requested = dashboardConfiguration(
+        providerIDs: ["provider-0"],
+        modules: [.usage, .primaryReset, .history]
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: requested,
+        snapshot: snapshot,
+        family: .medium,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.modules == [.usage, .primaryReset])
+    #expect(presentation.history == nil)
+}
+
 @Test func focusUsesExplicitWindowsAndExplainsUnavailableHistory() {
     let provider = WidgetProviderSnapshot(
         id: "codex",
@@ -83,6 +101,86 @@ func dashboardProviderMaximaAndOverflow(family: WidgetFamily, maximum: Int) {
     )
 
     #expect(presentation.providers.first?.rings.map(\.windowKind) == ["window-4", "window-2"])
+    #expect(presentation.history?.availabilityMessage == "History unavailable for this window")
+    #expect(presentation.history?.cells.isEmpty == true)
+}
+
+@Test func eligibleFocusWindowWithoutRowsProducesGapsInsteadOfUnavailableHistory() {
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: 1_900,
+        windows: (0..<5).map { (index: Int) in
+            WidgetWindowSnapshot(
+                kind: "window-\(index)",
+                label: "Window \(index)",
+                usedPercent: index,
+                resetAtEpoch: nil
+            )
+        },
+        history: []
+    )
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: 1_900,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: nil,
+        providers: [provider]
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: focusConfiguration(outer: "window-0", inner: nil),
+        snapshot: snapshot,
+        family: .large,
+        nowEpoch: 2_000,
+        endingAtDayEpoch: 86_400
+    )
+
+    #expect(presentation.history?.availabilityMessage == nil)
+    #expect(presentation.history?.cells.count == 7)
+    #expect(presentation.history?.cells.allSatisfy { $0.hasData == false } == true)
+}
+
+@Test func ineligibleFocusWindowStaysUnavailableDespiteAStrayHistoryRow() {
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: 1_900,
+        windows: (0..<5).map { (index: Int) in
+            WidgetWindowSnapshot(
+                kind: "window-\(index)",
+                label: "Window \(index)",
+                usedPercent: index,
+                resetAtEpoch: nil
+            )
+        },
+        history: [
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "window-4",
+                dayStartEpoch: 86_400,
+                consumedPercentPoints: 31,
+                latestUsedPercent: 31,
+                resetAtEpoch: nil
+            ),
+        ]
+    )
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: 1_900,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: 86_400,
+        providers: [provider]
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: focusConfiguration(outer: "window-4", inner: nil),
+        snapshot: snapshot,
+        family: .large,
+        nowEpoch: 2_000,
+        endingAtDayEpoch: 86_400
+    )
+
     #expect(presentation.history?.availabilityMessage == "History unavailable for this window")
     #expect(presentation.history?.cells.isEmpty == true)
 }
@@ -140,7 +238,10 @@ func dashboardProviderMaximaAndOverflow(family: WidgetFamily, maximum: Int) {
     #expect(atThreshold.freshness == .stale)
 }
 
-private func dashboardConfiguration(providerIDs: [String]) -> WidgetRenderConfiguration {
+private func dashboardConfiguration(
+    providerIDs: [String],
+    modules: Set<WidgetModule> = [.usage, .primaryReset, .history, .status, .freshness]
+) -> WidgetRenderConfiguration {
     WidgetRenderConfiguration(
         kind: .dashboard,
         providerIDs: providerIDs,
@@ -148,7 +249,7 @@ private func dashboardConfiguration(providerIDs: [String]) -> WidgetRenderConfig
         outerWindowKind: nil,
         innerWindowKind: nil,
         percentageMode: .used,
-        modules: [.usage, .primaryReset, .history, .status, .freshness],
+        modules: modules,
         historyStyle: .heatMap,
         historyPeriod: .days30,
         heatMapScope: .combined,
