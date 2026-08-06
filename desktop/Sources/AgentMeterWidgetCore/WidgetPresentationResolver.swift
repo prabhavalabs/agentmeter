@@ -47,12 +47,20 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
     public let name: String
     public let status: String
     public let rings: [WidgetRingPresentation]
+    public let additionalWindows: [WidgetRingPresentation]
 
-    public init(id: String, name: String, status: String, rings: [WidgetRingPresentation]) {
+    public init(
+        id: String,
+        name: String,
+        status: String,
+        rings: [WidgetRingPresentation],
+        additionalWindows: [WidgetRingPresentation] = []
+    ) {
         self.id = id
         self.name = name
         self.status = status
         self.rings = rings
+        self.additionalWindows = additionalWindows
     }
 }
 
@@ -195,11 +203,15 @@ public enum WidgetPresentationResolver {
                 ring(window: $0, mode: configuration.percentageMode, nowEpoch: nowEpoch)
             }
         }
+        let additionalWindows = selection.additional.map {
+            ring(window: $0, mode: configuration.percentageMode, nowEpoch: nowEpoch)
+        }
         return WidgetProviderPresentation(
             id: provider.id,
             name: provider.name,
             status: provider.status,
-            rings: rings
+            rings: rings,
+            additionalWindows: additionalWindows
         )
     }
 
@@ -231,34 +243,79 @@ public enum WidgetPresentationResolver {
         endingAtDayEpoch: Int,
         calendar: Calendar
     ) -> WidgetHistoryProjection? {
-        guard modules.contains(.history) else { return nil }
+        guard modules.contains(.history), configuration.historyStyle != .none else { return nil }
 
-        let focusWindowKind = configuration.kind == .focus
-            ? providers.first.flatMap {
-                WidgetWindowSelector.select(
-                    from: providerWindows($0),
-                    focusOuterKind: configuration.outerWindowKind,
-                    focusInnerKind: configuration.innerWindowKind
-                ).outer?.kind
-            }
-            : nil
-        if let provider = providers.first,
-           let focusWindowKind,
-           WidgetWindowSelector.historyEnabledKinds(from: providerWindows(provider))
-            .contains(focusWindowKind) == false {
-            return WidgetHistoryProjection(cells: [], availabilityMessage: unavailableHistoryMessage)
+        let firstProvider = providers.first
+        let selectedWindow = firstProvider.flatMap {
+            historyWindow(provider: $0, configuration: configuration)
         }
-        return WidgetHistoryProjection(
-            cells: WidgetHistoryProjection.heatMap(
-                providers: providers,
-                range: configuration.historyPeriod,
-                scope: configuration.heatMapScope,
-                selectedProviderID: configuration.focusProviderID ?? providers.first?.id,
-                windowKind: focusWindowKind,
-                endingAtDayEpoch: endingAtDayEpoch,
-                calendar: calendar
+        if let firstProvider, let selectedWindow,
+           WidgetWindowSelector.historyEnabledKinds(from: providerWindows(firstProvider))
+            .contains(selectedWindow.kind) == false {
+            return WidgetHistoryProjection(
+                windowKind: selectedWindow.kind,
+                windowLabel: selectedWindow.label,
+                availabilityMessage: unavailableHistoryMessage
             )
+        }
+
+        switch configuration.historyStyle {
+        case .none:
+            return nil
+        case .trend:
+            guard let firstProvider, let selectedWindow else {
+                return WidgetHistoryProjection(availabilityMessage: unavailableHistoryMessage)
+            }
+            return WidgetHistoryProjection(
+                trendPoints: WidgetHistoryProjection.trend(
+                    provider: firstProvider,
+                    range: configuration.historyPeriod,
+                    windowKind: selectedWindow.kind,
+                    endingAtDayEpoch: endingAtDayEpoch,
+                    calendar: calendar
+                ),
+                windowKind: selectedWindow.kind,
+                windowLabel: selectedWindow.label
+            )
+        case .heatMap, .bars:
+            let focusWindowKind = configuration.kind == .focus ? selectedWindow?.kind : nil
+            return WidgetHistoryProjection(
+                cells: WidgetHistoryProjection.heatMap(
+                    providers: providers,
+                    range: configuration.historyPeriod,
+                    scope: configuration.heatMapScope,
+                    selectedProviderID: configuration.focusProviderID ?? firstProvider?.id,
+                    windowKind: focusWindowKind,
+                    endingAtDayEpoch: endingAtDayEpoch,
+                    calendar: calendar
+                ),
+                windowKind: focusWindowKind,
+                windowLabel: configuration.kind == .focus ? selectedWindow?.label : nil
+            )
+        }
+    }
+
+    private static func historyWindow(
+        provider: WidgetProviderSnapshot,
+        configuration: WidgetRenderConfiguration
+    ) -> ProviderWindow? {
+        let windows = providerWindows(provider)
+        let selection = WidgetWindowSelector.select(
+            from: windows,
+            focusOuterKind: configuration.kind == .focus ? configuration.outerWindowKind : nil,
+            focusInnerKind: configuration.kind == .focus ? configuration.innerWindowKind : nil
         )
+        guard configuration.historyStyle == .trend else { return selection.outer }
+
+        switch configuration.trendWindow {
+        case .outer:
+            return selection.outer
+        case .inner:
+            return selection.inner
+        case .focus:
+            guard let kind = configuration.trendFocusWindowKind else { return nil }
+            return windows.first { $0.kind == kind }
+        }
     }
 
     private static func dayEpoch(containing epoch: Int, calendar: Calendar) -> Int {

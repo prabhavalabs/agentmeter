@@ -79,13 +79,14 @@ public enum WidgetTheme: String, Codable, Equatable, Sendable, CaseIterable {
     case light
     case dark
     case midnight
+    case neutral
+    case providerTinted
 }
 
 public enum WidgetTapDestination: String, Codable, Equatable, Sendable, CaseIterable {
-    case dashboard
-    case provider
+    case overview
     case agents
-    case settings
+    case providerDetail
 }
 
 public struct WidgetRenderConfiguration: Equatable, Sendable {

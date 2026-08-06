@@ -135,6 +135,47 @@ import Testing
     #expect(cells.suffix(3).map(\.value) == [5, nil, 16])
 }
 
+@Test func trendUsesLatestPercentagePreservesGapsAndRejectsInvalidValues() {
+    let end = 50 * 86_400
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: end,
+        windows: [WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 25, resetAtEpoch: nil)],
+        history: [
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: end - 2 * 86_400,
+                consumedPercentPoints: 31,
+                latestUsedPercent: 42,
+                resetAtEpoch: nil
+            ),
+            WidgetHistoryDay(
+                providerId: "codex",
+                windowKind: "weekly",
+                dayStartEpoch: end,
+                consumedPercentPoints: 2,
+                latestUsedPercent: 101,
+                resetAtEpoch: nil
+            ),
+        ]
+    )
+
+    let points = WidgetHistoryProjection.trend(
+        provider: provider,
+        range: .days7,
+        windowKind: "weekly",
+        endingAtDayEpoch: end,
+        calendar: utcCalendar
+    )
+
+    #expect(points.count == 7)
+    #expect(points.suffix(3).map(\.latestUsedPercent) == [42, nil, nil])
+    #expect(points.last?.dayStartEpoch == end)
+}
+
 private let utcCalendar: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(secondsFromGMT: 0)!

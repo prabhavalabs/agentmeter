@@ -90,6 +90,8 @@ enum IntentThemeOption: String, AppEnum {
     case light
     case dark
     case midnight
+    case neutral
+    case providerTinted
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Theme")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
@@ -97,6 +99,8 @@ enum IntentThemeOption: String, AppEnum {
         .light: "Light",
         .dark: "Dark",
         .midnight: "Midnight",
+        .neutral: "Neutral",
+        .providerTinted: "Provider Tinted",
     ]
 }
 
@@ -104,14 +108,12 @@ enum IntentTapDestinationOption: String, AppEnum {
     case overview
     case providerDetail
     case agents
-    case settings
 
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Tap Destination")
     static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
         .overview: "Overview",
         .providerDetail: "Provider Detail",
         .agents: "Agents",
-        .settings: "Settings",
     ]
 }
 

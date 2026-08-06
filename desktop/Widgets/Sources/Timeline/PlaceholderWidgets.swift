@@ -1,9 +1,37 @@
 import AppIntents
+import AgentMeterWidgetCore
 import SwiftUI
 import WidgetKit
 
-private struct FictionalUsageEntry: TimelineEntry {
+struct FictionalUsageEntry: TimelineEntry {
     let date: Date
+    let focusPresentation: WidgetPresentation?
+
+    init(date: Date, focusPresentation: WidgetPresentation? = nil) {
+        self.date = date
+        self.focusPresentation = focusPresentation
+    }
+}
+
+private struct FictionalFocusProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> FictionalUsageEntry {
+        entry(family: context.family)
+    }
+
+    func snapshot(for configuration: FocusWidgetIntent, in context: Context) async -> FictionalUsageEntry {
+        entry(family: context.family)
+    }
+
+    func timeline(for configuration: FocusWidgetIntent, in context: Context) async -> Timeline<FictionalUsageEntry> {
+        Timeline(entries: [entry(family: context.family)], policy: .never)
+    }
+
+    private func entry(family: WidgetKit.WidgetFamily) -> FictionalUsageEntry {
+        FictionalUsageEntry(
+            date: Date(),
+            focusPresentation: FictionalFocusPresentations.codex(family: family.presentationFamily)
+        )
+    }
 }
 
 private struct FictionalUsageProvider<Intent: WidgetConfigurationIntent>: AppIntentTimelineProvider {
@@ -43,20 +71,12 @@ private struct FocusPlaceholderView: View {
     var entry: FictionalUsageProvider.Entry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Focus", systemImage: "sparkles")
-                .font(.headline)
-            Text("Example session")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("18k tokens")
-                .font(.system(.title3, design: .rounded, weight: .semibold))
-            Text("Fictional preview")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        if let presentation = entry.focusPresentation {
+            FocusWidgetView(presentation: presentation)
+        } else {
+            WidgetStateView(title: "Fictional preview unavailable", systemImage: "sparkles")
+                .containerBackground(.fill.tertiary, for: .widget)
         }
-        .padding()
-        .containerBackground(.fill.tertiary, for: .widget)
     }
 }
 
@@ -84,12 +104,24 @@ struct AgentMeterFocusWidget: Widget {
         AppIntentConfiguration(
             kind: kind,
             intent: FocusWidgetIntent.self,
-            provider: FictionalUsageProvider<FocusWidgetIntent>()
+            provider: FictionalFocusProvider()
         ) { entry in
             FocusPlaceholderView(entry: entry)
         }
         .configurationDisplayName("AgentMeter Focus")
         .description("A fictional preview of the current coding session.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
+    }
+}
+
+private extension WidgetKit.WidgetFamily {
+    var presentationFamily: AgentMeterWidgetCore.WidgetFamily {
+        switch self {
+        case .systemSmall: .small
+        case .systemMedium: .medium
+        case .systemLarge: .large
+        case .systemExtraLarge: .extraLarge
+        @unknown default: .small
+        }
     }
 }

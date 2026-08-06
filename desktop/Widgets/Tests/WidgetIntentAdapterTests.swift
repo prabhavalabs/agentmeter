@@ -16,7 +16,7 @@ import Testing
     #expect(configuration.layout == .usageAndRings)
     #expect(configuration.density == .comfortable)
     #expect(configuration.theme == .system)
-    #expect(configuration.tapDestination == .dashboard)
+    #expect(configuration.tapDestination == .overview)
     #expect(configuration.showsResetCountdown)
     #expect(!configuration.showsAbsoluteResetDate)
 }
@@ -56,9 +56,28 @@ import Testing
     #expect(configuration.layout == .expanded)
     #expect(configuration.density == .compact)
     #expect(configuration.theme == .midnight)
-    #expect(configuration.tapDestination == .provider)
+    #expect(configuration.tapDestination == .providerDetail)
     #expect(!configuration.showsResetCountdown)
     #expect(configuration.showsAbsoluteResetDate)
+}
+
+@Test func approvedThemesRemainDistinctThroughIntentMapping() {
+    let intent = FocusWidgetIntent()
+    let cases: [(IntentThemeOption, WidgetTheme)] = [
+        (.system, .system),
+        (.midnight, .midnight),
+        (.neutral, .neutral),
+        (.providerTinted, .providerTinted),
+    ]
+
+    for (intentTheme, expectedTheme) in cases {
+        intent.theme = intentTheme
+        #expect(IntentConfigurationAdapter.focus(intent).theme == expectedTheme)
+    }
+}
+
+@Test func tapIntentExposesOnlyRoutableDestinations() {
+    #expect(Set(IntentTapDestinationOption.allCases) == [.overview, .providerDetail, .agents])
 }
 
 @Test func focusMappingRejectsWindowsFromAnotherProvider() {

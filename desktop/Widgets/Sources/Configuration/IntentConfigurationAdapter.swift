@@ -163,6 +163,8 @@ private extension IntentThemeOption {
         case .light: .light
         case .dark: .dark
         case .midnight: .midnight
+        case .neutral: .neutral
+        case .providerTinted: .providerTinted
         }
     }
 }
@@ -170,10 +172,9 @@ private extension IntentThemeOption {
 private extension IntentTapDestinationOption {
     var renderValue: WidgetTapDestination {
         switch self {
-        case .overview: .dashboard
-        case .providerDetail: .provider
+        case .overview: .overview
+        case .providerDetail: .providerDetail
         case .agents: .agents
-        case .settings: .settings
         }
     }
 }

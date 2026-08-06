@@ -143,6 +143,10 @@ targets:
     sources:
       - path: Widgets/Tests
       - path: Widgets/Sources/Configuration
+      - path: Widgets/Sources/Components
+      - path: Widgets/Sources/Focus
+        excludes:
+          - FocusWidgetPreviews.swift
     dependencies:
       - package: AgentMeterDesktop
         product: AgentMeterCore

@@ -1,4 +1,5 @@
 import AgentMeterCore
+import Foundation
 import Testing
 @testable import AgentMeterWidgetCore
 
@@ -238,6 +239,130 @@ func dashboardProviderMaximaAndOverflow(family: WidgetFamily, maximum: Int) {
     #expect(atThreshold.freshness == .stale)
 }
 
+@Test func focusPreservesAdditionalWindowsInSelectorOrder() {
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: 1_900,
+        windows: [
+            WidgetWindowSnapshot(kind: "monthly", label: "Monthly", usedPercent: 40, resetAtEpoch: 8_000),
+            WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: 5, resetAtEpoch: 3_000),
+            WidgetWindowSnapshot(kind: "daily", label: "Daily", usedPercent: nil, resetAtEpoch: nil),
+            WidgetWindowSnapshot(kind: "model", label: "Opus", usedPercent: 61, resetAtEpoch: 9_000),
+        ],
+        history: []
+    )
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: focusConfiguration(outer: "monthly", inner: "session"),
+        snapshot: WidgetSnapshot(
+            generatedAtEpoch: 1_900,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: nil,
+            providers: [provider]
+        ),
+        family: .large,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.providers.first?.additionalWindows.map(\.windowKind) == ["daily", "model"])
+    #expect(presentation.providers.first?.additionalWindows.map(\.displayedPercent) == [nil, 61])
+}
+
+@Test(arguments: [
+    (WidgetTrendWindow.outer, "monthly", "Monthly"),
+    (.inner, "session", "Session"),
+    (.focus, "model", "Opus"),
+])
+func focusTrendUsesConfiguredWindow(
+    trendWindow: WidgetTrendWindow,
+    expectedKind: String,
+    expectedLabel: String
+) {
+    let day = 86_400
+    let provider = WidgetProviderSnapshot(
+        id: "codex",
+        name: "Codex",
+        status: "ready",
+        updatedAtEpoch: 1_900,
+        windows: [
+            WidgetWindowSnapshot(kind: "monthly", label: "Monthly", usedPercent: 40, resetAtEpoch: nil),
+            WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: 5, resetAtEpoch: nil),
+            WidgetWindowSnapshot(kind: "model", label: "Opus", usedPercent: 61, resetAtEpoch: nil),
+        ],
+        history: [
+            WidgetHistoryDay(providerId: "codex", windowKind: "monthly", dayStartEpoch: day, consumedPercentPoints: 4, latestUsedPercent: 40, resetAtEpoch: nil),
+            WidgetHistoryDay(providerId: "codex", windowKind: "session", dayStartEpoch: day, consumedPercentPoints: 2, latestUsedPercent: 5, resetAtEpoch: nil),
+            WidgetHistoryDay(providerId: "codex", windowKind: "model", dayStartEpoch: day, consumedPercentPoints: 8, latestUsedPercent: 61, resetAtEpoch: nil),
+        ]
+    )
+    let configuration = WidgetRenderConfiguration(
+        kind: .focus,
+        providerIDs: ["codex"],
+        focusProviderID: "codex",
+        outerWindowKind: "monthly",
+        innerWindowKind: "session",
+        percentageMode: .used,
+        modules: [.usage, .primaryReset, .history],
+        historyStyle: .trend,
+        historyPeriod: .days7,
+        heatMapScope: .singleProvider,
+        trendWindow: trendWindow,
+        trendFocusWindowKind: "model",
+        layout: .automatic,
+        density: .comfortable,
+        theme: .system,
+        tapDestination: .overview
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: configuration,
+        snapshot: WidgetSnapshot(
+            generatedAtEpoch: 1_900,
+            pollIntervalSeconds: 300,
+            historyStartEpoch: day,
+            providers: [provider]
+        ),
+        family: .large,
+        nowEpoch: 2_000,
+        endingAtDayEpoch: day,
+        calendar: utcCalendarForResolver
+    )
+
+    #expect(presentation.history?.windowKind == expectedKind)
+    #expect(presentation.history?.windowLabel == expectedLabel)
+    #expect(presentation.history?.trendPoints.last?.latestUsedPercent == ["monthly": 40, "session": 5, "model": 61][expectedKind])
+    #expect(presentation.history?.cells.isEmpty == true)
+}
+
+@Test func noneHistoryStyleProducesNoProjectionEvenWhenModuleIsRequested() {
+    let configuration = WidgetRenderConfiguration(
+        kind: .focus,
+        providerIDs: ["codex"],
+        focusProviderID: "codex",
+        outerWindowKind: "weekly",
+        innerWindowKind: nil,
+        percentageMode: .used,
+        modules: [.usage, .primaryReset, .history],
+        historyStyle: .none,
+        historyPeriod: .days7,
+        heatMapScope: .singleProvider,
+        layout: .automatic,
+        density: .comfortable,
+        theme: .neutral,
+        tapDestination: .overview
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: configuration,
+        snapshot: presentationSnapshot(providerCount: 1),
+        family: .large,
+        nowEpoch: 2_000
+    )
+
+    #expect(presentation.history == nil)
+}
+
 private func dashboardConfiguration(
     providerIDs: [String],
     modules: Set<WidgetModule> = [.usage, .primaryReset, .history, .status, .freshness]
@@ -256,7 +381,7 @@ private func dashboardConfiguration(
         layout: .automatic,
         density: .comfortable,
         theme: .system,
-        tapDestination: .dashboard
+        tapDestination: .overview
     )
 }
 
@@ -275,9 +400,15 @@ private func focusConfiguration(outer: String?, inner: String?) -> WidgetRenderC
         layout: .automatic,
         density: .comfortable,
         theme: .system,
-        tapDestination: .dashboard
+        tapDestination: .overview
     )
 }
+
+private let utcCalendarForResolver: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar
+}()
 
 private func presentationSnapshot(providerCount: Int) -> WidgetSnapshot {
     WidgetSnapshot(

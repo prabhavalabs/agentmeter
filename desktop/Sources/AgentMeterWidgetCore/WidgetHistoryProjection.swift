@@ -23,12 +23,34 @@ public struct WidgetHeatMapCell: Equatable, Sendable {
     }
 }
 
+public struct WidgetTrendPoint: Equatable, Sendable {
+    public let dayStartEpoch: Int
+    public let latestUsedPercent: Int?
+
+    public init(dayStartEpoch: Int, latestUsedPercent: Int?) {
+        self.dayStartEpoch = dayStartEpoch
+        self.latestUsedPercent = latestUsedPercent
+    }
+}
+
 public struct WidgetHistoryProjection: Equatable, Sendable {
     public let cells: [WidgetHeatMapCell]
+    public let trendPoints: [WidgetTrendPoint]
+    public let windowKind: String?
+    public let windowLabel: String?
     public let availabilityMessage: String?
 
-    public init(cells: [WidgetHeatMapCell], availabilityMessage: String? = nil) {
+    public init(
+        cells: [WidgetHeatMapCell] = [],
+        trendPoints: [WidgetTrendPoint] = [],
+        windowKind: String? = nil,
+        windowLabel: String? = nil,
+        availabilityMessage: String? = nil
+    ) {
         self.cells = cells
+        self.trendPoints = trendPoints
+        self.windowKind = windowKind
+        self.windowLabel = windowLabel
         self.availabilityMessage = availabilityMessage
     }
 
@@ -62,6 +84,30 @@ public struct WidgetHistoryProjection: Equatable, Sendable {
             }
             let value = available.reduce(0, +) / Double(available.count)
             return WidgetHeatMapCell(dayStartEpoch: epoch, value: value, band: band(for: value))
+        }
+    }
+
+    public static func trend(
+        provider: WidgetProviderSnapshot,
+        range: WidgetHistoryPeriod,
+        windowKind: String,
+        endingAtDayEpoch: Int,
+        calendar: Calendar = .current
+    ) -> [WidgetTrendPoint] {
+        let values = provider.history.reduce(into: [Int: Int]()) { result, day in
+            guard day.providerId == provider.id,
+                  day.windowKind == windowKind,
+                  let latestUsedPercent = day.latestUsedPercent,
+                  (0...100).contains(latestUsedPercent) else { return }
+            result[day.dayStartEpoch] = latestUsedPercent
+        }
+
+        return dayEpochs(
+            count: range.dayCount,
+            endingAtDayEpoch: endingAtDayEpoch,
+            calendar: calendar
+        ).map {
+            WidgetTrendPoint(dayStartEpoch: $0, latestUsedPercent: values[$0])
         }
     }
 
