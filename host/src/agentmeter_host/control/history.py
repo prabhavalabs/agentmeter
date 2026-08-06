@@ -334,6 +334,8 @@ class HistoryStore:
                 )
                 if (
                     previous_percent is not None
+                    and previous_reset_at is not None
+                    and reset_at is not None
                     and previous_reset_at == reset_at
                     and used_percent >= previous_percent
                 ):

@@ -35,6 +35,30 @@ def test_widget_summary_counts_positive_deltas_without_counting_resets(tmp_path)
     history.close()
 
 
+def test_widget_summary_does_not_count_increases_without_known_reset_continuity(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    history.record_usage("claude", "weekly", 1_788_249_600, 10, None)
+    history.record_usage("claude", "weekly", 1_788_253_200, 20, None)
+
+    result = history.query_widget_summary(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+        time_zone_identifier="UTC",
+    )
+
+    assert result["days"] == [
+        {
+            "providerId": "claude",
+            "windowKind": "weekly",
+            "dayStartEpoch": 1_788_220_800,
+            "consumedPercentPoints": 0,
+            "latestUsedPercent": 20,
+            "resetAtEpoch": None,
+        }
+    ]
+    history.close()
+
+
 def test_widget_summary_uses_local_day_starts_across_berlin_spring_dst(tmp_path) -> None:
     history = HistoryStore(tmp_path / "history.sqlite3")
     zone = ZoneInfo("Europe/Berlin")
