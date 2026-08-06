@@ -13,7 +13,8 @@ public enum AgentMeterRoute: Equatable, Sendable {
               components.port == nil,
               components.query == nil,
               components.fragment == nil,
-              let host = components.host else {
+              let host = components.percentEncodedHost,
+              host == "overview" || host == "agents" || host == "agent" else {
             self = .overview
             return
         }

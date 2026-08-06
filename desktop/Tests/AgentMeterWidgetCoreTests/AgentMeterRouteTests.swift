@@ -13,6 +13,18 @@ import Testing
     #expect(route == .provider("codex-team_1"))
 }
 
+@Test func percentEncodedApprovedHostsFallBackToOverview() {
+    let encodedHostRoutes = [
+        "agentmeter://%6Fverview",
+        "agentmeter://%61gents",
+        "agentmeter://%61gent/codex",
+    ]
+
+    for rawRoute in encodedHostRoutes {
+        #expect(AgentMeterRoute(url: URL(string: rawRoute)!) == .overview)
+    }
+}
+
 @Test func routeEmitsCanonicalURLsUsingValidatedProviderID() {
     #expect(AgentMeterRoute.overview.url.absoluteString == "agentmeter://overview")
     #expect(AgentMeterRoute.agents.url.absoluteString == "agentmeter://agents")
