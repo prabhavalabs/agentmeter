@@ -289,6 +289,8 @@ class HistoryStore:
     ) -> dict[str, object]:
         self._validate_epoch(since_epoch, "history boundary")
         self._validate_id(provider_id, "provider ID")
+        if not isinstance(time_zone_identifier, str):
+            raise HistoryError("time zone identifier is invalid")
         try:
             zone = ZoneInfo(time_zone_identifier)
         except (ZoneInfoNotFoundError, ValueError) as error:

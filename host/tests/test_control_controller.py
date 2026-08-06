@@ -307,8 +307,32 @@ async def test_history_summary_ipc_returns_widget_contract(tmp_path) -> None:
             "providerId": "claude",
             "timeZoneIdentifier": "Not/AZone",
         },
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "claude",
+            "timeZoneIdentifier": 123,
+        },
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "claude",
+            "timeZoneIdentifier": True,
+        },
+        {
+            "sinceEpoch": 1_788_249_600,
+            "providerId": "claude",
+            "timeZoneIdentifier": None,
+        },
     ],
-    ids=["missing-key", "extra-key", "boolean-epoch", "invalid-provider", "invalid-zone"],
+    ids=[
+        "missing-key",
+        "extra-key",
+        "boolean-epoch",
+        "invalid-provider",
+        "invalid-zone",
+        "integer-zone",
+        "boolean-zone",
+        "null-zone",
+    ],
 )
 @pytest.mark.asyncio
 async def test_history_summary_ipc_rejects_invalid_payloads(tmp_path, payload) -> None:
