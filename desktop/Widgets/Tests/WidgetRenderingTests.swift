@@ -60,6 +60,58 @@ func dashboardUnavailableHistoryStateHasSubstantiveRendering(colorScheme: ColorS
     )
 }
 
+@Test func dashboardLayoutPresetsProduceDistinctHistoryCapableStructures() {
+    let automatic = dashboardLayoutPlan(.automatic, family: .large)
+    let usageAndRings = dashboardLayoutPlan(.usageAndRings, family: .large)
+    let compact = dashboardLayoutPlan(.compact, family: .large)
+    let expanded = dashboardLayoutPlan(.expanded, family: .large)
+
+    #expect(automatic.rowStyle == .detailed)
+    #expect(automatic.providerColumns == 2)
+    #expect(automatic.historyEmphasis == .balanced)
+
+    #expect(usageAndRings.rowStyle == .dualCompact)
+    #expect(usageAndRings.providerColumns == 2)
+    #expect(usageAndRings.historyEmphasis == .compact)
+
+    #expect(compact.rowStyle == .outerOnly)
+    #expect(compact.providerColumns == 2)
+    #expect(compact.historyEmphasis == .balanced)
+    #expect(compact.spacing < automatic.spacing)
+
+    #expect(expanded.rowStyle == .analyticsCompact)
+    #expect(expanded.providerColumns == 1)
+    #expect(expanded.historyEmphasis == .expanded)
+
+    #expect(Set([automatic, usageAndRings, compact, expanded]).count == 4)
+}
+
+@Test func expandedAndCompactPresetsFallBackWithinCompactFamilyCapabilities() {
+    let smallExpanded = dashboardLayoutPlan(.expanded, family: .small)
+    let mediumExpanded = dashboardLayoutPlan(.expanded, family: .medium)
+    let mediumCompact = dashboardLayoutPlan(.compact, family: .medium)
+
+    #expect(smallExpanded.rowStyle == .outerOnly)
+    #expect(smallExpanded.historyEmphasis == .hidden)
+    #expect(mediumExpanded.rowStyle == .dualCompact)
+    #expect(mediumExpanded.historyEmphasis == .hidden)
+    #expect(mediumCompact.rowStyle == .outerOnly)
+    #expect(mediumCompact.historyEmphasis == .hidden)
+}
+
+@MainActor
+@Test(arguments: IntentLayoutOption.allCases)
+func everyDashboardLayoutPresetHasSubstantiveLargeRendering(layout: IntentLayoutOption) {
+    let presentation = presentationForLayout(layout, family: .large)
+    for scheme in [ColorScheme.light, .dark] {
+        assertSubstantiveRender(
+            DashboardWidgetView(presentation: presentation),
+            size: CGSize(width: 360, height: 380),
+            colorScheme: scheme
+        )
+    }
+}
+
 @Test(arguments: [
     (AgentMeterWidgetCore.WidgetFamily.small, 2, 6, false),
     (.medium, 4, 4, false),
@@ -94,6 +146,18 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     #expect(DashboardHistorySemantics(presentation: heat).rangeLabel == "Last 30 days")
     #expect(DashboardHistorySemantics(presentation: heat).style == .heatMap)
 
+    let singleHeatIntent = configuredDashboardIntent()
+    singleHeatIntent.providers = [ProviderEntity(id: "codex", name: "Codex")]
+    singleHeatIntent.historyStyle = .heatMap
+    singleHeatIntent.heatScope = .singleProvider
+    let singleHeat = FictionalDashboardPresentationSource.presentation(
+        for: singleHeatIntent,
+        family: .large
+    )
+
+    #expect(DashboardHistorySemantics(presentation: singleHeat).title == "Codex allowance consumed")
+    #expect(DashboardHistorySemantics(presentation: singleHeat).title != "Average allowance consumed")
+
     let trendIntent = configuredDashboardIntent()
     trendIntent.providers = [ProviderEntity(id: "gemini", name: "Gemini")]
     trendIntent.historyStyle = .trend
@@ -117,10 +181,158 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     let pending = presentation.providers.first { $0.id == "cursor" }?.rings.first
 
     #expect(longName?.name == "Aperture Research Allowance Service")
-    #expect(longName.map(DashboardProviderAccessibility.summary)?.contains("Aperture Research Allowance Service") == true)
+    #expect(longName.map {
+        DashboardProviderAccessibility.summary(
+            $0,
+            percentageMode: .used,
+            style: .expanded,
+            additionalWindowLimit: 2,
+            modules: presentation.modules,
+            freshness: presentation.freshness,
+            showsMetadata: true,
+            showsResetCountdown: true,
+            showsAbsoluteResetDate: true,
+            relativeTo: Date(timeIntervalSince1970: 1_799_996_400)
+        )
+    }?.contains("Aperture Research Allowance Service") == true)
     #expect(unknown.map(DashboardProviderCopy.percentage) == "Not reported")
     #expect(unknown.map(DashboardProviderCopy.reset) == "Reset time unavailable")
     #expect(pending.map(DashboardProviderCopy.reset) == "Refresh pending")
+}
+
+@Test func scheduledResetOptionsRemainIndependent() {
+    let ring = WidgetRingPresentation(
+        windowKind: "monthly",
+        label: "Monthly",
+        usedPercent: 42,
+        displayedPercent: 42,
+        resetState: .scheduled(epoch: 1_800_000_000)
+    )
+    let referenceDate = Date(timeIntervalSince1970: 1_799_996_400)
+
+    let neither = DashboardResetPresentation(
+        ring: ring,
+        showsCountdown: false,
+        showsAbsoluteDate: false,
+        relativeTo: referenceDate
+    )
+    let countdown = DashboardResetPresentation(
+        ring: ring,
+        showsCountdown: true,
+        showsAbsoluteDate: false,
+        relativeTo: referenceDate
+    )
+    let absolute = DashboardResetPresentation(
+        ring: ring,
+        showsCountdown: false,
+        showsAbsoluteDate: true,
+        relativeTo: referenceDate
+    )
+    let both = DashboardResetPresentation(
+        ring: ring,
+        showsCountdown: true,
+        showsAbsoluteDate: true,
+        relativeTo: referenceDate
+    )
+
+    #expect(neither.lines == ["Reset scheduled"])
+    #expect(countdown.lines.count == 1)
+    #expect(countdown.lines.first?.hasPrefix("Reset countdown ") == true)
+    #expect(absolute.lines.count == 1)
+    #expect(absolute.lines.first?.hasPrefix("Reset date ") == true)
+    #expect(both.lines.count == 2)
+    #expect(both.lines.contains(where: { $0.hasPrefix("Reset countdown ") }))
+    #expect(both.lines.contains(where: { $0.hasPrefix("Reset date ") }))
+}
+
+@Test func pendingAndUnavailableResetCopyRemainExactForEveryToggleCombination() {
+    let referenceDate = Date(timeIntervalSince1970: 1_799_996_400)
+    let pending = WidgetRingPresentation(
+        windowKind: "weekly",
+        label: "Weekly",
+        usedPercent: 10,
+        displayedPercent: 10,
+        resetState: .pending
+    )
+    let unavailable = WidgetRingPresentation(
+        windowKind: "session",
+        label: "Session",
+        usedPercent: nil,
+        displayedPercent: nil,
+        resetState: .unavailable
+    )
+
+    for showsCountdown in [false, true] {
+        for showsAbsoluteDate in [false, true] {
+            #expect(DashboardResetPresentation(
+                ring: pending,
+                showsCountdown: showsCountdown,
+                showsAbsoluteDate: showsAbsoluteDate,
+                relativeTo: referenceDate
+            ).lines == ["Refresh pending"])
+            #expect(DashboardResetPresentation(
+                ring: unavailable,
+                showsCountdown: showsCountdown,
+                showsAbsoluteDate: showsAbsoluteDate,
+                relativeTo: referenceDate
+            ).lines == ["Reset time unavailable"])
+        }
+    }
+}
+
+@Test func expandedProviderAccessibilityDescribesEveryVisibleStateAndOption() {
+    let provider = WidgetProviderPresentation(
+        id: "longname",
+        name: "Aperture Research Allowance Service",
+        status: "Action required",
+        rings: [
+            WidgetRingPresentation(
+                windowKind: "monthly",
+                label: "Monthly allowance",
+                usedPercent: 42,
+                displayedPercent: 58,
+                resetState: .scheduled(epoch: 1_800_000_000)
+            ),
+            WidgetRingPresentation(
+                windowKind: "session",
+                label: "Session allowance",
+                usedPercent: nil,
+                displayedPercent: nil,
+                resetState: .unavailable
+            ),
+        ],
+        additionalWindows: [
+            WidgetRingPresentation(
+                windowKind: "weekly",
+                label: "Weekly allowance",
+                usedPercent: 27,
+                displayedPercent: 73,
+                resetState: .pending
+            ),
+        ]
+    )
+
+    let summary = DashboardProviderAccessibility.summary(
+        provider,
+        percentageMode: .remaining,
+        style: .expanded,
+        additionalWindowLimit: 2,
+        modules: [.status, .freshness],
+        freshness: .stale,
+        showsMetadata: true,
+        showsResetCountdown: true,
+        showsAbsoluteResetDate: true,
+        relativeTo: Date(timeIntervalSince1970: 1_799_996_400)
+    )
+
+    #expect(summary.contains("Aperture Research Allowance Service"))
+    #expect(summary.contains("Monthly allowance, 58 percent remaining"))
+    #expect(summary.contains("Reset countdown "))
+    #expect(summary.contains("Reset date "))
+    #expect(summary.contains("Session allowance, Not reported, Reset time unavailable"))
+    #expect(summary.contains("Weekly allowance, 73 percent remaining, Refresh pending"))
+    #expect(summary.contains("Status Action required"))
+    #expect(summary.contains("Freshness Stale"))
 }
 
 @Test func extraLargeRowsExposeAdditionalWindowsWithoutInventingThemElsewhere() {
@@ -193,6 +405,68 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     #expect(presentation.history?.trendPoints.count == 7)
 }
 
+@Test func dashboardIntentAdapterCoversEveryLayoutDensityThemeAndPercentageChoice() {
+    let layoutCases: [(IntentLayoutOption, WidgetLayoutPreset)] = [
+        (.automatic, .automatic),
+        (.usageAndRings, .usageAndRings),
+        (.compact, .compact),
+        (.expanded, .expanded),
+    ]
+    for (choice, expected) in layoutCases {
+        let intent = DashboardWidgetIntent()
+        intent.layout = choice
+        #expect(IntentConfigurationAdapter.dashboard(intent).layout == expected)
+    }
+
+    let densityCases: [(IntentDensityOption, WidgetDensity)] = [
+        (.compact, .compact),
+        (.comfortable, .comfortable),
+    ]
+    for (choice, expected) in densityCases {
+        let intent = DashboardWidgetIntent()
+        intent.density = choice
+        #expect(IntentConfigurationAdapter.dashboard(intent).density == expected)
+    }
+
+    let themeCases: [(IntentThemeOption, WidgetTheme)] = [
+        (.system, .system),
+        (.light, .light),
+        (.dark, .dark),
+        (.midnight, .midnight),
+        (.neutral, .neutral),
+        (.providerTinted, .providerTinted),
+    ]
+    for (choice, expected) in themeCases {
+        let intent = DashboardWidgetIntent()
+        intent.theme = choice
+        #expect(IntentConfigurationAdapter.dashboard(intent).theme == expected)
+    }
+
+    let percentageCases: [(IntentPercentageOption, WidgetPercentageMode)] = [
+        (.used, .used),
+        (.remaining, .remaining),
+    ]
+    for (choice, expected) in percentageCases {
+        let intent = DashboardWidgetIntent()
+        intent.percentage = choice
+        #expect(IntentConfigurationAdapter.dashboard(intent).percentageMode == expected)
+    }
+}
+
+@Test func dashboardIntentAdapterCoversEveryResetToggleCombination() {
+    for showsCountdown in [false, true] {
+        for showsAbsoluteDate in [false, true] {
+            let intent = DashboardWidgetIntent()
+            intent.showResetCountdown = showsCountdown
+            intent.showAbsoluteResetDate = showsAbsoluteDate
+            let configuration = IntentConfigurationAdapter.dashboard(intent)
+
+            #expect(configuration.showsResetCountdown == showsCountdown)
+            #expect(configuration.showsAbsoluteResetDate == showsAbsoluteDate)
+        }
+    }
+}
+
 @Test func dashboardViewSourceDoesNotIntroduceScrolling() throws {
     let dashboardDirectory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -231,6 +505,22 @@ private func configuredFocusIntent() -> FocusWidgetIntent {
     intent.showStatus = true
     intent.showFreshness = true
     return intent
+}
+
+private func dashboardLayoutPlan(
+    _ layout: IntentLayoutOption,
+    family: AgentMeterWidgetCore.WidgetFamily
+) -> DashboardLayoutPlan {
+    DashboardLayoutPlan(presentation: presentationForLayout(layout, family: family))
+}
+
+private func presentationForLayout(
+    _ layout: IntentLayoutOption,
+    family: AgentMeterWidgetCore.WidgetFamily
+) -> WidgetPresentation {
+    let intent = configuredDashboardIntent()
+    intent.layout = layout
+    return FictionalDashboardPresentationSource.presentation(for: intent, family: family)
 }
 
 @MainActor

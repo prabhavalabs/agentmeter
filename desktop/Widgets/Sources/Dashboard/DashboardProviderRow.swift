@@ -1,11 +1,12 @@
 import AgentMeterWidgetCore
 import SwiftUI
 
-enum DashboardProviderRowStyle {
+enum DashboardProviderRowStyle: Hashable {
     case outerOnly
     case dualCompact
     case detailed
     case expanded
+    case analyticsCompact
 }
 
 enum DashboardProviderCopy {
@@ -20,14 +21,106 @@ enum DashboardProviderCopy {
         case .scheduled: "Reset scheduled"
         }
     }
+
+    static func accessiblePercentage(
+        _ ring: WidgetRingPresentation,
+        mode: WidgetPercentageMode
+    ) -> String {
+        guard let percent = ring.displayedPercent else { return "Not reported" }
+        let modeLabel = mode == .used ? "used" : "remaining"
+        return "\(percent) percent \(modeLabel)"
+    }
+}
+
+struct DashboardResetPresentation: Equatable {
+    let lines: [String]
+
+    init(
+        ring: WidgetRingPresentation,
+        showsCountdown: Bool,
+        showsAbsoluteDate: Bool,
+        relativeTo referenceDate: Date = .now
+    ) {
+        guard case let .scheduled(epoch) = ring.resetState else {
+            lines = [DashboardProviderCopy.reset(ring)]
+            return
+        }
+
+        let resetDate = Date(timeIntervalSince1970: TimeInterval(epoch))
+        var scheduledLines: [String] = []
+        if showsCountdown {
+            scheduledLines.append("Reset countdown \(Self.countdown(from: referenceDate, to: resetDate))")
+        }
+        if showsAbsoluteDate {
+            scheduledLines.append(
+                "Reset date \(resetDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
+            )
+        }
+        lines = scheduledLines.isEmpty ? ["Reset scheduled"] : scheduledLines
+    }
+
+    private static func countdown(from referenceDate: Date, to resetDate: Date) -> String {
+        let seconds = Int(resetDate.timeIntervalSince(referenceDate).rounded())
+        let magnitude = abs(seconds)
+        let value: Int
+        let unit: String
+
+        if magnitude >= 86_400 {
+            value = max(1, magnitude / 86_400)
+            unit = value == 1 ? "day" : "days"
+        } else if magnitude >= 3_600 {
+            value = max(1, magnitude / 3_600)
+            unit = value == 1 ? "hour" : "hours"
+        } else if magnitude >= 60 {
+            value = max(1, magnitude / 60)
+            unit = value == 1 ? "minute" : "minutes"
+        } else {
+            value = magnitude
+            unit = value == 1 ? "second" : "seconds"
+        }
+
+        return seconds >= 0 ? "in \(value) \(unit)" : "\(value) \(unit) ago"
+    }
 }
 
 enum DashboardProviderAccessibility {
-    static func summary(_ provider: WidgetProviderPresentation) -> String {
-        let rings = provider.rings.map {
-            "\($0.label), \(DashboardProviderCopy.percentage($0)), \(DashboardProviderCopy.reset($0))"
+    static func summary(
+        _ provider: WidgetProviderPresentation,
+        percentageMode: WidgetPercentageMode,
+        style: DashboardProviderRowStyle,
+        additionalWindowLimit: Int,
+        modules: Set<WidgetModule>,
+        freshness: WidgetFreshnessState,
+        showsMetadata: Bool,
+        showsResetCountdown: Bool,
+        showsAbsoluteResetDate: Bool,
+        relativeTo referenceDate: Date = .now
+    ) -> String {
+        var visibleWindows = Array(provider.rings.prefix(style == .outerOnly ? 1 : 2))
+        if style == .expanded || style == .analyticsCompact {
+            visibleWindows.append(contentsOf: provider.additionalWindows.prefix(additionalWindowLimit))
         }
-        return ([provider.name] + rings).joined(separator: ", ")
+
+        let rings = visibleWindows.map { ring in
+            let reset = DashboardResetPresentation(
+                ring: ring,
+                showsCountdown: showsResetCountdown,
+                showsAbsoluteDate: showsAbsoluteResetDate,
+                relativeTo: referenceDate
+            ).lines.joined(separator: ", ")
+            return "\(ring.label), \(DashboardProviderCopy.accessiblePercentage(ring, mode: percentageMode)), \(reset)"
+        }
+        var parts = [
+            provider.name,
+            "Percentage mode \(percentageMode == .used ? "Used" : "Remaining")",
+        ] + rings
+        if showsMetadata, modules.contains(.status) {
+            parts.append("Status \(provider.status)")
+        }
+        if showsMetadata, modules.contains(.freshness) {
+            parts.append("Freshness \(freshness == .fresh ? "Current" : "Stale")")
+        }
+        return parts.joined(separator: ", ")
     }
 }
 
@@ -40,6 +133,7 @@ struct DashboardProviderRow: View {
     let showsAbsoluteResetDate: Bool
     let style: DashboardProviderRowStyle
     let additionalWindowLimit: Int
+    let showsMetadata: Bool
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -58,7 +152,8 @@ struct DashboardProviderRow: View {
         showsAbsoluteResetDate: Bool,
         theme: WidgetTheme,
         style: DashboardProviderRowStyle,
-        additionalWindowLimit: Int = 0
+        additionalWindowLimit: Int = 0,
+        showsMetadata: Bool = false
     ) {
         self.provider = provider
         self.percentageMode = percentageMode
@@ -69,6 +164,7 @@ struct DashboardProviderRow: View {
         self.theme = theme
         self.style = style
         self.additionalWindowLimit = additionalWindowLimit
+        self.showsMetadata = showsMetadata
     }
 
     var body: some View {
@@ -112,9 +208,7 @@ struct DashboardProviderRow: View {
                         HStack(spacing: 4) {
                             Text(outer.label)
                                 .lineLimit(1)
-                            Text(resetDisplay(outer))
-                                .lineLimit(1)
-                                .foregroundStyle(palette.secondaryText)
+                            resetDetails(outer)
                         }
                         .font(.caption2)
                     } else {
@@ -130,13 +224,13 @@ struct DashboardProviderRow: View {
                     ringLine(inner, includesReset: style != .dualCompact)
                 }
 
-                if style == .expanded {
+                if style == .expanded || style == .analyticsCompact {
                     ForEach(Array(provider.additionalWindows.prefix(additionalWindowLimit)), id: \.windowKind) { window in
                         ringLine(window, includesReset: false)
                     }
                 }
 
-                if style == .detailed || style == .expanded {
+                if showsMetadata {
                     metadata
                 }
             }
@@ -144,7 +238,17 @@ struct DashboardProviderRow: View {
         }
         .foregroundStyle(palette.primaryText)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(DashboardProviderAccessibility.summary(provider))
+        .accessibilityLabel(DashboardProviderAccessibility.summary(
+            provider,
+            percentageMode: percentageMode,
+            style: style,
+            additionalWindowLimit: additionalWindowLimit,
+            modules: modules,
+            freshness: freshness,
+            showsMetadata: showsMetadata,
+            showsResetCountdown: showsResetCountdown,
+            showsAbsoluteResetDate: showsAbsoluteResetDate
+        ))
     }
 
     private func ringLine(
@@ -158,26 +262,25 @@ struct DashboardProviderRow: View {
                 .monospacedDigit()
                 .foregroundStyle(ring.displayedPercent == nil ? palette.secondaryText : palette.primaryText)
             if includesReset {
-                Text(resetDisplay(ring))
-                    .lineLimit(1)
-                    .foregroundStyle(palette.secondaryText)
+                resetDetails(ring)
             }
         }
         .font(.caption2)
     }
 
-    private func resetDisplay(_ ring: WidgetRingPresentation) -> String {
-        guard case let .scheduled(epoch) = ring.resetState else {
-            return DashboardProviderCopy.reset(ring)
+    private func resetDetails(_ ring: WidgetRingPresentation) -> some View {
+        let presentation = DashboardResetPresentation(
+            ring: ring,
+            showsCountdown: showsResetCountdown,
+            showsAbsoluteDate: showsAbsoluteResetDate
+        )
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(presentation.lines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .lineLimit(1)
+            }
         }
-        let date = Date(timeIntervalSince1970: TimeInterval(epoch))
-        if showsAbsoluteResetDate {
-            return date.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-        }
-        if showsResetCountdown {
-            return date.formatted(.relative(presentation: .numeric))
-        }
-        return "Reset scheduled"
+        .foregroundStyle(palette.secondaryText)
     }
 
     @ViewBuilder

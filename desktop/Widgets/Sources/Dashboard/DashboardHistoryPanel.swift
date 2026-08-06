@@ -10,11 +10,13 @@ struct DashboardHistorySemantics: Equatable {
         style = presentation.configuration.historyStyle
         rangeLabel = "Last \(presentation.configuration.historyPeriod.dayCount) days"
         switch presentation.configuration.historyStyle {
-        case .heatMap, .bars where presentation.configuration.heatMapScope == .combined:
-            title = "Average allowance consumed"
         case .heatMap, .bars:
-            let provider = presentation.providers.first?.name ?? "Selected provider"
-            title = "\(provider) allowance consumed"
+            if presentation.configuration.heatMapScope == .combined {
+                title = "Average allowance consumed"
+            } else {
+                let provider = presentation.providers.first?.name ?? "Selected provider"
+                title = "\(provider) allowance consumed"
+            }
         case .trend:
             let window = presentation.history?.windowLabel ?? "Selected window"
             title = "\(window) allowance used"
