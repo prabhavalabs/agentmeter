@@ -150,6 +150,7 @@ targets:
       - path: Widgets/Sources/Dashboard
         excludes:
           - DashboardWidgetPreviews.swift
+      - path: Widgets/Sources/Timeline
     dependencies:
       - package: AgentMeterDesktop
         product: AgentMeterCore

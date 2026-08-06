@@ -2,7 +2,7 @@ import AgentMeterWidgetCore
 import AppIntents
 import Foundation
 
-typealias WidgetSnapshotLoader = @Sendable () throws -> WidgetSnapshot?
+typealias WidgetEntitySnapshotLoader = @Sendable () throws -> WidgetSnapshot?
 
 struct ProviderEntity: AppEntity, Equatable, Sendable {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Provider")
@@ -32,13 +32,13 @@ struct WindowEntity: AppEntity, Equatable, Sendable {
 }
 
 struct ProviderEntityQuery: EntityQuery {
-    private let loader: WidgetSnapshotLoader
+    private let loader: WidgetEntitySnapshotLoader
 
     init() {
         loader = WidgetEntitySnapshotSource.load
     }
 
-    init(loader: @escaping WidgetSnapshotLoader) {
+    init(loader: @escaping WidgetEntitySnapshotLoader) {
         self.loader = loader
     }
 
@@ -70,7 +70,7 @@ struct WindowEntityQuery: EntityQuery {
     @IntentParameterDependency<FocusWidgetIntent>(\.$provider)
     private var intent
 
-    private let loader: WidgetSnapshotLoader
+    private let loader: WidgetEntitySnapshotLoader
     private let selectedProviderID: String?
 
     init() {
@@ -79,7 +79,7 @@ struct WindowEntityQuery: EntityQuery {
     }
 
     init(
-        loader: @escaping WidgetSnapshotLoader,
+        loader: @escaping WidgetEntitySnapshotLoader,
         selectedProviderID: String? = nil
     ) {
         self.loader = loader

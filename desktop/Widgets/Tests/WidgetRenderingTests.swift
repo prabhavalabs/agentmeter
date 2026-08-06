@@ -45,6 +45,18 @@ func dashboardAndFocusHaveSubstantiveRenderingAtEveryFamily(
 }
 
 @MainActor
+@Test(arguments: WidgetTimelineViewState.allCases)
+func everyTimelineFailureStateHasSubstantiveAccessibleRendering(state: WidgetTimelineViewState) {
+    assertSubstantiveRender(
+        WidgetTimelineStateView(state: state),
+        size: CGSize(width: 170, height: 170),
+        colorScheme: .dark
+    )
+    #expect(state.message.isEmpty == false)
+    #expect(state.accessibilityLabel.isEmpty == false)
+}
+
+@MainActor
 @Test(arguments: [ColorScheme.light, .dark])
 func dashboardUnavailableHistoryStateHasSubstantiveRendering(colorScheme: ColorScheme) {
     let intent = configuredDashboardIntent()
