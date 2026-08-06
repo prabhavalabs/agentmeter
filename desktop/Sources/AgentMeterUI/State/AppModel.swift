@@ -51,6 +51,11 @@ private struct SettingsCommandResult: Decodable, Sendable {
     let settings: DeviceSettings?
 }
 
+private struct RequestedProviderCollection: Equatable, Sendable {
+    let ids: [String]
+    let pollIntervalSeconds: Int
+}
+
 @MainActor
 @Observable
 public final class AppModel {
@@ -75,6 +80,7 @@ public final class AppModel {
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     @ObservationIgnored private var widgetRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var widgetLocalDayTask: Task<Void, Never>?
+    @ObservationIgnored private var pendingProviderCollection: RequestedProviderCollection?
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored public var stateEventHandler:
         (@MainActor @Sendable (BridgeEvent, ControlState, ControlState) -> Void)?
@@ -262,10 +268,30 @@ public final class AppModel {
     }
 
     public func updateProviderCollection(ids: [String], pollIntervalSeconds: Int) async {
-        await perform(
-            .providerRefresh,
-            command: .updateProviders(ids: ids, pollIntervalSeconds: pollIntervalSeconds)
-        )
+        var operationStarted = false
+        await withOperation(.providerRefresh) {
+            operationStarted = true
+            var updateWasAccepted = false
+            do {
+                _ = try await bridge.perform(
+                    .updateProviders(ids: ids, pollIntervalSeconds: pollIntervalSeconds)
+                )
+                updateWasAccepted = true
+                applyConfirmedProviderCollectionState(try await bridge.status())
+                bridgeReachable = true
+            } catch {
+                if let confirmed = try? await bridge.status() {
+                    applyConfirmedProviderCollectionState(confirmed)
+                } else if updateWasAccepted || providerCollectionWasCommitted(before: error) {
+                    applyRequestedProviderCollection(
+                        ids: ids,
+                        pollIntervalSeconds: pollIntervalSeconds
+                    )
+                }
+                present(error, title: "Action could not be completed")
+            }
+        }
+        guard operationStarted else { return }
         await invalidateWidgetSnapshot(.visibilityChanged)
     }
 
@@ -380,14 +406,14 @@ public final class AppModel {
                     self.stateEventHandler?(event, previous, incoming)
                     if self.widgetVisibilityChanged(
                         from: previous.settings,
-                        to: incoming.settings
+                        to: self.state.settings
                     ) {
                         await self.invalidateWidgetSnapshot(
                             .visibilityChanged,
-                            state: incoming
+                            state: self.state
                         )
                     } else if event.type == "providers.changed" || event.type == "state.changed" {
-                        self.scheduleWidgetRefresh(state: incoming)
+                        self.scheduleWidgetRefresh(state: self.state)
                     }
                 }
             } catch is CancellationError {
@@ -437,7 +463,19 @@ public final class AppModel {
 
     private func apply(_ incoming: ControlState) {
         guard incoming.revision >= state.revision else { return }
-        state = incoming
+        if let pendingProviderCollection {
+            if incoming.bridge.configuredProviderIds == pendingProviderCollection.ids {
+                self.pendingProviderCollection = nil
+                state = incoming
+            } else {
+                state = stateByApplying(
+                    pendingProviderCollection,
+                    to: incoming
+                )
+            }
+        } else {
+            state = incoming
+        }
         discoveredDevices = incoming.peripherals
         bridgeReachable = incoming.bridge.running
         if pendingSettingsPatch == nil {
@@ -459,6 +497,56 @@ public final class AppModel {
             providers: state.providers,
             bridge: state.bridge
         )
+    }
+
+    private func applyRequestedProviderCollection(
+        ids: [String],
+        pollIntervalSeconds: Int
+    ) {
+        let requested = RequestedProviderCollection(
+            ids: ids,
+            pollIntervalSeconds: pollIntervalSeconds
+        )
+        pendingProviderCollection = requested
+        state = stateByApplying(requested, to: state)
+    }
+
+    private func applyConfirmedProviderCollectionState(_ confirmed: ControlState) {
+        pendingProviderCollection = nil
+        apply(confirmed)
+    }
+
+    private func stateByApplying(
+        _ requested: RequestedProviderCollection,
+        to base: ControlState
+    ) -> ControlState {
+        let currentBridge = base.bridge
+        let projectedBridge = BridgeStatus(
+            version: currentBridge.version,
+            running: currentBridge.running,
+            lastProviderRefreshEpoch: currentBridge.lastProviderRefreshEpoch,
+            lastDeviceSyncEpoch: currentBridge.lastDeviceSyncEpoch,
+            lastErrorCode: currentBridge.lastErrorCode,
+            providerHealth: currentBridge.providerHealth,
+            configuredProviderIds: requested.ids,
+            pollIntervalSeconds: requested.pollIntervalSeconds
+        )
+        return ControlState(
+            revision: base.revision,
+            connection: base.connection,
+            peripherals: base.peripherals,
+            information: base.information,
+            telemetry: base.telemetry,
+            settings: base.settings,
+            providers: base.providers,
+            bridge: projectedBridge
+        )
+    }
+
+    private func providerCollectionWasCommitted(before error: Error) -> Bool {
+        guard let bridgeError = error as? BridgeClientError,
+              case let .remote(code, _, _) = bridgeError else { return false }
+        return code == "providerRefreshFailed"
     }
 
     private func widgetVisibilityChanged(

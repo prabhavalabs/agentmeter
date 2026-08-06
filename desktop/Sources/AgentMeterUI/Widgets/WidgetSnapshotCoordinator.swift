@@ -287,12 +287,19 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
 
     private func stateForPublication(from state: ControlState) -> ControlState {
         let hidden = Set(state.settings?.hiddenProviderIds ?? [])
-        let visible = state.providers.filter { hidden.contains($0.id) == false }
+        let configuredProviderIds = state.bridge.configuredProviderIds
+        let configuredProviderSet = Set(configuredProviderIds)
+        let hasAuthoritativeCollection = configuredProviderIds.isEmpty == false
+        let visible = state.providers.filter { provider in
+            hidden.contains(provider.id) == false
+                && (hasAuthoritativeCollection == false
+                    || configuredProviderSet.contains(provider.id))
+        }
         let configuredOrder: [String]
         if let settingsOrder = state.settings?.providerOrder, settingsOrder.isEmpty == false {
             configuredOrder = settingsOrder
-        } else if state.bridge.configuredProviderIds.isEmpty == false {
-            configuredOrder = state.bridge.configuredProviderIds
+        } else if hasAuthoritativeCollection {
+            configuredOrder = configuredProviderIds
         } else {
             configuredOrder = visible.map(\.id)
         }

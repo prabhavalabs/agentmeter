@@ -53,6 +53,35 @@ import Testing
     }
 }
 
+@Test func widgetCoordinatorDoesNotFilterProvidersWithoutAnAuthoritativeCollection() async throws {
+    try await withTemporaryDirectory { directory in
+        let bridge = RecordingWidgetBridge()
+        let store = WidgetSnapshotStore(directoryURL: directory)
+        let coordinator = WidgetSnapshotCoordinator(
+            bridge: bridge,
+            store: store,
+            reloader: RecordingTimelineReloader(),
+            calendar: berlinCalendar,
+            now: { Date(timeIntervalSince1970: 1_774_951_200) }
+        )
+        let state = makeCoordinatorState(
+            revision: 1,
+            providers: [
+                makeProvider(id: "codex", usedPercent: 25),
+                makeProvider(id: "claude", usedPercent: 35),
+            ],
+            providerOrder: ["codex"],
+            configuredProviderIds: []
+        )
+
+        await coordinator.refresh(state: state)
+
+        #expect(await bridge.recordedQueries().map(\.providerId) == ["codex", "claude"])
+        let snapshot = try #require(try store.load())
+        #expect(snapshot.providers.map(\.id) == ["codex", "claude"])
+    }
+}
+
 @Test func widgetCoordinatorReloadsOnlyWhenCanonicalSnapshotBytesChange() async throws {
     try await withTemporaryDirectory { directory in
         let bridge = RecordingWidgetBridge()
@@ -569,7 +598,8 @@ private func makeCoordinatorState(
     revision: UInt64,
     providers: [ProviderSummary],
     providerOrder: [String],
-    hiddenProviderIds: [String] = []
+    hiddenProviderIds: [String] = [],
+    configuredProviderIds: [String]? = nil
 ) -> ControlState {
     ControlState(
         revision: revision,
@@ -592,7 +622,7 @@ private func makeCoordinatorState(
             version: "1",
             running: true,
             lastProviderRefreshEpoch: Int(revision) * 1_000,
-            configuredProviderIds: providerOrder,
+            configuredProviderIds: configuredProviderIds ?? providerOrder,
             pollIntervalSeconds: 300
         )
     )
