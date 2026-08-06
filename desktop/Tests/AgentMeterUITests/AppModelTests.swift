@@ -144,6 +144,63 @@ import Testing
 }
 
 @MainActor
+@Test func appModelPublishesWidgetSnapshotAfterStartupAndExplicitProviderRefresh() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 4, phase: .connected))
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
+
+    await model.start()
+    #expect(await coordinator.revisions() == [4])
+
+    await model.refreshProviders()
+    #expect(await coordinator.revisions() == [4, 4])
+    await model.stop()
+}
+
+@MainActor
+@Test func appModelPublishesOnlyNewerProviderAndStateEvents() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 4, phase: .connected))
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
+    await model.start()
+
+    await bridge.emitState(
+        makeState(revision: 3, phase: .degraded),
+        eventType: "providers.changed"
+    )
+    await bridge.emitState(
+        makeState(revision: 5, phase: .degraded),
+        eventType: "connection.changed"
+    )
+    await bridge.emitState(
+        makeState(revision: 6, phase: .connected),
+        eventType: "providers.changed"
+    )
+    await bridge.emitState(
+        makeState(revision: 6, phase: .connected),
+        eventType: "state.changed"
+    )
+    await bridge.emitState(
+        makeState(revision: 7, phase: .connected),
+        eventType: "state.changed"
+    )
+    for _ in 0..<100 where await coordinator.revisions().count < 3 {
+        await Task.yield()
+    }
+
+    #expect(await coordinator.revisions() == [4, 6, 7])
+    await model.stop()
+}
+
+@MainActor
 private func makePreferences() -> AppPreferences {
     let name = "AgentMeterModelTests.\(UUID().uuidString)"
     return AppPreferences(defaults: UserDefaults(suiteName: name)!)
@@ -233,4 +290,14 @@ private actor ConfirmingSettingsBridge: BridgeAPI {
     }
 
     func close() async {}
+}
+
+private actor RecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
+    private var recordedRevisions: [UInt64] = []
+
+    func refresh(state: ControlState) async {
+        recordedRevisions.append(state.revision)
+    }
+
+    func revisions() -> [UInt64] { recordedRevisions }
 }

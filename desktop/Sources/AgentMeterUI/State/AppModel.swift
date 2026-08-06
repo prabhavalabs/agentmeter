@@ -67,15 +67,21 @@ public final class AppModel {
     public let preferences: AppPreferences
 
     @ObservationIgnored private let bridge: any BridgeAPI
+    @ObservationIgnored private let widgetSnapshotCoordinator: any WidgetSnapshotCoordinating
     @ObservationIgnored private var eventTask: Task<Void, Never>?
     @ObservationIgnored private var reconnectTask: Task<Void, Never>?
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored public var stateEventHandler:
         (@MainActor @Sendable (BridgeEvent, ControlState, ControlState) -> Void)?
 
-    public init(bridge: any BridgeAPI, preferences: AppPreferences) {
+    public init(
+        bridge: any BridgeAPI,
+        preferences: AppPreferences,
+        widgetSnapshotCoordinator: any WidgetSnapshotCoordinating = NoopWidgetSnapshotCoordinator()
+    ) {
         self.bridge = bridge
         self.preferences = preferences
+        self.widgetSnapshotCoordinator = widgetSnapshotCoordinator
     }
 
     public var selectedSection: NavigationSection {
@@ -95,6 +101,7 @@ public final class AppModel {
                 apply(try await bridge.status())
                 listenForEvents()
                 await loadSupplementalData()
+                await widgetSnapshotCoordinator.refresh(state: state)
             } catch {
                 bridgeReachable = false
                 hasStarted = false
@@ -161,6 +168,7 @@ public final class AppModel {
     public func refreshProviders() async {
         await perform(.providerRefresh, command: .refreshProviders)
         await loadSupplementalData()
+        await widgetSnapshotCoordinator.refresh(state: state)
     }
 
     public func patchSettings(_ patch: DeviceSettingsPatch) async {
@@ -325,6 +333,9 @@ public final class AppModel {
                     let previous = self.state
                     self.apply(incoming)
                     self.stateEventHandler?(event, previous, incoming)
+                    if event.type == "providers.changed" || event.type == "state.changed" {
+                        await self.widgetSnapshotCoordinator.refresh(state: incoming)
+                    }
                 }
             } catch is CancellationError {
                 return
