@@ -8,7 +8,7 @@ import WidgetKit
 
 public protocol WidgetSnapshotCoordinating: Sendable {
     func refresh(state: ControlState) async
-    func invalidateAndRefresh(
+    func invalidate(
         state: ControlState,
         invalidation: WidgetSnapshotInvalidation
     ) async
@@ -17,13 +17,14 @@ public protocol WidgetSnapshotCoordinating: Sendable {
 public extension WidgetSnapshotCoordinating {
     func invalidateAndRefresh(
         state: ControlState,
-        invalidation _: WidgetSnapshotInvalidation
+        invalidation: WidgetSnapshotInvalidation
     ) async {
+        await invalidate(state: state, invalidation: invalidation)
         await refresh(state: state)
     }
 }
 
-public enum WidgetSnapshotInvalidation: Sendable {
+public enum WidgetSnapshotInvalidation: Equatable, Sendable {
     case visibilityChanged
     case historyCleared
 }
@@ -51,7 +52,7 @@ public struct NoopWidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
 
     public func refresh(state _: ControlState) async {}
 
-    public func invalidateAndRefresh(
+    public func invalidate(
         state _: ControlState,
         invalidation _: WidgetSnapshotInvalidation
     ) async {}
@@ -143,54 +144,34 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
     }
 
     public func refresh(state: ControlState) async {
-        await performRefresh(state: state, invalidation: nil)
+        await performRefresh(state: state)
     }
 
-    public func invalidateAndRefresh(
+    public func invalidate(
         state: ControlState,
         invalidation: WidgetSnapshotInvalidation
     ) async {
-        await performRefresh(state: state, invalidation: invalidation)
-    }
-
-    private func performRefresh(
-        state: ControlState,
-        invalidation: WidgetSnapshotInvalidation?
-    ) async {
         refreshGeneration &+= 1
         let generation = refreshGeneration
-        let publicationState = stateForPublication(from: state)
-        let providerIds = publicationState.providers.map(\.id)
-        let calendar = currentGregorianCalendar()
-        let today = calendar.startOfDay(for: now())
-        guard let historyStart = calendar.date(
-            byAdding: .day,
-            value: -(WidgetSnapshot.maximumHistoryDayCount - 1),
-            to: today
+        guard let publication = preparePublication(
+            state: state,
+            invalidation: invalidation
         ) else { return }
-        let sinceEpoch = max(0, Int(historyStart.timeIntervalSince1970))
-        let timeZoneIdentifier = calendar.timeZone.identifier
-        if cachedTimeZoneIdentifier != timeZoneIdentifier {
-            cachedSummaries.removeAll()
-            cachedTimeZoneIdentifier = timeZoneIdentifier
-        }
-        if invalidation == .historyCleared {
-            cachedSummaries.removeAll()
-        }
-        cachedSummaries = Dictionary(
-            uniqueKeysWithValues: providerIds.compactMap { providerId in
-                cachedSummaries[providerId].map {
-                    (providerId, clipped($0, sinceEpoch: sinceEpoch))
-                }
-            }
+        _ = await publish(
+            state: publication.state,
+            providerIds: publication.providerIds,
+            generation: generation
         )
-        if invalidation != nil {
-            guard await publish(
-                state: publicationState,
-                providerIds: providerIds,
-                generation: generation
-            ) else { return }
-        }
+    }
+
+    private func performRefresh(state: ControlState) async {
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
+        guard let publication = preparePublication(state: state, invalidation: nil) else { return }
+        let publicationState = publication.state
+        let providerIds = publication.providerIds
+        let sinceEpoch = publication.sinceEpoch
+        let timeZoneIdentifier = publication.timeZoneIdentifier
 
         for providerId in providerIds {
             guard Task.isCancelled == false else { return }
@@ -215,6 +196,48 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
             state: publicationState,
             providerIds: providerIds,
             generation: generation
+        )
+    }
+
+    private func preparePublication(
+        state: ControlState,
+        invalidation: WidgetSnapshotInvalidation?
+    ) -> (
+        state: ControlState,
+        providerIds: [String],
+        sinceEpoch: Int,
+        timeZoneIdentifier: String
+    )? {
+        let publicationState = stateForPublication(from: state)
+        let providerIds = publicationState.providers.map(\.id)
+        let calendar = currentGregorianCalendar()
+        let today = calendar.startOfDay(for: now())
+        guard let historyStart = calendar.date(
+            byAdding: .day,
+            value: -(WidgetSnapshot.maximumHistoryDayCount - 1),
+            to: today
+        ) else { return nil }
+        let sinceEpoch = max(0, Int(historyStart.timeIntervalSince1970))
+        let timeZoneIdentifier = calendar.timeZone.identifier
+        if cachedTimeZoneIdentifier != timeZoneIdentifier {
+            cachedSummaries.removeAll()
+            cachedTimeZoneIdentifier = timeZoneIdentifier
+        }
+        if invalidation == .historyCleared {
+            cachedSummaries.removeAll()
+        }
+        cachedSummaries = Dictionary(
+            uniqueKeysWithValues: providerIds.compactMap { providerId in
+                cachedSummaries[providerId].map {
+                    (providerId, clipped($0, sinceEpoch: sinceEpoch))
+                }
+            }
+        )
+        return (
+            state: publicationState,
+            providerIds: providerIds,
+            sinceEpoch: sinceEpoch,
+            timeZoneIdentifier: timeZoneIdentifier
         )
     }
 

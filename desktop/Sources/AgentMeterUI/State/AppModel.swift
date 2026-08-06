@@ -382,9 +382,9 @@ public final class AppModel {
                         from: previous.settings,
                         to: incoming.settings
                     ) {
-                        self.scheduleWidgetInvalidation(
-                            state: incoming,
-                            invalidation: .visibilityChanged
+                        await self.invalidateWidgetSnapshot(
+                            .visibilityChanged,
+                            state: incoming
                         )
                     } else if event.type == "providers.changed" || event.type == "state.changed" {
                         self.scheduleWidgetRefresh(state: incoming)
@@ -477,27 +477,18 @@ public final class AppModel {
         }
     }
 
-    private func scheduleWidgetInvalidation(
-        state: ControlState,
-        invalidation: WidgetSnapshotInvalidation
-    ) {
-        widgetRefreshTask?.cancel()
-        let coordinator = widgetSnapshotCoordinator
-        widgetRefreshTask = Task {
-            await coordinator.invalidateAndRefresh(
-                state: state,
-                invalidation: invalidation
-            )
-        }
-    }
-
-    private func invalidateWidgetSnapshot(_ invalidation: WidgetSnapshotInvalidation) async {
+    private func invalidateWidgetSnapshot(
+        _ invalidation: WidgetSnapshotInvalidation,
+        state publicationState: ControlState? = nil
+    ) async {
         widgetRefreshTask?.cancel()
         widgetRefreshTask = nil
-        await widgetSnapshotCoordinator.invalidateAndRefresh(
-            state: state,
+        let publicationState = publicationState ?? state
+        await widgetSnapshotCoordinator.invalidate(
+            state: publicationState,
             invalidation: invalidation
         )
+        scheduleWidgetRefresh(state: publicationState)
     }
 
     private func updateSettingsSyncState() {

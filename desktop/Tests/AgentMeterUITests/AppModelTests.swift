@@ -150,6 +150,60 @@ import Testing
 }
 
 @MainActor
+@Test func bufferedProviderEventCannotCancelAPendingVisibilityRevocation() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
+    let coordinator = RecordingSnapshotCoordinator()
+    let model = AppModel(
+        bridge: bridge,
+        preferences: makePreferences(),
+        widgetSnapshotCoordinator: coordinator
+    )
+    await model.start()
+    let gate = ModelRefreshGate()
+    await coordinator.blockNextRefresh(on: gate)
+    await bridge.emitState(
+        makeState(revision: 2, phase: .connected),
+        eventType: "providers.changed"
+    )
+    await gate.waitUntilEntered()
+    let invalidationGate = ModelRefreshGate()
+    await coordinator.blockNextInvalidation(on: invalidationGate)
+
+    await bridge.emitState(
+        makeState(
+            revision: 3,
+            phase: .connected,
+            hiddenProviderIds: ["codex"]
+        ),
+        eventType: "settings.changed"
+    )
+    await invalidationGate.waitUntilEntered()
+    await bridge.emitState(
+        makeState(
+            revision: 4,
+            phase: .connected,
+            hiddenProviderIds: ["codex"]
+        ),
+        eventType: "providers.changed"
+    )
+    for _ in 0..<100 where model.state.revision < 4 {
+        await Task.yield()
+    }
+    await invalidationGate.open()
+    for _ in 0..<100 where model.state.revision < 4 {
+        await Task.yield()
+    }
+    #expect(model.state.revision == 4)
+    for _ in 0..<100 where await coordinator.invalidations().isEmpty {
+        await Task.yield()
+    }
+
+    #expect(await coordinator.invalidations() == ["visibilityChanged"])
+    await gate.open()
+    await model.stop()
+}
+
+@MainActor
 @Test func clearingHistoryInvalidatesWidgetHistoryWhileARefreshIsInFlight() async {
     let bridge = FakeBridgeAPI(state: makeState(revision: 1, phase: .connected))
     let coordinator = RecordingSnapshotCoordinator()
@@ -393,6 +447,7 @@ private actor RecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
     private var recordedRevisions: [UInt64] = []
     private var recordedInvalidations: [String] = []
     private var nextRefreshGate: ModelRefreshGate?
+    private var nextInvalidationGate: ModelRefreshGate?
 
     func refresh(state: ControlState) async {
         recordedRevisions.append(state.revision)
@@ -401,10 +456,14 @@ private actor RecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
         if let gate { await gate.enter() }
     }
 
-    func invalidateAndRefresh(
+    func invalidate(
         state _: ControlState,
         invalidation: WidgetSnapshotInvalidation
     ) async {
+        let gate = nextInvalidationGate
+        nextInvalidationGate = nil
+        if let gate { await gate.enter() }
+        guard Task.isCancelled == false else { return }
         switch invalidation {
         case .visibilityChanged:
             recordedInvalidations.append("visibilityChanged")
@@ -418,6 +477,10 @@ private actor RecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
 
     func blockNextRefresh(on gate: ModelRefreshGate) {
         nextRefreshGate = gate
+    }
+
+    func blockNextInvalidation(on gate: ModelRefreshGate) {
+        nextInvalidationGate = gate
     }
 }
 

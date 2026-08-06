@@ -169,6 +169,8 @@ private actor DayRecordingSnapshotCoordinator: WidgetSnapshotCoordinating {
         recordedRevisions.append(state.revision)
     }
 
+    func invalidate(state _: ControlState, invalidation _: WidgetSnapshotInvalidation) async {}
+
     func revisions() -> [UInt64] { recordedRevisions }
 }
 
@@ -186,6 +188,8 @@ private actor BlockingInitialSnapshotCoordinator: WidgetSnapshotCoordinating {
         guard released == false else { return }
         await withCheckedContinuation { releaseWaiters.append($0) }
     }
+
+    func invalidate(state _: ControlState, invalidation _: WidgetSnapshotInvalidation) async {}
 
     func waitUntilRefreshEntered() async {
         guard entered == false else { return }
