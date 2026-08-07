@@ -736,3 +736,45 @@ async def test_provider_collection_settings_are_persisted_and_published(tmp_path
     assert saved.provider_ids == ("codex", "cursor")
     assert saved.poll_interval_seconds == 120
     history.close()
+
+
+@pytest.mark.asyncio
+async def test_history_hourly_ipc_returns_bounded_points(tmp_path) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+    history.record_usage("claude", "weekly", 1_788_249_600, 11, 1_788_336_000)
+
+    result = await controller.handle_ipc(
+        IpcRequest(
+            id="hourly-1",
+            type="history.hourly",
+            payload={"sinceEpoch": 1_788_249_600, "providerId": "claude"},
+        )
+    )
+
+    assert set(result) == {"hours"}
+    assert result["hours"][0]["latestUsedPercent"] == 11
+    history.close()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"providerId": "claude"},
+        {"sinceEpoch": 1_788_249_600},
+        {"sinceEpoch": 1_788_249_600, "providerId": "claude", "limit": 7},
+        {"sinceEpoch": True, "providerId": "claude"},
+        {"sinceEpoch": 1_788_249_600, "providerId": "Claude!"},
+    ],
+    ids=["missing-since", "missing-provider", "extra-key", "boolean-epoch", "invalid-provider"],
+)
+@pytest.mark.asyncio
+async def test_history_hourly_ipc_rejects_invalid_payloads(tmp_path, payload) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+
+    with pytest.raises(IpcCommandError) as error:
+        await controller.handle_ipc(
+            IpcRequest(id="hourly-invalid", type="history.hourly", payload=payload)
+        )
+
+    assert error.value.code == "invalidPayload"
+    history.close()

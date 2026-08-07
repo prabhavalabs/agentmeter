@@ -310,3 +310,79 @@ def test_history_bounds_values_and_clear_removes_every_table(tmp_path) -> None:
     assert history._connection.execute("SELECT COUNT(*) FROM device_sample").fetchone()[0] == 0
     assert history._connection.execute("SELECT COUNT(*) FROM connection_event").fetchone()[0] == 0
     history.close()
+
+
+def test_widget_hourly_returns_latest_known_percent_per_hour(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+    for sampled_at, percent in (
+        (1_788_249_600, 10),
+        (1_788_250_500, 14),  # same hour, later sample wins
+        (1_788_253_200, None),  # unknown percent never becomes a point
+        (1_788_256_800, 21),
+    ):
+        history.record_usage("claude", "weekly", sampled_at, percent, 1_788_336_000)
+    history.record_usage("codex", "weekly", 1_788_249_900, 90, 1_788_336_000)
+
+    result = history.query_widget_hourly(
+        since_epoch=1_788_249_600,
+        provider_id="claude",
+    )
+
+    assert result == {
+        "hours": [
+            {
+                "providerId": "claude",
+                "windowKind": "weekly",
+                "hourStartEpoch": 1_788_249_600,
+                "latestUsedPercent": 14,
+                "resetAtEpoch": 1_788_336_000,
+            },
+            {
+                "providerId": "claude",
+                "windowKind": "weekly",
+                "hourStartEpoch": 1_788_256_800,
+                "latestUsedPercent": 21,
+                "resetAtEpoch": 1_788_336_000,
+            },
+        ]
+    }
+    history.close()
+
+
+def test_widget_hourly_bounds_points_and_respects_boundary(tmp_path) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3", retention_seconds=90 * 86_400)
+    base = 1_788_249_600
+    for hour in range(40):
+        history.record_usage("claude", "session", base + hour * 3_600, hour % 100, base + 500_000)
+
+    result = history.query_widget_hourly(since_epoch=base, provider_id="claude")
+    assert len(result["hours"]) == 26
+    assert result["hours"][-1]["hourStartEpoch"] == base + 39 * 3_600
+
+    bounded = history.query_widget_hourly(
+        since_epoch=base + 38 * 3_600,
+        provider_id="claude",
+    )
+    assert [hour["hourStartEpoch"] for hour in bounded["hours"]] == [
+        base + 38 * 3_600,
+        base + 39 * 3_600,
+    ]
+    history.close()
+
+
+@pytest.mark.parametrize(
+    ("since_epoch", "provider_id"),
+    [
+        (True, "claude"),
+        (-4, "claude"),
+        (1_788_249_600, "Claude!"),
+        (1_788_249_600, ""),
+    ],
+)
+def test_widget_hourly_rejects_invalid_queries(tmp_path, since_epoch, provider_id) -> None:
+    history = HistoryStore(tmp_path / "history.sqlite3")
+
+    with pytest.raises(HistoryError):
+        history.query_widget_hourly(since_epoch=since_epoch, provider_id=provider_id)
+
+    history.close()

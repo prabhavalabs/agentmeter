@@ -25,6 +25,7 @@ COMMAND_TYPES = frozenset(
         "providers.update",
         "history.query",
         "history.summary",
+        "history.hourly",
         "history.clear",
         "diagnostics.get",
         "bridge.restart",

@@ -760,6 +760,17 @@ class BridgeController:
                 )
             except HistoryError as error:
                 raise IpcCommandError("invalidPayload", str(error)) from error
+        if command == "history.hourly":
+            required = {"sinceEpoch", "providerId"}
+            if set(request.payload) != required:
+                raise IpcCommandError("invalidPayload", "History hourly query is invalid")
+            try:
+                return self._history.query_widget_hourly(
+                    since_epoch=request.payload["sinceEpoch"],
+                    provider_id=request.payload["providerId"],
+                )
+            except HistoryError as error:
+                raise IpcCommandError("invalidPayload", str(error)) from error
         if command == "history.clear":
             self._require_empty(request)
             self._history.clear()
