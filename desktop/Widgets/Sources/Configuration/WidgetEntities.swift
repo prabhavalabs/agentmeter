@@ -120,11 +120,11 @@ struct WindowEntityQuery: EntityQuery {
 }
 
 private enum WidgetEntitySnapshotSource {
-    static let appGroupIdentifier = "group.com.prabhavalabs.agentmeter.shared"
-
+    // Single source of truth for the container — a duplicated literal here once
+    // left the configuration pickers reading a nonexistent group.
     static func load() throws -> WidgetSnapshot? {
         guard let directory = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+            forSecurityApplicationGroupIdentifier: WidgetSnapshotLoader.appGroupIdentifier
         ) else {
             return nil
         }
