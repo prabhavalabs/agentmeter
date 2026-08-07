@@ -41,6 +41,8 @@ public actor FakeBridgeAPI: BridgeAPI {
             payload = try UsageHistoryResult(usage: []).jsonValue()
         case .queryWidgetHistory:
             payload = try WidgetHistorySummary(historyStartEpoch: nil, days: []).jsonValue()
+        case .queryWidgetHourly:
+            payload = try WidgetHourlySummary(hours: []).jsonValue()
         case .diagnostics:
             payload = try BridgeDiagnostics(
                 bridgeVersion: state.bridge.version,

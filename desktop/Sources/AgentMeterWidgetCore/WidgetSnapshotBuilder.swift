@@ -10,7 +10,8 @@ public struct WidgetSnapshotBuilder: Sendable {
 
     public func build(
         state: ControlState,
-        summaries: [String: WidgetHistorySummary]
+        summaries: [String: WidgetHistorySummary],
+        hourlySummaries: [String: WidgetHourlySummary] = [:]
     ) throws -> WidgetSnapshot {
         let providers = orderedProviders(in: state)
             .prefix(WidgetSnapshot.maximumProviderCount)
@@ -27,6 +28,11 @@ public struct WidgetSnapshotBuilder: Sendable {
                         for: provider,
                         retainedWindows: retainedWindows,
                         summary: summaries[provider.id]
+                    ),
+                    hourly: hourly(
+                        for: provider,
+                        retainedWindows: retainedWindows,
+                        summary: hourlySummaries[provider.id]
                     )
                 )
             }
@@ -127,6 +133,28 @@ public struct WidgetSnapshotBuilder: Sendable {
                 if leftKind != rightKind { return leftKind < rightKind }
                 return $0.windowKind < $1.windowKind
             }
+    }
+
+    private func hourly(
+        for provider: ProviderSummary,
+        retainedWindows: [ProviderWindow],
+        summary: WidgetHourlySummary?
+    ) -> [WidgetHourlyPoint] {
+        guard let summary else { return [] }
+        let retainedKinds = Set(retainedWindows.map(\.kind))
+        var byKind: [String: [WidgetHourlyPoint]] = [:]
+        for point in summary.hours
+        where point.providerId == provider.id
+            && retainedKinds.contains(point.windowKind)
+            && (0...100).contains(point.latestUsedPercent)
+            && point.hourStartEpoch >= 0 {
+            byKind[point.windowKind, default: []].append(point)
+        }
+        return byKind.values.flatMap { points in
+            points
+                .sorted { $0.hourStartEpoch < $1.hourStartEpoch }
+                .suffix(WidgetSnapshot.maximumHourlyPointCountPerWindow)
+        }
     }
 
     private func makeHistoryDaySnapshot(_ day: WidgetHistoryDay) -> WidgetHistoryDay {

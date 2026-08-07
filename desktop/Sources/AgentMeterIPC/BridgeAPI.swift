@@ -31,6 +31,7 @@ public enum BridgeCommand: Sendable {
         providerId: String,
         timeZoneIdentifier: String
     )
+    case queryWidgetHourly(sinceEpoch: Int, providerId: String)
     case clearHistory
     case diagnostics
     case restartBridge
@@ -50,6 +51,7 @@ public enum BridgeCommand: Sendable {
         case .updateProviders: "providers.update"
         case .queryHistory: "history.query"
         case .queryWidgetHistory: "history.summary"
+        case .queryWidgetHourly: "history.hourly"
         case .clearHistory: "history.clear"
         case .diagnostics: "diagnostics.get"
         case .restartBridge: "bridge.restart"
@@ -84,6 +86,11 @@ public enum BridgeCommand: Sendable {
                 "sinceEpoch": .integer(sinceEpoch),
                 "providerId": .string(providerId),
                 "timeZoneIdentifier": .string(timeZoneIdentifier),
+            ]
+        case let .queryWidgetHourly(sinceEpoch, providerId):
+            return [
+                "sinceEpoch": .integer(sinceEpoch),
+                "providerId": .string(providerId),
             ]
         default:
             return [:]

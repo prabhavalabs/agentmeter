@@ -84,6 +84,7 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
     private let now: @Sendable () -> Date
 
     private var cachedSummaries: [String: WidgetHistorySummary] = [:]
+    private var cachedHourly: [String: WidgetHourlySummary] = [:]
     private var cachedTimeZoneIdentifier: String?
     private var refreshGeneration: UInt64 = 0
 
@@ -173,6 +174,7 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         let sinceEpoch = publication.sinceEpoch
         let timeZoneIdentifier = publication.timeZoneIdentifier
 
+        let hourlySinceEpoch = max(0, Int(now().timeIntervalSince1970) - 25 * 3_600)
         for providerId in providerIds {
             guard Task.isCancelled == false else { return }
             do {
@@ -186,6 +188,16 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
                 let summary = try result.decodePayload(WidgetHistorySummary.self)
                 guard Task.isCancelled == false, generation == refreshGeneration else { return }
                 cachedSummaries[providerId] = clipped(summary, sinceEpoch: sinceEpoch)
+            } catch {
+                guard Task.isCancelled == false, generation == refreshGeneration else { return }
+            }
+            do {
+                let result = try await bridge.perform(
+                    .queryWidgetHourly(sinceEpoch: hourlySinceEpoch, providerId: providerId)
+                )
+                let hourly = try result.decodePayload(WidgetHourlySummary.self)
+                guard Task.isCancelled == false, generation == refreshGeneration else { return }
+                cachedHourly[providerId] = hourly
             } catch {
                 guard Task.isCancelled == false, generation == refreshGeneration else { return }
             }
@@ -225,6 +237,7 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
         }
         if invalidation == .historyCleared {
             cachedSummaries.removeAll()
+            cachedHourly.removeAll()
         }
         cachedSummaries = Dictionary(
             uniqueKeysWithValues: providerIds.compactMap { providerId in
@@ -252,10 +265,16 @@ public actor WidgetSnapshotCoordinator: WidgetSnapshotCoordinating {
                 cachedSummaries[providerId].map { (providerId, $0) }
             }
         )
+        let hourlySummaries = Dictionary(
+            uniqueKeysWithValues: providerIds.compactMap { providerId in
+                cachedHourly[providerId].map { (providerId, $0) }
+            }
+        )
         do {
             let snapshot = try WidgetSnapshotBuilder().build(
                 state: state,
-                summaries: summaries
+                summaries: summaries,
+                hourlySummaries: hourlySummaries
             )
             guard Task.isCancelled == false, generation == refreshGeneration else { return false }
             if try store.writeIfChanged(snapshot) {
