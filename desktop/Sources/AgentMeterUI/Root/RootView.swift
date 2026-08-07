@@ -12,7 +12,12 @@ public struct RootView: View {
     public var body: some View {
         @Bindable var preferences = model.preferences
         NavigationSplitView {
-            Sidebar(selection: $preferences.selectedSection)
+            Sidebar(
+                selection: $preferences.selectedSection,
+                sections: NavigationSection.visibleSections(
+                    deviceSyncEnabled: model.deviceSyncEnabled
+                )
+            )
         } detail: {
             destination
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -37,6 +42,12 @@ public struct RootView: View {
         }
         .onChange(of: model.bridgeReachable) { _, reachable in
             if reachable { bridgeService.confirmBridgeReady() }
+        }
+        .onChange(of: model.deviceSyncEnabled, initial: true) { _, enabled in
+            model.selectedSection = NavigationSection.resolvedSelection(
+                model.selectedSection,
+                deviceSyncEnabled: enabled
+            )
         }
         .sheet(
             isPresented: Binding(
@@ -69,6 +80,7 @@ public struct RootView: View {
         case .agents: AgentsView()
         case .display: DisplaySettingsView()
         case .diagnostics: DiagnosticsView()
+        case .settings: ApplicationSettingsSectionView()
         }
     }
 }

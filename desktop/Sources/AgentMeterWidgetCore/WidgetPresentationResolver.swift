@@ -63,6 +63,9 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
     public let healthState: WidgetProviderHealthState
     public let rings: [WidgetRingPresentation]
     public let additionalWindows: [WidgetRingPresentation]
+    /// Hourly points for the hero (outer) window, oldest first — feeds the
+    /// 24-hour trend chart.
+    public let hourlyTrend: [WidgetHourlyPoint]
 
     public init(
         id: String,
@@ -71,7 +74,8 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
         availability: WidgetProviderAvailability = .available,
         healthState: WidgetProviderHealthState = .healthy,
         rings: [WidgetRingPresentation],
-        additionalWindows: [WidgetRingPresentation] = []
+        additionalWindows: [WidgetRingPresentation] = [],
+        hourlyTrend: [WidgetHourlyPoint] = []
     ) {
         self.id = id
         self.name = name
@@ -80,6 +84,7 @@ public struct WidgetProviderPresentation: Equatable, Sendable {
         self.healthState = healthState
         self.rings = rings
         self.additionalWindows = additionalWindows
+        self.hourlyTrend = hourlyTrend
     }
 }
 
@@ -246,13 +251,19 @@ public enum WidgetPresentationResolver {
         let additionalWindows = selection.additional.map {
             ring(window: $0, mode: configuration.percentageMode, nowEpoch: nowEpoch)
         }
+        let heroKind = selection.outer?.kind
         return WidgetProviderPresentation(
             id: provider.id,
             name: provider.name,
             status: provider.status,
             healthState: healthState(for: provider.status),
             rings: rings,
-            additionalWindows: additionalWindows
+            additionalWindows: additionalWindows,
+            hourlyTrend: heroKind.map { kind in
+                provider.hourly
+                    .filter { $0.windowKind == kind }
+                    .sorted { $0.hourStartEpoch < $1.hourStartEpoch }
+            } ?? []
         )
     }
 

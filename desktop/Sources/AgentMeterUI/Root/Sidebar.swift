@@ -2,22 +2,25 @@ import SwiftUI
 
 public struct Sidebar: View {
     @Binding private var selection: NavigationSection
+    private let sections: [NavigationSection]
     private let version: String
 
     public init(
         selection: Binding<NavigationSection>,
+        sections: [NavigationSection] = NavigationSection.allCases,
         version: String = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
         ) as? String ?? "Development"
     ) {
         _selection = selection
+        self.sections = sections
         self.version = version
     }
 
     public var body: some View {
         List(selection: $selection) {
             Section {
-                ForEach(NavigationSection.allCases) { section in
+                ForEach(sections) { section in
                     NavigationLink(value: section) {
                         Label(section.title, systemImage: section.symbolName)
                             .font(.body.weight(.medium))

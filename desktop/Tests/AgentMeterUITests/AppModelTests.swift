@@ -77,6 +77,42 @@ import Testing
 }
 
 @MainActor
+@Test func setDeviceSyncSendsBridgeCommandAndMirrorsTheReturnedState() async {
+    let bridge = FakeBridgeAPI(state: makeState(revision: 3, phase: .connected))
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    await model.start()
+    #expect(model.deviceSyncEnabled)
+
+    await model.setDeviceSync(false)
+
+    #expect(await bridge.commandTypes().contains("device.sync"))
+    #expect(model.deviceSyncEnabled == false)
+    #expect(model.state.bridge.deviceSyncEnabled == false)
+    #expect(model.activeOperations.isEmpty)
+
+    await model.setDeviceSync(true)
+
+    #expect(model.deviceSyncEnabled)
+    #expect(await bridge.commandTypes().filter { $0 == "device.sync" }.count == 2)
+    await model.stop()
+}
+
+@MainActor
+@Test func setDeviceSyncSurfacesBridgeFailuresWithoutFlippingState() async {
+    let bridge = DeviceSyncRejectingBridge(state: makeState(revision: 3, phase: .connected))
+    let model = AppModel(bridge: bridge, preferences: makePreferences())
+    await model.start()
+
+    await model.setDeviceSync(false)
+
+    #expect(model.deviceSyncEnabled)
+    #expect(model.state.bridge.deviceSyncEnabled)
+    #expect(model.notice?.title == "Action could not be completed")
+    #expect(model.activeOperations.isEmpty)
+    await model.stop()
+}
+
+@MainActor
 @Test func settingsPatchAppliesOnlyTheConfirmedSettingsResult() async throws {
     let initial = makeState(revision: 7, phase: .connected)
     let confirmed = DeviceSettings(
@@ -549,6 +585,47 @@ private actor ConfirmingSettingsBridge: BridgeAPI {
             payload = .object([:])
         }
         return BridgeResult(id: "settings-test", type: "settings.result", payload: payload)
+    }
+
+    func close() async {}
+}
+
+private actor DeviceSyncRejectingBridge: BridgeAPI {
+    private let state: ControlState
+
+    init(state: ControlState) {
+        self.state = state
+    }
+
+    nonisolated func events() -> AsyncThrowingStream<BridgeEvent, Error> {
+        AsyncThrowingStream { _ in }
+    }
+
+    func connect() async throws {}
+
+    func status() async throws -> ControlState {
+        state
+    }
+
+    func scan() async throws -> [PeripheralSummary] {
+        state.peripherals
+    }
+
+    func perform(_ command: BridgeCommand) async throws -> BridgeResult {
+        if case .setDeviceSync = command {
+            throw BridgeClientError.remote(
+                code: "internalError",
+                message: "Device sync could not be changed",
+                recoverable: true
+            )
+        }
+        let payload: JSONValue
+        if case .queryHistory = command {
+            payload = .object(["usage": .array([])])
+        } else {
+            payload = .object([:])
+        }
+        return BridgeResult(id: "device-sync-test", type: "device.result", payload: payload)
     }
 
     func close() async {}

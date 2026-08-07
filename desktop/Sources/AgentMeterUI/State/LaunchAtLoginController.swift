@@ -16,6 +16,16 @@ public final class LaunchAtLoginController {
         isEnabled = SMAppService.mainApp.status == .enabled
     }
 
+    /// Registers the app as a login item on first run so it survives
+    /// restarts out of the box. Runs once; an explicit user choice in
+    /// Settings is recorded as configured and is never overridden.
+    public func enableByDefaultIfUnconfigured(preferences: AppPreferences) async {
+        guard preferences.launchAtLoginConfigured == false else { return }
+        preferences.launchAtLoginConfigured = true
+        let succeeded = await setEnabled(true)
+        preferences.launchAtLogin = succeeded
+    }
+
     public func setEnabled(_ enabled: Bool) async -> Bool {
         guard enabled != isEnabled else { return true }
         isUpdating = true

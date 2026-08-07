@@ -16,6 +16,7 @@ public enum BridgeCommand: Sendable {
     case forgetDevice
     case identifyDevice
     case refreshDevice
+    case setDeviceSync(enabled: Bool)
     case getSettings
     case patchSettings(DeviceSettingsPatch)
     case refreshProviders
@@ -31,6 +32,7 @@ public enum BridgeCommand: Sendable {
         providerId: String,
         timeZoneIdentifier: String
     )
+    case queryWidgetHourly(sinceEpoch: Int, providerId: String)
     case clearHistory
     case diagnostics
     case restartBridge
@@ -44,12 +46,14 @@ public enum BridgeCommand: Sendable {
         case .forgetDevice: "device.forget"
         case .identifyDevice: "device.identify"
         case .refreshDevice: "device.refresh"
+        case .setDeviceSync: "device.sync"
         case .getSettings: "settings.get"
         case .patchSettings: "settings.patch"
         case .refreshProviders: "providers.refresh"
         case .updateProviders: "providers.update"
         case .queryHistory: "history.query"
         case .queryWidgetHistory: "history.summary"
+        case .queryWidgetHourly: "history.hourly"
         case .clearHistory: "history.clear"
         case .diagnostics: "diagnostics.get"
         case .restartBridge: "bridge.restart"
@@ -84,6 +88,13 @@ public enum BridgeCommand: Sendable {
                 "sinceEpoch": .integer(sinceEpoch),
                 "providerId": .string(providerId),
                 "timeZoneIdentifier": .string(timeZoneIdentifier),
+            ]
+        case let .setDeviceSync(enabled):
+            return ["enabled": .boolean(enabled)]
+        case let .queryWidgetHourly(sinceEpoch, providerId):
+            return [
+                "sinceEpoch": .integer(sinceEpoch),
+                "providerId": .string(providerId),
             ]
         default:
             return [:]

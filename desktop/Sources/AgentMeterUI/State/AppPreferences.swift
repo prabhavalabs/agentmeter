@@ -22,6 +22,7 @@ public final class AppPreferences {
         static let sidebarVisible = "sidebarVisible"
         static let onboardingComplete = "onboardingComplete"
         static let launchAtLogin = "launchAtLogin"
+        static let launchAtLoginConfigured = "launchAtLoginConfigured"
         static let notificationsEnabled = "notificationsEnabled"
     }
 
@@ -47,6 +48,12 @@ public final class AppPreferences {
         didSet { defaults.set(launchAtLogin, forKey: Key.launchAtLogin) }
     }
 
+    /// True once the user has made an explicit launch-at-login choice; until
+    /// then the app registers itself at login by default.
+    public var launchAtLoginConfigured: Bool {
+        didSet { defaults.set(launchAtLoginConfigured, forKey: Key.launchAtLoginConfigured) }
+    }
+
     public var notificationsEnabled: Bool {
         didSet { defaults.set(notificationsEnabled, forKey: Key.notificationsEnabled) }
     }
@@ -62,6 +69,7 @@ public final class AppPreferences {
         sidebarVisible = defaults.object(forKey: Key.sidebarVisible) as? Bool ?? true
         onboardingComplete = defaults.bool(forKey: Key.onboardingComplete)
         launchAtLogin = defaults.bool(forKey: Key.launchAtLogin)
+        launchAtLoginConfigured = defaults.bool(forKey: Key.launchAtLoginConfigured)
         notificationsEnabled = defaults.object(forKey: Key.notificationsEnabled) as? Bool ?? false
     }
 }

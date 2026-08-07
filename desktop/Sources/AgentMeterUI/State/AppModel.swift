@@ -104,6 +104,8 @@ public final class AppModel {
 
     public var isBusy: Bool { !activeOperations.isEmpty }
 
+    public var deviceSyncEnabled: Bool { state.bridge.deviceSyncEnabled }
+
     public func navigate(to route: AgentMeterRoute) {
         switch route {
         case .overview:
@@ -206,6 +208,20 @@ public final class AppModel {
         await perform(.providerRefresh, command: .refreshProviders)
         await loadSupplementalData()
         await widgetSnapshotCoordinator.refresh(state: state)
+    }
+
+    public func setDeviceSync(_ enabled: Bool) async {
+        await withOperation(.settings) {
+            do {
+                // The bridge answers device.sync with the full state document,
+                // like device.connect.
+                let result = try await bridge.perform(.setDeviceSync(enabled: enabled))
+                apply(try result.decodePayload(ControlState.self))
+                bridgeReachable = true
+            } catch {
+                present(error, title: "Action could not be completed")
+            }
+        }
     }
 
     public func patchSettings(_ patch: DeviceSettingsPatch) async {
@@ -529,7 +545,8 @@ public final class AppModel {
             lastErrorCode: currentBridge.lastErrorCode,
             providerHealth: currentBridge.providerHealth,
             configuredProviderIds: requested.ids,
-            pollIntervalSeconds: requested.pollIntervalSeconds
+            pollIntervalSeconds: requested.pollIntervalSeconds,
+            deviceSyncEnabled: currentBridge.deviceSyncEnabled
         )
         return ControlState(
             revision: base.revision,

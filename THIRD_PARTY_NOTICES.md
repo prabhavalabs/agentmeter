@@ -37,4 +37,14 @@ Copyright and complete license terms are available in each upstream distribution
 - [typing_extensions](https://github.com/python/typing_extensions)
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
 
+## Brand marks
+
+The macOS widgets identify each coding-agent service with that vendor's own mark, redrawn as
+vector path data (see `desktop/Widgets/Sources/Components/WidgetProviderMark.swift`). The OpenAI,
+Anthropic Claude, Google Gemini, and Cursor marks are trademarks of their respective owners and
+are used solely to identify those services. Their use here does not imply any affiliation with or
+endorsement by those companies. The Claude, Gemini, and Cursor path data derives from the
+[Simple Icons](https://github.com/simple-icons/simple-icons) collection (CC0 1.0); trademark
+rights remain with the respective owners.
+
 AgentMeter itself is licensed under the MIT License; see `LICENSE`.

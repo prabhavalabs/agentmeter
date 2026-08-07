@@ -623,3 +623,104 @@ private func presentationSnapshot(providerCount: Int) -> WidgetSnapshot {
         }
     )
 }
+
+@Test
+func resetPhrasingClassifiesByDistanceAndFormatsDeterministically() {
+    let now = 1_788_249_600
+    let posix = Locale(identifier: "en_US_POSIX")
+    let utc = TimeZone(identifier: "UTC")!
+
+    let relative = WidgetResetPhrasing.phrase(
+        for: .scheduled(epoch: now + 2 * 3_600 + 5 * 60),
+        nowEpoch: now
+    )
+    #expect(relative == .relative(epoch: now + 2 * 3_600 + 5 * 60))
+    #expect(
+        WidgetResetPhrasing.longText(relative, nowEpoch: now, timeZone: utc, locale: posix)
+            == "Resets in 2 hr 5 min"
+    )
+    #expect(
+        WidgetResetPhrasing.compactText(relative, nowEpoch: now, timeZone: utc, locale: posix)
+            == "⟳ 2h 5m"
+    )
+
+    let weekday = WidgetResetPhrasing.phrase(
+        for: .scheduled(epoch: now + 3 * 86_400),
+        nowEpoch: now
+    )
+    #expect(weekday == .weekdayTime(epoch: now + 3 * 86_400))
+    #expect(
+        WidgetResetPhrasing.longText(weekday, nowEpoch: now, timeZone: utc, locale: posix)
+            .hasPrefix("Resets ")
+    )
+    #expect(
+        WidgetResetPhrasing.compactText(weekday, nowEpoch: now, timeZone: utc, locale: posix)
+            == "⟳ 3d"
+    )
+
+    let far = WidgetResetPhrasing.phrase(
+        for: .scheduled(epoch: now + 8 * 86_400),
+        nowEpoch: now
+    )
+    #expect(far == .calendarDate(epoch: now + 8 * 86_400))
+
+    #expect(WidgetResetPhrasing.phrase(for: .scheduled(epoch: now), nowEpoch: now) == .pending)
+    #expect(
+        WidgetResetPhrasing.longText(.pending, nowEpoch: now, timeZone: utc, locale: posix)
+            == "Refresh pending"
+    )
+    #expect(
+        WidgetResetPhrasing.longText(.unavailable, nowEpoch: now, timeZone: utc, locale: posix)
+            == "Reset unavailable"
+    )
+    #expect(
+        WidgetResetPhrasing.compactText(.unavailable, nowEpoch: now, timeZone: utc, locale: posix)
+            == "—"
+    )
+}
+
+@Test
+func resolvedProvidersCarryHeroWindowHourlyTrend() {
+    let provider = WidgetProviderSnapshot(
+        id: "claude",
+        name: "Claude",
+        status: "ok",
+        updatedAtEpoch: 1_000,
+        windows: [
+            WidgetWindowSnapshot(kind: "session", label: "Session", usedPercent: 28, resetAtEpoch: 9_000),
+            WidgetWindowSnapshot(kind: "weekly", label: "Weekly", usedPercent: 59, resetAtEpoch: 90_000),
+        ],
+        history: [],
+        hourly: [
+            WidgetHourlyPoint(
+                providerId: "claude", windowKind: "weekly",
+                hourStartEpoch: 7_200, latestUsedPercent: 58, resetAtEpoch: nil
+            ),
+            WidgetHourlyPoint(
+                providerId: "claude", windowKind: "weekly",
+                hourStartEpoch: 3_600, latestUsedPercent: 55, resetAtEpoch: nil
+            ),
+            WidgetHourlyPoint(
+                providerId: "claude", windowKind: "session",
+                hourStartEpoch: 3_600, latestUsedPercent: 10, resetAtEpoch: nil
+            ),
+        ]
+    )
+    let snapshot = WidgetSnapshot(
+        generatedAtEpoch: 8_000,
+        pollIntervalSeconds: 300,
+        historyStartEpoch: nil,
+        providers: [provider]
+    )
+
+    let presentation = WidgetPresentationResolver.resolve(
+        configuration: dashboardConfiguration(providerIDs: ["claude"]),
+        snapshot: snapshot,
+        family: .large,
+        nowEpoch: 8_000
+    )
+
+    let trend = presentation.providers.first?.hourlyTrend
+    #expect(trend?.map(\.hourStartEpoch) == [3_600, 7_200])
+    #expect(trend?.allSatisfy { $0.windowKind == "weekly" } == true)
+}

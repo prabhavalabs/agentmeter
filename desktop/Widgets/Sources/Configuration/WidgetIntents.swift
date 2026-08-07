@@ -144,18 +144,47 @@ struct DashboardWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Data Freshness", default: false) var showFreshness: Bool
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Dashboard: \(\.$percentage), \(\.$historyStyle), \(\.$layout)") {
-            \.$providers
-            \.$historyRange
-            \.$heatScope
-            \.$trendWindow
-            \.$density
-            \.$theme
-            \.$tapDestination
-            \.$showResetCountdown
-            \.$showAbsoluteResetDate
-            \.$showStatus
-            \.$showFreshness
+        Switch(\.$historyStyle) {
+            Case(.heatMap) {
+                Summary("Dashboard: \(\.$percentage), \(\.$historyStyle), \(\.$layout)") {
+                    \.$providers
+                    \.$historyRange
+                    \.$heatScope
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
+            Case(.trend) {
+                Summary("Dashboard: \(\.$percentage), \(\.$historyStyle), \(\.$layout)") {
+                    \.$providers
+                    \.$historyRange
+                    \.$trendWindow
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
+            DefaultCase {
+                Summary("Dashboard: \(\.$percentage), \(\.$historyStyle), \(\.$layout)") {
+                    \.$providers
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
         }
     }
 
@@ -186,21 +215,54 @@ struct FocusWidgetIntent: WidgetConfigurationIntent {
     @Parameter(title: "Data Freshness", default: false) var showFreshness: Bool
 
     static var parameterSummary: some ParameterSummary {
-        Summary("Focus: \(\.$provider), \(\.$percentage), \(\.$historyStyle)") {
-            \.$outerWindow
-            \.$innerWindow
-            \.$specificTrendWindow
-            \.$historyRange
-            \.$heatScope
-            \.$trendWindow
-            \.$layout
-            \.$density
-            \.$theme
-            \.$tapDestination
-            \.$showResetCountdown
-            \.$showAbsoluteResetDate
-            \.$showStatus
-            \.$showFreshness
+        Switch(\.$historyStyle) {
+            Case(.heatMap) {
+                Summary("Focus: \(\.$provider), \(\.$percentage), \(\.$historyStyle)") {
+                    \.$outerWindow
+                    \.$innerWindow
+                    \.$historyRange
+                    \.$heatScope
+                    \.$layout
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
+            Case(.trend) {
+                Summary("Focus: \(\.$provider), \(\.$percentage), \(\.$historyStyle)") {
+                    \.$outerWindow
+                    \.$innerWindow
+                    \.$historyRange
+                    \.$trendWindow
+                    \.$specificTrendWindow
+                    \.$layout
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
+            DefaultCase {
+                Summary("Focus: \(\.$provider), \(\.$percentage), \(\.$historyStyle)") {
+                    \.$outerWindow
+                    \.$innerWindow
+                    \.$layout
+                    \.$density
+                    \.$theme
+                    \.$tapDestination
+                    \.$showResetCountdown
+                    \.$showAbsoluteResetDate
+                    \.$showStatus
+                    \.$showFreshness
+                }
+            }
         }
     }
 

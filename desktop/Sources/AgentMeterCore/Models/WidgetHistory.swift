@@ -37,3 +37,33 @@ public struct WidgetHistorySummary: Codable, Equatable, Sendable {
         self.days = days
     }
 }
+
+public struct WidgetHourlyPoint: Codable, Equatable, Sendable {
+    public let providerId: String
+    public let windowKind: String
+    public let hourStartEpoch: Int
+    public let latestUsedPercent: Int
+    public let resetAtEpoch: Int?
+
+    public init(
+        providerId: String,
+        windowKind: String,
+        hourStartEpoch: Int,
+        latestUsedPercent: Int,
+        resetAtEpoch: Int?
+    ) {
+        self.providerId = providerId
+        self.windowKind = windowKind
+        self.hourStartEpoch = hourStartEpoch
+        self.latestUsedPercent = latestUsedPercent
+        self.resetAtEpoch = resetAtEpoch
+    }
+}
+
+public struct WidgetHourlySummary: Codable, Equatable, Sendable {
+    public let hours: [WidgetHourlyPoint]
+
+    public init(hours: [WidgetHourlyPoint]) {
+        self.hours = hours
+    }
+}

@@ -364,3 +364,23 @@ private func ambiguousEntitySnapshot() -> WidgetSnapshot {
         ]
     )
 }
+
+@Test func windowQueryOffersEveryWindowBeforeAnAgentIsChosen() async throws {
+    let query = WindowEntityQuery(loader: { entitySnapshot() })
+
+    let suggested = try await query.suggestedEntities()
+
+    #expect(suggested.isEmpty == false)
+    #expect(Set(suggested.map(\.providerID)).count > 1)
+    #expect(suggested.allSatisfy { $0.detail?.isEmpty == false })
+}
+
+@Test func entityDisplayCarriesUsageSubtitlesWithoutInventingZeroes() async throws {
+    let providers = try await ProviderEntityQuery(loader: { entitySnapshot() }).suggestedEntities()
+    let windows = try await WindowEntityQuery(loader: { entitySnapshot() }).suggestedEntities()
+
+    #expect(providers.allSatisfy { $0.usageSummary?.isEmpty == false })
+    let reported = windows.compactMap(\.detail).joined(separator: " | ")
+    #expect(reported.contains("% used"))
+    #expect(reported.contains("0% used") == false || reported.contains("Not reported"))
+}

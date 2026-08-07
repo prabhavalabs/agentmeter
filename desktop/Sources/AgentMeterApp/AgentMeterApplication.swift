@@ -28,6 +28,15 @@ struct AgentMeterApplication: App {
                     model.navigate(to: AgentMeterRoute(url: url))
                     ApplicationPresentationController.shared.windowWillOpen()
                 }
+                .task {
+                    // Managed installs start at login out of the box; an
+                    // explicit choice in Settings always wins afterwards.
+                    if bridgeService.isCommunityBuild == false {
+                        await launchAtLogin.enableByDefaultIfUnconfigured(
+                            preferences: model.preferences
+                        )
+                    }
+                }
         }
         .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)
@@ -44,6 +53,8 @@ struct AgentMeterApplication: App {
                     .keyboardShortcut("4", modifiers: .command)
                 Button("Diagnostics") { model.selectedSection = .diagnostics }
                     .keyboardShortcut("5", modifiers: .command)
+                Button("Settings") { model.selectedSection = .settings }
+                    .keyboardShortcut("6", modifiers: .command)
             }
             CommandGroup(replacing: .appTermination) {
                 Button("Quit AgentMeter") {

@@ -91,7 +91,10 @@ struct FocusTimelineEntryView: View {
 
     var body: some View {
         if let presentation = entry.presentation {
-            FocusWidgetView(presentation: presentation)
+            FocusWidgetView(
+                presentation: presentation,
+                nowEpoch: Int(entry.date.timeIntervalSince1970)
+            )
         } else if let state = entry.state {
             WidgetTimelineStateView(state: state)
         }

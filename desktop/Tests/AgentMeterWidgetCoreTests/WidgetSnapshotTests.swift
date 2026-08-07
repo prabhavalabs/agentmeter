@@ -309,6 +309,67 @@ import Testing
     #expect(snapshot.providers[0].history.contains { $0.dayStartEpoch == 20_000 } == false)
 }
 
+@Test
+func builderBoundsAndFiltersHourlyPoints() throws {
+    let state = makeWidgetState(providerCount: 2, windowsPerProvider: 2)
+    let hours = (0..<40).map { hour in
+        WidgetHourlyPoint(
+            providerId: "provider-0",
+            windowKind: "window-0",
+            hourStartEpoch: 100_000 + hour * 3_600,
+            latestUsedPercent: hour % 100,
+            resetAtEpoch: nil
+        )
+    } + [
+        WidgetHourlyPoint(
+            providerId: "provider-1",
+            windowKind: "window-0",
+            hourStartEpoch: 100_000,
+            latestUsedPercent: 50,
+            resetAtEpoch: nil
+        ),
+        WidgetHourlyPoint(
+            providerId: "provider-0",
+            windowKind: "unknown-window",
+            hourStartEpoch: 100_000,
+            latestUsedPercent: 50,
+            resetAtEpoch: nil
+        ),
+    ]
+
+    let snapshot = try WidgetSnapshotBuilder().build(
+        state: state,
+        summaries: [:],
+        hourlySummaries: ["provider-0": WidgetHourlySummary(hours: hours)]
+    )
+
+    let first = try #require(snapshot.providers.first)
+    #expect(first.hourly.count == WidgetSnapshot.maximumHourlyPointCountPerWindow)
+    #expect(first.hourly.allSatisfy { $0.providerId == "provider-0" })
+    #expect(first.hourly.allSatisfy { $0.windowKind == "window-0" })
+    #expect(first.hourly.last?.hourStartEpoch == 100_000 + 39 * 3_600)
+    #expect(snapshot.providers[1].hourly.isEmpty)
+}
+
+@Test
+func snapshotsWithoutHourlyKeyStillDecode() throws {
+    let state = makeWidgetState(providerCount: 1, windowsPerProvider: 1)
+    let snapshot = try WidgetSnapshotBuilder().build(state: state, summaries: [:])
+    var object = try #require(
+        try JSONSerialization.jsonObject(
+            with: WidgetSnapshotCoding.encode(snapshot)
+        ) as? [String: Any]
+    )
+    var providers = try #require(object["providers"] as? [[String: Any]])
+    providers[0].removeValue(forKey: "hourly")
+    object["providers"] = providers
+    let legacyData = try JSONSerialization.data(withJSONObject: object)
+
+    let decoded = try JSONDecoder().decode(WidgetSnapshot.self, from: legacyData)
+
+    #expect(decoded.providers.first?.hourly == [])
+}
+
 private func buildHistory(_ days: [WidgetHistoryDay]) throws -> [WidgetHistoryDay] {
     let snapshot = try WidgetSnapshotBuilder().build(
         state: makeWidgetState(providerCount: 1, windowsPerProvider: 1),

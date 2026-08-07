@@ -9,6 +9,7 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
     public let providerHealth: [String: String]
     public let configuredProviderIds: [String]
     public let pollIntervalSeconds: Int
+    public let deviceSyncEnabled: Bool
 
     public init(
         version: String,
@@ -18,7 +19,8 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
         lastErrorCode: String? = nil,
         providerHealth: [String: String] = [:],
         configuredProviderIds: [String] = [],
-        pollIntervalSeconds: Int = 300
+        pollIntervalSeconds: Int = 300,
+        deviceSyncEnabled: Bool = true
     ) {
         self.version = version
         self.running = running
@@ -28,11 +30,13 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
         self.providerHealth = providerHealth
         self.configuredProviderIds = configuredProviderIds
         self.pollIntervalSeconds = pollIntervalSeconds
+        self.deviceSyncEnabled = deviceSyncEnabled
     }
 
     private enum CodingKeys: String, CodingKey {
         case version, running, lastProviderRefreshEpoch, lastDeviceSyncEpoch, lastErrorCode
         case providerHealth, configuredProviderIds, pollIntervalSeconds
+        case deviceSyncEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -45,6 +49,7 @@ public struct BridgeStatus: Codable, Equatable, Sendable {
         providerHealth = try values.decodeIfPresent([String: String].self, forKey: .providerHealth) ?? [:]
         configuredProviderIds = try values.decodeIfPresent([String].self, forKey: .configuredProviderIds) ?? []
         pollIntervalSeconds = try values.decodeIfPresent(Int.self, forKey: .pollIntervalSeconds) ?? 300
+        deviceSyncEnabled = try values.decodeIfPresent(Bool.self, forKey: .deviceSyncEnabled) ?? true
     }
 }
 

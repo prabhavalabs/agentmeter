@@ -86,30 +86,12 @@ enum FictionalDashboardPresentations {
     )
 }
 
-#Preview("Trend · Remaining · Large", as: .systemLarge) {
-    AgentMeterDashboardWidget()
-} timeline: {
-    FictionalUsageEntry(
-        date: Date(timeIntervalSince1970: TimeInterval(FictionalDashboardPresentationSource.endingDayEpoch)),
-        dashboardPresentation: FictionalDashboardPresentations.remainingTrend(family: .large)
-    )
-}
-
 #Preview("Eight Providers · Light · Extra Large", as: .systemExtraLarge) {
     AgentMeterDashboardWidget()
 } timeline: {
     FictionalUsageEntry(
         date: Date(timeIntervalSince1970: TimeInterval(FictionalDashboardPresentationSource.endingDayEpoch)),
         dashboardPresentation: FictionalDashboardPresentations.usedHeat(family: .extraLarge, theme: .light)
-    )
-}
-
-#Preview("Trend · Midnight · Extra Large", as: .systemExtraLarge) {
-    AgentMeterDashboardWidget()
-} timeline: {
-    FictionalUsageEntry(
-        date: Date(timeIntervalSince1970: TimeInterval(FictionalDashboardPresentationSource.endingDayEpoch)),
-        dashboardPresentation: FictionalDashboardPresentations.remainingTrend(family: .extraLarge)
     )
 }
 

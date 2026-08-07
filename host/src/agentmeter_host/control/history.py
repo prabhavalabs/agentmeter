@@ -10,6 +10,8 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _BUCKET_SECONDS = 300
+_HOUR_SECONDS = 3_600
+_MAX_HOURLY_POINTS = 26
 _RETENTION_SECONDS = 30 * 86_400
 _SAFE_ID = re.compile(r"[a-z0-9_-]{1,23}")
 
@@ -304,6 +306,46 @@ class HistoryStore:
             (provider_id,),
         ).fetchall()
         return self._widget_summary_document(rows, since_epoch=since_epoch, zone=zone)
+
+    def query_widget_hourly(
+        self,
+        *,
+        since_epoch: int,
+        provider_id: str,
+    ) -> dict[str, object]:
+        self._validate_epoch(since_epoch, "history boundary")
+        self._validate_id(provider_id, "provider ID")
+        rows = self._connection.execute(
+            """
+            SELECT provider_id, window_kind, sampled_at, used_percent, reset_at
+            FROM usage_sample WHERE provider_id = ? AND sampled_at >= ?
+            ORDER BY window_kind ASC, sampled_at ASC
+            """,
+            (provider_id, since_epoch),
+        ).fetchall()
+        hours: dict[tuple[str, int], dict[str, object]] = {}
+        for row_provider_id, window_kind, sampled_at, used_percent, reset_at in rows:
+            if used_percent is None:
+                continue
+            hour_start_epoch = sampled_at - (sampled_at % _HOUR_SECONDS)
+            # Rows arrive in sample order, so the last write per hour wins.
+            hours[(window_kind, hour_start_epoch)] = {
+                "providerId": row_provider_id,
+                "windowKind": window_kind,
+                "hourStartEpoch": hour_start_epoch,
+                "latestUsedPercent": used_percent,
+                "resetAtEpoch": reset_at,
+            }
+        recent_per_kind: dict[str, list[dict[str, object]]] = defaultdict(list)
+        for (window_kind, _), hour in sorted(hours.items()):
+            recent_per_kind[window_kind].append(hour)
+        documents = [
+            hour
+            for hours_for_kind in recent_per_kind.values()
+            for hour in hours_for_kind[-_MAX_HOURLY_POINTS:]
+        ]
+        documents.sort(key=lambda hour: (hour["hourStartEpoch"], hour["windowKind"]))
+        return {"hours": documents}
 
     @staticmethod
     def _widget_summary_document(

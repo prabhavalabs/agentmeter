@@ -11,6 +11,9 @@ public enum WidgetSnapshotValidationError: Error, Equatable, Sendable {
     case tooManyHistoryCells(providerID: String, kind: String)
     case mismatchedHistoryProvider(providerID: String)
     case unknownHistoryWindow(providerID: String, kind: String)
+    case tooManyHourlyPoints(providerID: String, kind: String)
+    case mismatchedHourlyProvider(providerID: String)
+    case unknownHourlyWindow(providerID: String, kind: String)
     case invalidValue
 }
 
@@ -127,12 +130,55 @@ public enum WidgetSnapshotCanonicalizer {
             }
         }
 
+        var hourlyPoints: [HourlyPointKey: WidgetHourlyPoint] = [:]
+        for point in provider.hourly {
+            guard point.providerId == provider.id else {
+                throw WidgetSnapshotValidationError.mismatchedHourlyProvider(
+                    providerID: provider.id
+                )
+            }
+            guard windowKinds.contains(point.windowKind) else {
+                throw WidgetSnapshotValidationError.unknownHourlyWindow(
+                    providerID: provider.id,
+                    kind: point.windowKind
+                )
+            }
+            guard point.hourStartEpoch >= 0,
+                  (0...100).contains(point.latestUsedPercent),
+                  point.resetAtEpoch.map({ $0 >= 0 }) ?? true else {
+                throw WidgetSnapshotValidationError.invalidValue
+            }
+            let key = HourlyPointKey(
+                windowKind: point.windowKind,
+                hourStartEpoch: point.hourStartEpoch
+            )
+            hourlyPoints[key] = point
+        }
+        for kind in Set(hourlyPoints.keys.map(\.windowKind)) {
+            let count = hourlyPoints.keys.filter { $0.windowKind == kind }.count
+            guard count <= WidgetSnapshot.maximumHourlyPointCountPerWindow else {
+                throw WidgetSnapshotValidationError.tooManyHourlyPoints(
+                    providerID: provider.id,
+                    kind: kind
+                )
+            }
+        }
+
         let windowOrder = Dictionary(
             uniqueKeysWithValues: provider.windows.enumerated().map { ($1.kind, $0) }
         )
         let history = cells.values.sorted { left, right in
             if left.dayStartEpoch != right.dayStartEpoch {
                 return left.dayStartEpoch < right.dayStartEpoch
+            }
+            let leftOrder = windowOrder[left.windowKind] ?? .max
+            let rightOrder = windowOrder[right.windowKind] ?? .max
+            if leftOrder != rightOrder { return leftOrder < rightOrder }
+            return left.windowKind < right.windowKind
+        }
+        let hourly = hourlyPoints.values.sorted { left, right in
+            if left.hourStartEpoch != right.hourStartEpoch {
+                return left.hourStartEpoch < right.hourStartEpoch
             }
             let leftOrder = windowOrder[left.windowKind] ?? .max
             let rightOrder = windowOrder[right.windowKind] ?? .max
@@ -146,7 +192,8 @@ public enum WidgetSnapshotCanonicalizer {
             status: provider.status,
             updatedAtEpoch: provider.updatedAtEpoch,
             windows: provider.windows,
-            history: history
+            history: history,
+            hourly: hourly
         )
     }
 
@@ -180,6 +227,11 @@ public enum WidgetSnapshotCanonicalizer {
 private struct HistoryCellKey: Hashable {
     let windowKind: String
     let dayStartEpoch: Int
+}
+
+private struct HourlyPointKey: Hashable {
+    let windowKind: String
+    let hourStartEpoch: Int
 }
 
 enum WidgetSnapshotCoding {

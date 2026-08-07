@@ -90,8 +90,15 @@ public enum NotificationPlanner {
     }
 }
 
+public enum NotificationPermissionState: Sendable {
+    case notDetermined
+    case denied
+    case authorized
+}
+
 @MainActor
 public protocol UserNotificationDelivering: AnyObject {
+    func permissionState() async -> NotificationPermissionState
     func requestAuthorization() async throws -> Bool
     func add(_ plan: PlannedNotification) async throws
     func removePending(identifiers: [String])
@@ -135,17 +142,41 @@ public final class UserNotificationController {
         }
         isUpdating = true
         defer { isUpdating = false }
+        switch await delivery.permissionState() {
+        case .authorized:
+            isAuthorized = true
+            return true
+        case .denied:
+            isAuthorized = false
+            errorMessage = Self.deniedMessage
+            return false
+        case .notDetermined:
+            break
+        }
         do {
             isAuthorized = try await delivery.requestAuthorization()
             if isAuthorized == false {
-                errorMessage = "Notifications are disabled in System Settings."
+                errorMessage = Self.deniedMessage
             }
             return isAuthorized
         } catch {
-            errorMessage = error.localizedDescription
+            // A dev-signed bundle that Notification Center has not registered
+            // yet fails here; point at the actionable fix instead of the
+            // framework's wording.
+            errorMessage = Self.deniedMessage
             isAuthorized = false
             return false
         }
+    }
+
+    public static let deniedMessage =
+        "Allow notifications for AgentMeter in System Settings → Notifications."
+
+    public static func openSystemNotificationSettings() {
+        guard let url = URL(
+            string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension"
+        ) else { return }
+        NSWorkspace.shared.open(url)
     }
 
     public func process(
@@ -193,6 +224,15 @@ private final class SystemNotificationDelivery: NSObject, UserNotificationDelive
     override init() {
         super.init()
         center.delegate = notificationDelegate
+    }
+
+    func permissionState() async -> NotificationPermissionState {
+        switch await center.notificationSettings().authorizationStatus {
+        case .authorized, .provisional: .authorized
+        case .denied: .denied
+        case .notDetermined: .notDetermined
+        @unknown default: .notDetermined
+        }
     }
 
     func requestAuthorization() async throws -> Bool {

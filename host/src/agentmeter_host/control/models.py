@@ -209,6 +209,7 @@ class BridgeStatus:
     provider_health: tuple[tuple[str, str], ...] = ()
     configured_provider_ids: tuple[str, ...] = ()
     poll_interval_seconds: int = 300
+    device_sync_enabled: bool = True
 
     def to_document(self) -> dict[str, object]:
         return {
@@ -220,6 +221,7 @@ class BridgeStatus:
             "providerHealth": dict(self.provider_health),
             "configuredProviderIds": list(self.configured_provider_ids),
             "pollIntervalSeconds": self.poll_interval_seconds,
+            "deviceSyncEnabled": self.device_sync_enabled,
         }
 
 

@@ -26,11 +26,11 @@ constexpr uint32_t kSurfaceRaised = 0x182235;
 constexpr uint32_t kBorder = 0x26344D;
 constexpr uint32_t kText = 0xF4F7FF;
 constexpr uint32_t kMuted = 0x8C9AB2;
-constexpr uint32_t kGreen = 0x52E3B2;
+constexpr uint32_t kGreen = 0x3DDC97;
 constexpr uint32_t kAmber = 0xF5C451;
 constexpr uint32_t kRed = 0xFF6B7A;
 constexpr uint32_t kPurple = 0x8B7CFF;
-constexpr uint32_t kBlue = 0x5EC8FF;
+constexpr uint32_t kBlue = 0x6FA8FF;
 
 enum class ViewMode : uint8_t { Overview, Detail, Settings };
 

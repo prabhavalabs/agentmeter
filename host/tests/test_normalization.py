@@ -579,3 +579,57 @@ def test_normalizer_selects_codex_claude_and_gemini_in_configured_order() -> Non
         "claude",
         "gemini",
     ]
+
+
+def test_usage_normalizer_gives_cursor_and_gemini_meaningful_window_kinds() -> None:
+    """Catch slot-based kinds that made Cursor's total and Gemini's daily
+    quotas sort as session windows in every downstream selector."""
+    from agentmeter_host.normalization import (
+        DisplayPreferences,
+        normalize_provider_usages,
+    )
+
+    snapshot = normalize_provider_usages(
+        {
+            "cursor": provider_usage("cursor"),
+            "gemini": provider_usage("gemini"),
+        },
+        provider_ids=("cursor", "gemini"),
+        message_id=24,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+    )
+
+    cursor, gemini = snapshot["providers"]
+    assert [(window["kind"], window["label"]) for window in cursor["windows"]] == [
+        ("total", "Total"),
+        ("auto", "Auto"),
+    ]
+    assert [(window["kind"], window["label"]) for window in gemini["windows"]] == [
+        ("pro_daily", "Pro"),
+        ("flash_daily", "Flash"),
+    ]
+
+
+def test_usage_normalizer_keeps_claude_model_window_kind_distinct() -> None:
+    from agentmeter_host.normalization import (
+        DisplayPreferences,
+        normalize_provider_usages,
+    )
+
+    usage = provider_usage("claude")
+    usage["usage"]["tertiary"] = {
+        "usedPercent": 42,
+        "resetsAt": "2026-08-08T18:00:00Z",
+    }
+
+    snapshot = normalize_provider_usages(
+        {"claude": usage},
+        provider_ids=("claude",),
+        message_id=25,
+        display=DisplayPreferences(55, (75, 90), False),
+        generated_at=datetime(2026, 8, 1, 18, 0, tzinfo=UTC),
+    )
+
+    kinds = [window["kind"] for window in snapshot["providers"][0]["windows"]]
+    assert kinds == ["session", "weekly", "model_weekly"]

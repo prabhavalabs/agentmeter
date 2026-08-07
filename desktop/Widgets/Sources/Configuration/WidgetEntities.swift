@@ -10,9 +10,13 @@ struct ProviderEntity: AppEntity, Equatable, Sendable {
 
     let id: String
     let name: String
+    var usageSummary: String?
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(name)")
+        guard let usageSummary else {
+            return DisplayRepresentation(title: "\(name)")
+        }
+        return DisplayRepresentation(title: "\(name)", subtitle: "\(usageSummary)")
     }
 }
 
@@ -23,11 +27,26 @@ struct WindowEntity: AppEntity, Equatable, Sendable {
     let providerID: String
     let windowKind: String
     let label: String
+    var detail: String?
 
     var id: String { "\(providerID):\(windowKind)" }
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(label)")
+        guard let detail else {
+            return DisplayRepresentation(title: "\(label)")
+        }
+        return DisplayRepresentation(title: "\(label)", subtitle: "\(detail)")
+    }
+}
+
+enum WidgetEntityUsageText {
+    static func percentText(_ usedPercent: Int?) -> String {
+        usedPercent.map { "\($0)% used" } ?? "Not reported"
+    }
+
+    static func providerSummary(_ provider: WidgetProviderSnapshot) -> String? {
+        guard let window = provider.windows.first else { return nil }
+        return "\(window.label) · \(percentText(window.usedPercent))"
     }
 }
 
@@ -61,7 +80,11 @@ struct ProviderEntityQuery: EntityQuery {
         }
         return validProviders.compactMap { provider in
             guard identityCounts[provider.id] == 1 else { return nil }
-            return ProviderEntity(id: provider.id, name: provider.name)
+            return ProviderEntity(
+                id: provider.id,
+                name: provider.name,
+                usageSummary: WidgetEntityUsageText.providerSummary(provider)
+            )
         }
     }
 }
@@ -92,8 +115,13 @@ struct WindowEntityQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [WindowEntity] {
-        guard let providerID = selectedProviderID ?? intent?.provider.id else { return [] }
-        return allEntities().filter { $0.providerID == providerID }
+        let all = allEntities()
+        // An empty suggestion list renders as a dead popover in the system
+        // sheet, so before an agent is chosen the picker offers every window,
+        // subtitled with its agent for disambiguation.
+        guard let providerID = selectedProviderID ?? intent?.provider.id else { return all }
+        let scoped = all.filter { $0.providerID == providerID }
+        return scoped.isEmpty ? all : scoped
     }
 
     private func allEntities() -> [WindowEntity] {
@@ -107,7 +135,9 @@ struct WindowEntityQuery: EntityQuery {
                 let entity = WindowEntity(
                     providerID: provider.id,
                     windowKind: window.kind,
-                    label: window.label
+                    label: window.label,
+                    detail: "\(provider.name) · "
+                        + WidgetEntityUsageText.percentText(window.usedPercent)
                 )
                 return entity
             }
@@ -120,11 +150,11 @@ struct WindowEntityQuery: EntityQuery {
 }
 
 private enum WidgetEntitySnapshotSource {
-    static let appGroupIdentifier = "group.com.prabhavalabs.agentmeter.shared"
-
+    // Single source of truth for the container — a duplicated literal here once
+    // left the configuration pickers reading a nonexistent group.
     static func load() throws -> WidgetSnapshot? {
         guard let directory = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+            forSecurityApplicationGroupIdentifier: WidgetSnapshotLoader.appGroupIdentifier
         ) else {
             return nil
         }

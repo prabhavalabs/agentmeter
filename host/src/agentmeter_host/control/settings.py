@@ -117,6 +117,7 @@ class MutableHostSettings:
     selected_device_id: str | None = None
     selected_device_name: str | None = None
     auto_reconnect: bool = True
+    device_sync_enabled: bool = True
     pending_device_patch: PendingSettingsPatch | None = None
 
     def __post_init__(self) -> None:
@@ -140,6 +141,8 @@ class MutableHostSettings:
                 raise ControlSettingsError(f"{label} is invalid")
         if not isinstance(self.auto_reconnect, bool):
             raise ControlSettingsError("auto reconnect must be a boolean")
+        if not isinstance(self.device_sync_enabled, bool):
+            raise ControlSettingsError("device sync must be a boolean")
 
     @classmethod
     def from_host_config(cls, config: HostConfig) -> MutableHostSettings:
@@ -156,6 +159,7 @@ class MutableHostSettings:
             "selectedDeviceId": self.selected_device_id,
             "selectedDeviceName": self.selected_device_name,
             "autoReconnect": self.auto_reconnect,
+            "deviceSyncEnabled": self.device_sync_enabled,
             "pendingDevicePatch": (
                 None
                 if self.pending_device_patch is None
@@ -227,7 +231,7 @@ class ControlSettingsStore:
     def _decode(document: object) -> MutableHostSettings:
         if not isinstance(document, dict):
             raise ControlSettingsError("control settings must be an object")
-        expected = {
+        required = {
             "schemaVersion",
             "providerIds",
             "pollIntervalSeconds",
@@ -236,7 +240,13 @@ class ControlSettingsStore:
             "autoReconnect",
             "pendingDevicePatch",
         }
-        if set(document) != expected or document.get("schemaVersion") != _SCHEMA_VERSION:
+        # deviceSyncEnabled arrived after the first release; earlier control
+        # files omit it and default to synchronizing.
+        expected = required | {"deviceSyncEnabled"}
+        if (
+            not required <= set(document) <= expected
+            or document.get("schemaVersion") != _SCHEMA_VERSION
+        ):
             raise ControlSettingsError("control settings schema is invalid")
         provider_ids = document["providerIds"]
         if not isinstance(provider_ids, list) or not all(
@@ -264,5 +274,6 @@ class ControlSettingsStore:
             selected_device_id=document["selectedDeviceId"],
             selected_device_name=document["selectedDeviceName"],
             auto_reconnect=document["autoReconnect"],
+            device_sync_enabled=document.get("deviceSyncEnabled", True),
             pending_device_patch=pending,
         )

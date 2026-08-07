@@ -6,6 +6,7 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     public static let maximumWindowCountPerProvider = 8
     public static let maximumHistoryWindowCountPerProvider = 4
     public static let maximumHistoryDayCount = 30
+    public static let maximumHourlyPointCountPerWindow = 26
     public static let maximumEncodedBytes = 256 * 1_024
 
     public let schemaVersion: Int
@@ -36,6 +37,7 @@ public struct WidgetProviderSnapshot: Codable, Equatable, Identifiable, Sendable
     public let updatedAtEpoch: Int?
     public let windows: [WidgetWindowSnapshot]
     public let history: [WidgetHistoryDay]
+    public let hourly: [WidgetHourlyPoint]
 
     public init(
         id: String,
@@ -43,7 +45,8 @@ public struct WidgetProviderSnapshot: Codable, Equatable, Identifiable, Sendable
         status: String,
         updatedAtEpoch: Int?,
         windows: [WidgetWindowSnapshot],
-        history: [WidgetHistoryDay]
+        history: [WidgetHistoryDay],
+        hourly: [WidgetHourlyPoint] = []
     ) {
         self.id = id
         self.name = name
@@ -51,6 +54,19 @@ public struct WidgetProviderSnapshot: Codable, Equatable, Identifiable, Sendable
         self.updatedAtEpoch = updatedAtEpoch
         self.windows = windows
         self.history = history
+        self.hourly = hourly
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        status = try container.decode(String.self, forKey: .status)
+        updatedAtEpoch = try container.decodeIfPresent(Int.self, forKey: .updatedAtEpoch)
+        windows = try container.decode([WidgetWindowSnapshot].self, forKey: .windows)
+        history = try container.decode([WidgetHistoryDay].self, forKey: .history)
+        // Absent in snapshots written before the hourly trend existed.
+        hourly = try container.decodeIfPresent([WidgetHourlyPoint].self, forKey: .hourly) ?? []
     }
 }
 

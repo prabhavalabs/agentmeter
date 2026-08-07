@@ -74,8 +74,13 @@ import Testing
 private final class FakeNotificationDelivery: UserNotificationDelivering {
     var authorizationRequests = 0
     var authorizationResult = true
+    var permission = NotificationPermissionState.notDetermined
     var plans: [PlannedNotification] = []
     var removed: [String] = []
+
+    func permissionState() async -> NotificationPermissionState {
+        permission
+    }
 
     func requestAuthorization() async throws -> Bool {
         authorizationRequests += 1
@@ -133,4 +138,37 @@ private func notificationState(
 
 private func drainNotificationTasks() async {
     for _ in 0 ..< 10 { await Task.yield() }
+}
+
+
+@MainActor
+@Test func deniedSystemPermissionSurfacesTheSettingsFixWithoutPrompting() async {
+    let delivery = FakeNotificationDelivery()
+    delivery.permission = .denied
+    let controller = UserNotificationController(
+        defaults: UserDefaults(suiteName: "notify-denied-\(UUID().uuidString)")!,
+        delivery: delivery
+    )
+
+    let enabled = await controller.setEnabled(true)
+
+    #expect(enabled == false)
+    #expect(delivery.authorizationRequests == 0)
+    #expect(controller.errorMessage == UserNotificationController.deniedMessage)
+}
+
+@MainActor
+@Test func alreadyAuthorizedPermissionEnablesWithoutReprompting() async {
+    let delivery = FakeNotificationDelivery()
+    delivery.permission = .authorized
+    let controller = UserNotificationController(
+        defaults: UserDefaults(suiteName: "notify-authorized-\(UUID().uuidString)")!,
+        delivery: delivery
+    )
+
+    let enabled = await controller.setEnabled(true)
+
+    #expect(enabled == true)
+    #expect(delivery.authorizationRequests == 0)
+    #expect(controller.errorMessage == nil)
 }
