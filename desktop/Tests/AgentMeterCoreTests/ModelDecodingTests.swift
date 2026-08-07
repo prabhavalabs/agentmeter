@@ -114,3 +114,19 @@ private enum Fixture {
     #expect(try JSONDecoder().decode(WidgetHistoryDay.self, from: withBoundary).cycleStartEpoch == 900)
     #expect(try JSONDecoder().decode(WidgetHistoryDay.self, from: legacy).cycleStartEpoch == nil)
 }
+
+@Test func bridgeStatusDeviceSyncDefaultsTrueAndDecodesExplicitValues() throws {
+    let legacy = Data(
+        #"{"version":"0.1.0","running":true}"#.utf8
+    )
+    let standalone = Data(
+        #"{"version":"0.1.0","running":true,"deviceSyncEnabled":false}"#.utf8
+    )
+    let synchronized = Data(
+        #"{"version":"0.1.0","running":true,"deviceSyncEnabled":true}"#.utf8
+    )
+
+    #expect(try JSONDecoder().decode(BridgeStatus.self, from: legacy).deviceSyncEnabled)
+    #expect(try JSONDecoder().decode(BridgeStatus.self, from: standalone).deviceSyncEnabled == false)
+    #expect(try JSONDecoder().decode(BridgeStatus.self, from: synchronized).deviceSyncEnabled)
+}

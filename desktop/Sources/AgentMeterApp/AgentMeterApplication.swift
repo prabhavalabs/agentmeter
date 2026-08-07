@@ -53,6 +53,8 @@ struct AgentMeterApplication: App {
                     .keyboardShortcut("4", modifiers: .command)
                 Button("Diagnostics") { model.selectedSection = .diagnostics }
                     .keyboardShortcut("5", modifiers: .command)
+                Button("Settings") { model.selectedSection = .settings }
+                    .keyboardShortcut("6", modifiers: .command)
             }
             CommandGroup(replacing: .appTermination) {
                 Button("Quit AgentMeter") {

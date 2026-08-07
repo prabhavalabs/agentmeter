@@ -21,6 +21,15 @@ public struct DisplaySettingsView: View {
     public init() {}
 
     public var body: some View {
+        if model.deviceSyncEnabled {
+            settingsContent
+        } else {
+            DeviceSyncOffView()
+                .navigationTitle("Display")
+        }
+    }
+
+    private var settingsContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 HStack {

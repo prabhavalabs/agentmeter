@@ -19,6 +19,7 @@
 		1585EFB283E9FA601FD9937F /* JsonLineDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3877C43A7260CDD43E8DD2F /* JsonLineDecoderTests.swift */; };
 		186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
 		190ECDF9E1962280C4E43436 /* UsageBarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57517A9EF637ACCEE499FF88 /* UsageBarRow.swift */; };
+		1A37CA136FA67E199A81304B /* NavigationSectionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0845C9FF5A1D5F478D4C4E4D /* NavigationSectionTests.swift */; };
 		1C54823D1578345A395D9FCA /* WidgetStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA66ED3180281C864B89381B /* WidgetStateView.swift */; };
 		1D2500E915836C556C2CFA67 /* WidgetLocalDaySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */; };
 		1DC79AA66ABD329092045169 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
@@ -145,6 +146,7 @@
 		0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardProviderRow.swift; sourceTree = "<group>"; };
 		05537A4E78A391358E3C9265 /* LivePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePill.swift; sourceTree = "<group>"; };
 		05658DC367B0D76481945762 /* DashboardWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetView.swift; sourceTree = "<group>"; };
+		0845C9FF5A1D5F478D4C4E4D /* NavigationSectionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationSectionTests.swift; sourceTree = "<group>"; };
 		09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FictionalFocusPresentationSource.swift; sourceTree = "<group>"; };
 		09D518E9D78EC1CFD9BAE036 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
 		0FDF1585B479FACF779FEA4E /* WidgetSnapshotStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStoreTests.swift; sourceTree = "<group>"; };
@@ -426,6 +428,7 @@
 				A1B425590ADBC293AA842B6E /* DisplaySettingsTests.swift */,
 				E76F177E3765BC7131F98A53 /* MenuBarPanelViewportTests.swift */,
 				F83FBFE1962F9CAAED078DD0 /* MenuProviderDetailsTests.swift */,
+				0845C9FF5A1D5F478D4C4E4D /* NavigationSectionTests.swift */,
 				09D518E9D78EC1CFD9BAE036 /* ThemeTests.swift */,
 				2C81F1C7953B2BE2E847B8CF /* UserNotificationControllerTests.swift */,
 				364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */,
@@ -792,6 +795,7 @@
 				4F520D7E5E4F04AAE62E41CE /* DisplaySettingsTests.swift in Sources */,
 				3BEA4AA7D5171BB9F9BF73F6 /* MenuBarPanelViewportTests.swift in Sources */,
 				DC4D0E1ABF5B72865D7B78D5 /* MenuProviderDetailsTests.swift in Sources */,
+				1A37CA136FA67E199A81304B /* NavigationSectionTests.swift in Sources */,
 				939A7ADF8483777CEEB4CCCC /* ThemeTests.swift in Sources */,
 				2310D3BFF98980ADFB3F9897 /* UserNotificationControllerTests.swift in Sources */,
 				1D2500E915836C556C2CFA67 /* WidgetLocalDaySchedulerTests.swift in Sources */,

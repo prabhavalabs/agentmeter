@@ -36,20 +36,22 @@ public struct MenuBarContent: View {
 
                 menuSection("Open AgentMeter") {
                     VStack(spacing: 0) {
-                        navigationRow(.overview)
-                        menuDivider
-                        navigationRow(.device)
-                        menuDivider
-                        navigationRow(.agents)
-                        menuDivider
-                        navigationRow(.display)
+                        let sections = menuNavigationSections
+                        ForEach(Array(sections.enumerated()), id: \.element.id) { index, section in
+                            navigationRow(section)
+                            if index < sections.count - 1 {
+                                menuDivider
+                            }
+                        }
                     }
                 }
 
                 menuSection("Controls") {
                     VStack(spacing: 0) {
-                        connectionRow
-                        menuDivider
+                        if model.deviceSyncEnabled {
+                            connectionRow
+                            menuDivider
+                        }
                         refreshRow
                         menuDivider
                         launchAtLoginRow
@@ -102,28 +104,43 @@ public struct MenuBarContent: View {
     }
 
     private var deviceHeader: some View {
-        HStack(spacing: 12) {
+        let standalone = model.deviceSyncEnabled == false
+        let headerSymbol = standalone
+            ? "desktopcomputer"
+            : model.state.connection.phase.symbolName
+        let headerTint = standalone ? Color.secondary : model.state.connection.phase.tint
+        return HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(model.state.connection.phase.tint.opacity(0.14))
-                Image(systemName: model.state.connection.phase.symbolName)
+                    .fill(headerTint.opacity(0.14))
+                Image(systemName: headerSymbol)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(model.state.connection.phase.tint)
+                    .foregroundStyle(headerTint)
             }
             .frame(width: 46, height: 46)
             .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(model.state.connection.selectedDeviceName ?? "AgentMeter")
-                    .font(.headline)
-                    .lineLimit(1)
-
-                Label(
-                    model.state.connection.phase.displayName,
-                    systemImage: model.state.connection.phase.symbolName
+                Text(
+                    standalone
+                        ? "AgentMeter"
+                        : model.state.connection.selectedDeviceName ?? "AgentMeter"
                 )
-                .foregroundStyle(model.state.connection.phase.tint)
-                .font(.caption.weight(.semibold))
+                .font(.headline)
+                .lineLimit(1)
+
+                if standalone {
+                    Label("Standalone", systemImage: "bolt.slash")
+                        .foregroundStyle(.secondary)
+                        .font(.caption.weight(.semibold))
+                } else {
+                    Label(
+                        model.state.connection.phase.displayName,
+                        systemImage: model.state.connection.phase.symbolName
+                    )
+                    .foregroundStyle(model.state.connection.phase.tint)
+                    .font(.caption.weight(.semibold))
+                }
 
                 Label(
                     bridgeService.state.title,
@@ -174,6 +191,13 @@ public struct MenuBarContent: View {
                 + (isExpanded ? "expanded" : "collapsed")
         )
         .accessibilityHint(isExpanded ? "Collapse usage details" : "Expand usage details")
+    }
+
+    private var menuNavigationSections: [NavigationSection] {
+        let visible = NavigationSection.visibleSections(
+            deviceSyncEnabled: model.deviceSyncEnabled
+        )
+        return [.overview, .device, .agents, .display].filter(visible.contains)
     }
 
     private func navigationRow(_ section: NavigationSection) -> some View {
@@ -310,6 +334,7 @@ extension NavigationSection {
         case .agents: "Coding Agents"
         case .display: "Display Settings"
         case .diagnostics: "Diagnostics"
+        case .settings: "Settings"
         }
     }
 
@@ -320,6 +345,7 @@ extension NavigationSection {
         case .agents: Color(red: 0.36, green: 0.84, blue: 0.69)
         case .display: Color(red: 0.73, green: 0.53, blue: 1.0)
         case .diagnostics: AgentMeterTheme.warning
+        case .settings: AgentMeterTheme.accent
         }
     }
 }

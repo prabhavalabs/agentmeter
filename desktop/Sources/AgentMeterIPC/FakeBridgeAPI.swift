@@ -52,6 +52,11 @@ public actor FakeBridgeAPI: BridgeAPI {
                 providerHealth: state.bridge.providerHealth,
                 recentEvents: []
             ).jsonValue()
+        case let .setDeviceSync(enabled):
+            // The real bridge applies the mode and answers with the full
+            // state document, like device.connect.
+            state = stateBySettingDeviceSync(enabled: enabled, on: state)
+            payload = try state.jsonValue()
         default:
             payload = .object([:])
         }
@@ -68,6 +73,33 @@ public actor FakeBridgeAPI: BridgeAPI {
 
     public func commandTypes() -> [String] {
         receivedCommandTypes
+    }
+
+    private func stateBySettingDeviceSync(
+        enabled: Bool,
+        on base: ControlState
+    ) -> ControlState {
+        let bridge = base.bridge
+        return ControlState(
+            revision: base.revision,
+            connection: base.connection,
+            peripherals: base.peripherals,
+            information: base.information,
+            telemetry: base.telemetry,
+            settings: base.settings,
+            providers: base.providers,
+            bridge: BridgeStatus(
+                version: bridge.version,
+                running: bridge.running,
+                lastProviderRefreshEpoch: bridge.lastProviderRefreshEpoch,
+                lastDeviceSyncEpoch: bridge.lastDeviceSyncEpoch,
+                lastErrorCode: bridge.lastErrorCode,
+                providerHealth: bridge.providerHealth,
+                configuredProviderIds: bridge.configuredProviderIds,
+                pollIntervalSeconds: bridge.pollIntervalSeconds,
+                deviceSyncEnabled: enabled
+            )
+        )
     }
 
     public func close() async {

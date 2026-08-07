@@ -66,6 +66,15 @@ public struct DeviceView: View {
     public init() {}
 
     public var body: some View {
+        if model.deviceSyncEnabled {
+            deviceContent
+        } else {
+            DeviceSyncOffView()
+                .navigationTitle("Device")
+        }
+    }
+
+    private var deviceContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 connectionCard
