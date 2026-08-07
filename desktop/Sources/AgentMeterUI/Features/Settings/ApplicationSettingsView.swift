@@ -151,8 +151,12 @@ public struct ApplicationSettingsSectionView: View {
 
     public var body: some View {
         ApplicationSettingsForm()
+            // The grouped form paints its own system background, which clashes
+            // with the app's window background used by every other page.
+            .scrollContentBackground(.hidden)
             .frame(maxWidth: 700)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AgentMeterTheme.windowBackground)
             .navigationTitle("Settings")
     }
 }
