@@ -106,26 +106,37 @@ or absolute date, optional status and freshness, and whether a click opens Overv
 provider detail. Every widget instance stores its own configuration, so a Dashboard and multiple
 Focus widgets can make independent choices.
 
-Dashboard omits history in small and medium. Focus omits history in small and can show compact
-history in medium. Large and extra-large families can show the fuller configured heat map or trend:
+Focus leads with the hero window — a large number at small, a glowing ring at medium and above —
+and lists every remaining window as a labelled progress bar. Dashboard renders a compact provider
+list at small, a ring-per-agent board at medium, provider rows with a 24-hour trend and a 30-day
+consumption strip at large, and a mini-card grid with an analytics rail at extra large.
 
-- A heat map measures percentage points consumed during each local calendar day. Combined scope
-  averages available provider values; single-provider scope uses only the selected provider.
-- A trend shows the latest used percentage recorded on each day for the selected outer, inner, or
-  specific Focus window. Switching the rings to **Remaining** does not invert historical facts;
-  history continues to describe allowance consumption.
+Dashboard omits history in small and medium. Focus omits history in small and can show compact
+history in medium. Large and extra-large families can show the configured history:
+
+- The consumption strip and grid measure percentage points consumed during each local calendar
+  day, ending today. Combined scope averages available provider values; single-provider scope
+  uses only the selected provider.
+- The 24-hour trend draws each agent's latest known hero-window percentage per hour from the
+  bridge's retained five-minute samples. When no hourly points exist, the module is omitted
+  rather than fabricated.
+- A Focus trend shows the latest used percentage recorded on each day for the selected window.
+  Switching to **Remaining** does not invert historical facts; history continues to describe
+  allowance consumption.
 - Missing days are gaps, not zeroes. The 7-day and 30-day ranges follow local calendar boundaries,
   including daylight-saving changes.
 
-If a reset timestamp has passed but no fresh provider sample has established the next window, the
-widget says **Refresh pending**. It does not infer a zero or roll the old value into a new cycle.
-Widget timelines continue updating while the main window is closed because the menu-bar app and
-bridge remain active.
+Reset times are phrased by distance: **Resets in 2 hr 5 min** under a day, **Resets Mon 6:00 PM**
+under a week, **Resets Mon 12 Aug** beyond that, and the compact **⟳ 2h 5m** form in dense
+layouts. If a reset timestamp has passed but no fresh provider sample has established the next
+window, the widget says **Refresh pending**. It does not infer a zero or roll the old value into
+a new cycle. Widget timelines continue updating while the main window is closed because the
+menu-bar app and bridge remain active.
 
 The app writes one bounded JSON snapshot to
 `group.com.prabhavalabs.agentmeter.shared`; the extension reads that file directly. The snapshot
 contains only provider IDs and display names, health status, percentages, reset and update times,
-and downsampled daily history. It contains no account identity, prompt, code, repository or file
+downsampled daily history, and up to 26 hourly percentage points per window. It contains no account identity, prompt, code, repository or file
 path, API token, cookie, credential, raw response, local session log, cost, credit, or billing
 field. The extension has no IPC, Bluetooth, SQLite, network, or keychain dependency.
 
@@ -272,7 +283,7 @@ development team and matching app/widget App Group profiles:
    and inspect app and extension independently with `codesign -dvvv --entitlements :-`.
 2. Install the app and confirm Dashboard and Focus appear in the widget gallery.
 3. Add independent instances and exercise small, medium, large, and extra-large families.
-4. Verify used and remaining values, 7/30-day heat maps and trends, density, every theme, window
+4. Verify used and remaining values, 7/30-day consumption strips and trends, density, every theme, window
    selections, and Overview, Agents, and provider-detail deep links.
 5. Close the main window and confirm widget data continues updating.
 6. Interrupt and restore the bridge, confirming honest stale/unavailable recovery.

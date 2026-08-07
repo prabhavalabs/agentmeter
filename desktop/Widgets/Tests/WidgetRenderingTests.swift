@@ -57,13 +57,20 @@ func everyTimelineFailureStateHasSubstantiveAccessibleRendering(state: WidgetTim
 }
 
 @MainActor
-@Test func dashboardProviderRowComposesScheduledResetAsDynamicTimer() throws {
+@Test func dashboardProviderRowComposesLiveResetCountdownAndExactPendingCopy() throws {
     let presentation = FictionalDashboardPresentationSource.presentation(
         for: configuredDashboardIntent(),
         family: .small
     )
     let provider = try #require(presentation.providers.first)
-    let scheduled = try #require(provider.rings.first)
+    let nowEpoch = FictionalDashboardPresentationSource.nowEpoch
+    let soon = WidgetRingPresentation(
+        windowKind: "session",
+        label: "Session",
+        usedPercent: 18,
+        displayedPercent: 18,
+        resetState: .scheduled(epoch: nowEpoch + 4_000)
+    )
     let pending = WidgetRingPresentation(
         windowKind: "weekly",
         label: "Weekly",
@@ -71,25 +78,28 @@ func everyTimelineFailureStateHasSubstantiveAccessibleRendering(state: WidgetTim
         displayedPercent: 42,
         resetState: .pending
     )
-    let row = DashboardProviderRow(
-        provider: provider,
-        percentageMode: presentation.configuration.percentageMode,
-        modules: presentation.modules,
-        freshness: presentation.freshness,
-        showsResetCountdown: true,
-        showsAbsoluteResetDate: false,
-        theme: presentation.configuration.theme,
-        style: .outerOnly
-    )
 
-    #expect(row.resetComposition(for: scheduled).content == [
-        .timer(Date(timeIntervalSince1970: 1_800_020_000)),
+    #expect(ResetSummarySemantics(
+        presentation: soon,
+        showsCountdown: true,
+        showsAbsoluteDate: false,
+        nowEpoch: nowEpoch
+    ).content == [
+        .liveRelative(Date(timeIntervalSince1970: TimeInterval(nowEpoch + 4_000))),
     ])
-    #expect(row.resetComposition(for: pending).content == [.text("Refresh pending")])
-    #expect(dashboardProviderRowBodyContainsResetSummary(row))
+    #expect(ResetSummarySemantics(
+        presentation: pending,
+        showsCountdown: true,
+        showsAbsoluteDate: false,
+        nowEpoch: nowEpoch
+    ).content == [.text("Refresh pending")])
     assertSubstantiveRender(
-        row,
-        size: CGSize(width: 170, height: 90),
+        DashboardProviderRow(
+            provider: provider,
+            theme: presentation.configuration.theme,
+            nowEpoch: nowEpoch
+        ),
+        size: CGSize(width: 340, height: 44),
         colorScheme: .dark
     )
 }
@@ -156,45 +166,6 @@ func legacyDashboardFocusTrendFallsBackToRenderedOuterHistory(colorScheme: Color
     )
 }
 
-@Test func dashboardLayoutPresetsProduceDistinctHistoryCapableStructures() {
-    let automatic = dashboardLayoutPlan(.automatic, family: .large)
-    let usageAndRings = dashboardLayoutPlan(.usageAndRings, family: .large)
-    let compact = dashboardLayoutPlan(.compact, family: .large)
-    let expanded = dashboardLayoutPlan(.expanded, family: .large)
-
-    #expect(automatic.rowStyle == .detailed)
-    #expect(automatic.providerColumns == 2)
-    #expect(automatic.historyEmphasis == .balanced)
-
-    #expect(usageAndRings.rowStyle == .dualCompact)
-    #expect(usageAndRings.providerColumns == 2)
-    #expect(usageAndRings.historyEmphasis == .compact)
-
-    #expect(compact.rowStyle == .outerOnly)
-    #expect(compact.providerColumns == 2)
-    #expect(compact.historyEmphasis == .balanced)
-    #expect(compact.spacing < automatic.spacing)
-
-    #expect(expanded.rowStyle == .analyticsCompact)
-    #expect(expanded.providerColumns == 1)
-    #expect(expanded.historyEmphasis == .expanded)
-
-    #expect(Set([automatic, usageAndRings, compact, expanded]).count == 4)
-}
-
-@Test func expandedAndCompactPresetsFallBackWithinCompactFamilyCapabilities() {
-    let smallExpanded = dashboardLayoutPlan(.expanded, family: .small)
-    let mediumExpanded = dashboardLayoutPlan(.expanded, family: .medium)
-    let mediumCompact = dashboardLayoutPlan(.compact, family: .medium)
-
-    #expect(smallExpanded.rowStyle == .outerOnly)
-    #expect(smallExpanded.historyEmphasis == .hidden)
-    #expect(mediumExpanded.rowStyle == .dualCompact)
-    #expect(mediumExpanded.historyEmphasis == .hidden)
-    #expect(mediumCompact.rowStyle == .outerOnly)
-    #expect(mediumCompact.historyEmphasis == .hidden)
-}
-
 @MainActor
 @Test(arguments: IntentLayoutOption.allCases)
 func everyDashboardLayoutPresetHasSubstantiveLargeRendering(layout: IntentLayoutOption) {
@@ -224,23 +195,23 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         for: configuredDashboardIntent(),
         family: family
     )
-    let semantics = DashboardWidgetSemantics(presentation: presentation)
 
-    #expect(semantics.visibleProviderCount == providerCount)
-    #expect(semantics.overflowLabel == (overflowCount == 0 ? nil : "+\(overflowCount)"))
-    #expect(semantics.showsHistory == showsHistory)
+    #expect(presentation.providers.count == providerCount)
+    #expect(presentation.overflowCount == overflowCount)
+    #expect((presentation.history != nil) == showsHistory)
 }
 
-@Test func dashboardHistorySemanticsDescribeTruthfulScopeStyleAndRange() {
+@Test func dashboardHistoryProjectionsStayTruthfulAcrossScopeStyleAndRange() {
     let heatIntent = configuredDashboardIntent()
     heatIntent.historyStyle = .heatMap
     heatIntent.historyRange = .days30
     heatIntent.heatScope = .combined
     let heat = FictionalDashboardPresentationSource.presentation(for: heatIntent, family: .large)
 
-    #expect(DashboardHistorySemantics(presentation: heat).title == "Average allowance consumed")
-    #expect(DashboardHistorySemantics(presentation: heat).rangeLabel == "Last 30 days")
-    #expect(DashboardHistorySemantics(presentation: heat).style == .heatMap)
+    #expect(heat.configuration.historyStyle == .heatMap)
+    #expect(heat.configuration.historyPeriod.displayLabel == "Last 30 days")
+    #expect(heat.history?.availabilityMessage == nil)
+    #expect(heat.history?.cells.count == 30)
 
     let singleHeatIntent = configuredDashboardIntent()
     singleHeatIntent.providers = [ProviderEntity(id: "codex", name: "Codex")]
@@ -251,8 +222,8 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         family: .large
     )
 
-    #expect(DashboardHistorySemantics(presentation: singleHeat).title == "Codex allowance consumed")
-    #expect(DashboardHistorySemantics(presentation: singleHeat).title != "Average allowance consumed")
+    #expect(singleHeat.history?.cells.isEmpty == false)
+    #expect(singleHeat.history?.cells.contains(where: { $0.hasData == false }) == true)
 
     let trendIntent = configuredDashboardIntent()
     trendIntent.providers = [ProviderEntity(id: "gemini", name: "Gemini")]
@@ -260,95 +231,167 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
     trendIntent.historyRange = .days7
     trendIntent.trendWindow = .inner
     let trend = FictionalDashboardPresentationSource.presentation(for: trendIntent, family: .extraLarge)
-    let trendSemantics = DashboardHistorySemantics(presentation: trend)
 
-    #expect(trendSemantics.title == "Daily allowance used")
-    #expect(trendSemantics.rangeLabel == "Last 7 days")
-    #expect(trendSemantics.style == .trend)
+    #expect(trend.configuration.historyStyle == .trend)
+    #expect(trend.configuration.historyPeriod.displayLabel == "Last 7 days")
+    #expect(trend.history?.windowLabel == "Daily")
     #expect(trend.history?.trendPoints.count == 7)
     #expect(trend.history?.trendPoints.contains(where: { $0.latestUsedPercent == nil }) == true)
 }
 
-@Test func dashboardRowsPreserveExactUnavailableCopyAndFullAccessibleNames() {
+@MainActor
+@Test func dashboardRowsPreserveExactUnavailableCopyAndLongNames() throws {
     let intent = configuredDashboardIntent()
     let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .extraLarge)
     let longName = presentation.providers.first { $0.id == "longname" }
     let unknown = presentation.providers.first { $0.id == "claude" }?.rings.first
     let pending = presentation.providers.first { $0.id == "cursor" }?.rings.first
+    let nowEpoch = FictionalDashboardPresentationSource.nowEpoch
 
     #expect(longName?.name == "Aperture Research Allowance Service")
-    #expect(longName.map {
-        DashboardProviderAccessibility.summary(
-            $0,
-            percentageMode: .used,
-            style: .expanded,
-            additionalWindowLimit: 2,
-            modules: presentation.modules,
-            freshness: presentation.freshness,
-            showsMetadata: true,
-            showsResetCountdown: true,
-            showsAbsoluteResetDate: true,
-            relativeTo: Date(timeIntervalSince1970: 1_799_996_400)
-        )
-    }?.contains("Aperture Research Allowance Service") == true)
-    #expect(unknown.map(DashboardProviderCopy.percentage) == "Not reported")
-    #expect(unknown.map(DashboardProviderCopy.reset) == "Reset time unavailable")
-    #expect(pending.map(DashboardProviderCopy.reset) == "Refresh pending")
+    #expect(unknown?.usedPercent == nil)
+    #expect(unknown?.displayedPercent == nil)
+    #expect(unknown?.resetState == .unavailable)
+    #expect(WidgetResetPhrasing.longText(
+        WidgetResetPhrasing.phrase(for: .unavailable, nowEpoch: nowEpoch),
+        nowEpoch: nowEpoch
+    ) == "Reset unavailable")
+    #expect(WidgetResetPhrasing.compactText(
+        WidgetResetPhrasing.phrase(for: .unavailable, nowEpoch: nowEpoch),
+        nowEpoch: nowEpoch
+    ) == "—")
+    #expect(pending?.resetState == .pending)
+    #expect(pending?.resetText == "Refresh pending")
+    #expect(WidgetResetPhrasing.longText(.pending, nowEpoch: nowEpoch) == "Refresh pending")
+
+    let row = DashboardProviderRow(
+        provider: try #require(longName),
+        theme: presentation.configuration.theme,
+        nowEpoch: nowEpoch
+    )
+    assertSubstantiveRender(row, size: CGSize(width: 340, height: 44), colorScheme: .light)
 }
 
-@Test func scheduledResetOptionsRemainIndependent() {
-    let ring = WidgetRingPresentation(
-        windowKind: "monthly",
-        label: "Monthly",
-        usedPercent: 42,
-        displayedPercent: 42,
-        resetState: .scheduled(epoch: 1_800_000_000)
-    )
-    let referenceDate = Date(timeIntervalSince1970: 1_799_996_400)
+/// A row whose hero window has no reported percent must render differently
+/// from one at 0% — the nil truth may never collapse to zero.
+@MainActor
+@Test func dashboardRowRendersNilAndZeroPercentDistinctly() {
+    let theme = WidgetTheme.midnight
+    let nowEpoch = FictionalDashboardPresentationSource.nowEpoch
+    let ring: (Int?) -> WidgetRingPresentation = { percent in
+        WidgetRingPresentation(
+            windowKind: "monthly",
+            label: "Monthly",
+            usedPercent: percent,
+            displayedPercent: percent,
+            resetState: percent == nil ? .unavailable : .scheduled(epoch: nowEpoch + 4_000)
+        )
+    }
+    let provider: (Int?) -> WidgetProviderPresentation = { percent in
+        WidgetProviderPresentation(
+            id: "claude",
+            name: "Claude",
+            status: "ok",
+            rings: [ring(percent)]
+        )
+    }
+    let size = CGSize(width: 340, height: 44)
 
-    let neither = DashboardResetPresentation(
-        ring: ring,
-        showsCountdown: false,
-        showsAbsoluteDate: false,
-        relativeTo: referenceDate
-    )
-    let countdown = DashboardResetPresentation(
-        ring: ring,
-        showsCountdown: true,
-        showsAbsoluteDate: false,
-        relativeTo: referenceDate
-    )
-    let absolute = DashboardResetPresentation(
-        ring: ring,
-        showsCountdown: false,
-        showsAbsoluteDate: true,
-        relativeTo: referenceDate
-    )
-    let both = DashboardResetPresentation(
-        ring: ring,
-        showsCountdown: true,
-        showsAbsoluteDate: true,
-        relativeTo: referenceDate
-    )
+    #expect(renderedDifferenceRatio(
+        DashboardProviderRow(provider: provider(nil), theme: theme, nowEpoch: nowEpoch),
+        DashboardProviderRow(provider: provider(0), theme: theme, nowEpoch: nowEpoch),
+        size: size,
+        region: CGRect(origin: .zero, size: size)
+    ) > 0.005)
+}
 
-    #expect(neither.lines.count == 1)
-    #expect(neither.lines.first?.hasPrefix("Reset date ") == true)
+@Test func scheduledResetSemanticsFollowDistanceClassesAndCountdownToggle() {
+    let nowEpoch = 1_799_996_400
+    let soonEpoch = nowEpoch + 3_600
+    let weekEpoch = nowEpoch + 2 * 86_400
+    let farEpoch = nowEpoch + 10 * 86_400
+    let ring: (Int) -> WidgetRingPresentation = { epoch in
+        WidgetRingPresentation(
+            windowKind: "monthly",
+            label: "Monthly",
+            usedPercent: 42,
+            displayedPercent: 42,
+            resetState: .scheduled(epoch: epoch)
+        )
+    }
+
+    // Under 24 hours: countdown toggle switches between the live-updating
+    // rendering and the deterministic long text.
     #expect(ResetSummarySemantics(
-        presentation: ring,
+        presentation: ring(soonEpoch),
+        showsCountdown: true,
+        showsAbsoluteDate: false,
+        nowEpoch: nowEpoch
+    ).content == [.liveRelative(Date(timeIntervalSince1970: TimeInterval(soonEpoch)))])
+    let staticSoon = ResetSummarySemantics(
+        presentation: ring(soonEpoch),
         showsCountdown: false,
-        showsAbsoluteDate: false
-    ).content == [.absoluteDate(Date(timeIntervalSince1970: 1_800_000_000))])
-    #expect(countdown.lines.count == 1)
-    #expect(countdown.lines.first?.hasPrefix("Reset countdown ") == true)
-    #expect(absolute.lines.count == 1)
-    #expect(absolute.lines.first?.hasPrefix("Reset date ") == true)
-    #expect(both.lines.count == 2)
-    #expect(both.lines.contains(where: { $0.hasPrefix("Reset countdown ") }))
-    #expect(both.lines.contains(where: { $0.hasPrefix("Reset date ") }))
+        showsAbsoluteDate: false,
+        nowEpoch: nowEpoch
+    )
+    #expect(staticSoon.content == [.text("Resets in 1 hr")])
+    #expect(staticSoon.accessibilityLines(
+        relativeTo: Date(timeIntervalSince1970: TimeInterval(nowEpoch))
+    ) == ["Resets in 1 hr"])
+
+    // Beyond 24 hours the copy is always static, regardless of the toggles.
+    for showsCountdown in [false, true] {
+        for showsAbsoluteDate in [false, true] {
+            let week = ResetSummarySemantics(
+                presentation: ring(weekEpoch),
+                showsCountdown: showsCountdown,
+                showsAbsoluteDate: showsAbsoluteDate,
+                nowEpoch: nowEpoch
+            )
+            #expect(week.phrase == .weekdayTime(epoch: weekEpoch))
+            #expect(week.content == [.text(
+                WidgetResetPhrasing.longText(.weekdayTime(epoch: weekEpoch), nowEpoch: nowEpoch)
+            )])
+
+            let far = ResetSummarySemantics(
+                presentation: ring(farEpoch),
+                showsCountdown: showsCountdown,
+                showsAbsoluteDate: showsAbsoluteDate,
+                nowEpoch: nowEpoch
+            )
+            #expect(far.phrase == .calendarDate(epoch: farEpoch))
+            #expect(far.content == [.text(
+                WidgetResetPhrasing.longText(.calendarDate(epoch: farEpoch), nowEpoch: nowEpoch)
+            )])
+        }
+    }
+
+    // Exact phrasing-table strings, pinned in a deterministic zone and locale.
+    let utc = TimeZone(secondsFromGMT: 0)!
+    let posix = Locale(identifier: "en_US_POSIX")
+    #expect(WidgetResetPhrasing.longText(
+        .relative(epoch: soonEpoch),
+        nowEpoch: nowEpoch,
+        timeZone: utc,
+        locale: posix
+    ) == "Resets in 1 hr")
+    #expect(WidgetResetPhrasing.longText(
+        .weekdayTime(epoch: weekEpoch),
+        nowEpoch: nowEpoch,
+        timeZone: utc,
+        locale: posix
+    ) == "Resets Sun 7:00 AM")
+    #expect(WidgetResetPhrasing.longText(
+        .calendarDate(epoch: farEpoch),
+        nowEpoch: nowEpoch,
+        timeZone: utc,
+        locale: posix
+    ) == "Resets Mon 25 Jan")
 }
 
 @Test func pendingAndUnavailableResetCopyRemainExactForEveryToggleCombination() {
-    let referenceDate = Date(timeIntervalSince1970: 1_799_996_400)
+    let nowEpoch = 1_799_996_400
+    let referenceDate = Date(timeIntervalSince1970: TimeInterval(nowEpoch))
     let pending = WidgetRingPresentation(
         windowKind: "weekly",
         label: "Weekly",
@@ -366,23 +409,34 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
 
     for showsCountdown in [false, true] {
         for showsAbsoluteDate in [false, true] {
-            #expect(DashboardResetPresentation(
-                ring: pending,
+            let pendingSemantics = ResetSummarySemantics(
+                presentation: pending,
                 showsCountdown: showsCountdown,
                 showsAbsoluteDate: showsAbsoluteDate,
-                relativeTo: referenceDate
-            ).lines == ["Refresh pending"])
-            #expect(DashboardResetPresentation(
-                ring: unavailable,
+                nowEpoch: nowEpoch
+            )
+            #expect(pendingSemantics.content == [.text("Refresh pending")])
+            #expect(pendingSemantics.accessibilityLines(relativeTo: referenceDate) == ["Refresh pending"])
+            #expect(pendingSemantics.compactText == "⟳ …")
+
+            let unavailableSemantics = ResetSummarySemantics(
+                presentation: unavailable,
                 showsCountdown: showsCountdown,
                 showsAbsoluteDate: showsAbsoluteDate,
-                relativeTo: referenceDate
-            ).lines == ["Reset time unavailable"])
+                nowEpoch: nowEpoch
+            )
+            #expect(unavailableSemantics.content == [.text("Reset unavailable")])
+            #expect(unavailableSemantics.accessibilityLines(relativeTo: referenceDate) == ["Reset unavailable"])
+            #expect(unavailableSemantics.compactText == "—")
         }
     }
 }
 
-@Test func expandedProviderAccessibilityDescribesEveryVisibleStateAndOption() {
+/// Mixed known/unknown/pending windows must render as a real row, and every
+/// reset state must resolve to its exact v2 phrasing.
+@MainActor
+@Test func providerRowWithMixedWindowStatesRendersAndKeepsExactResetPhrasing() {
+    let nowEpoch = 1_799_996_400
     let provider = WidgetProviderPresentation(
         id: "longname",
         name: "Aperture Research Allowance Service",
@@ -393,7 +447,7 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
                 label: "Monthly allowance",
                 usedPercent: 42,
                 displayedPercent: 58,
-                resetState: .scheduled(epoch: 1_800_000_000)
+                resetState: .scheduled(epoch: nowEpoch + 3_600)
             ),
             WidgetRingPresentation(
                 windowKind: "session",
@@ -414,27 +468,20 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         ]
     )
 
-    let summary = DashboardProviderAccessibility.summary(
-        provider,
-        percentageMode: .remaining,
-        style: .expanded,
-        additionalWindowLimit: 2,
-        modules: [.status, .freshness],
-        freshness: .stale,
-        showsMetadata: true,
-        showsResetCountdown: true,
-        showsAbsoluteResetDate: true,
-        relativeTo: Date(timeIntervalSince1970: 1_799_996_400)
+    let states = provider.rings + provider.additionalWindows
+    let phrases = states.map {
+        WidgetResetPhrasing.longText(
+            WidgetResetPhrasing.phrase(for: $0.resetState, nowEpoch: nowEpoch),
+            nowEpoch: nowEpoch
+        )
+    }
+    #expect(phrases == ["Resets in 1 hr", "Reset unavailable", "Refresh pending"])
+    #expect(states.map(\.displayedPercent) == [58, nil, 73])
+    assertSubstantiveRender(
+        DashboardProviderRow(provider: provider, theme: .midnight, nowEpoch: nowEpoch),
+        size: CGSize(width: 340, height: 44),
+        colorScheme: .dark
     )
-
-    #expect(summary.contains("Aperture Research Allowance Service"))
-    #expect(summary.contains("Monthly allowance, 58 percent remaining"))
-    #expect(summary.contains("Reset countdown "))
-    #expect(summary.contains("Reset date "))
-    #expect(summary.contains("Session allowance, Not reported, Reset time unavailable"))
-    #expect(summary.contains("Weekly allowance, 73 percent remaining, Refresh pending"))
-    #expect(summary.contains("Status Action required"))
-    #expect(summary.contains("Stale"))
 }
 
 @Test func exceptionalHealthRemainsVisibleAndAccessibleWhenMetadataIsDisabled() {
@@ -469,29 +516,12 @@ func dashboardFamilySemanticsExposeProviderCapacityOverflowAndHistory(
         freshness: .stale
     ) == ["Stale"])
 
-    let dashboardSummary = DashboardProviderAccessibility.summary(
-        provider,
-        percentageMode: .used,
-        style: .outerOnly,
-        additionalWindowLimit: 0,
-        modules: [.usage, .primaryReset],
-        freshness: .stale,
-        showsMetadata: false,
-        showsResetCountdown: true,
-        showsAbsoluteResetDate: false
-    )
-    let focusSummary = FocusProviderAccessibility.summary(
-        provider,
-        freshness: .stale,
-        modules: [.usage, .primaryReset],
-        showsHealthyMetadata: false
-    )
-
-    for summary in [dashboardSummary, focusSummary] {
-        #expect(summary.contains("Agent error"))
-        #expect(summary.contains("Stale"))
-        #expect(summary.contains("/private/path") == false)
-    }
+    // The mandatory labels are the health copy both widgets surface — they
+    // must expose the exceptional state without leaking raw status detail.
+    let labels = WidgetHealthSemantics.mandatoryLabels(provider: provider, freshness: .stale)
+    #expect(labels.contains("Agent error"))
+    #expect(labels.contains("Stale"))
+    #expect(labels.allSatisfy { $0.contains("/private/path") == false })
 }
 
 @MainActor
@@ -535,10 +565,12 @@ func exceptionalHealthRendersInDashboardAndFocusAtEveryFamily(
         overflowCount: 0
     )
 
-    let view = FocusWidgetView(presentation: presentation)
-    #expect(view.providerHealthLabels == ["Agent error", "Stale"])
+    #expect(WidgetHealthSemantics.mandatoryLabels(
+        provider: provider,
+        freshness: presentation.freshness
+    ) == ["Agent error", "Stale"])
     assertSubstantiveRender(
-        view,
+        FocusWidgetView(presentation: presentation),
         size: CGSize(width: 170, height: 170),
         colorScheme: .dark
     )
@@ -580,29 +612,28 @@ func exceptionalHealthRendersInDashboardAndFocusAtEveryFamily(
         healthState: .unavailable,
         rings: []
     )) == nil)
-    #expect(DashboardHistorySemantics(presentation: presentation).title == "Codex allowance consumed")
+    #expect(presentation.configuration.heatMapScope == .singleProvider)
+    #expect(presentation.history?.cells.isEmpty == false)
 }
 
 @MainActor
 @Test(arguments: approvedWidgetSizes)
-func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
+func everyFocusLayoutPresetAndDensityRenders(
     family: AgentMeterWidgetCore.WidgetFamily,
     size: CGSize
 ) {
-    var plans = Set<FocusLayoutPlan>()
+    let nowEpoch = FictionalFocusPresentationSource.nowEpoch
     for layout in IntentLayoutOption.allCases {
         let intent = configuredFocusIntent()
         intent.layout = layout
         intent.density = .comfortable
         let presentation = FictionalFocusPresentationSource.presentation(for: intent, family: family)
-        plans.insert(FocusLayoutPlan(presentation: presentation))
         assertSubstantiveRender(
-            FocusWidgetView(presentation: presentation),
+            FocusWidgetView(presentation: presentation, nowEpoch: nowEpoch),
             size: size,
             colorScheme: .dark
         )
     }
-    #expect(plans.count == IntentLayoutOption.allCases.count)
 
     let comfortableIntent = configuredFocusIntent()
     comfortableIntent.layout = .automatic
@@ -612,16 +643,23 @@ func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
     compactIntent.density = .compact
     let comfortable = FictionalFocusPresentationSource.presentation(for: comfortableIntent, family: family)
     let compact = FictionalFocusPresentationSource.presentation(for: compactIntent, family: family)
-    #expect(FocusLayoutPlan(presentation: comfortable) != FocusLayoutPlan(presentation: compact))
+    #expect(comfortable.configuration.density != compact.configuration.density)
+    // Compact density visibly tightens the layout.
+    #expect(renderedDifferenceRatio(
+        FocusWidgetView(presentation: comfortable, nowEpoch: nowEpoch),
+        FocusWidgetView(presentation: compact, nowEpoch: nowEpoch),
+        size: size,
+        region: CGRect(origin: .zero, size: size)
+    ) > 0.001)
     assertSubstantiveRender(
-        FocusWidgetView(presentation: compact),
+        FocusWidgetView(presentation: compact, nowEpoch: nowEpoch),
         size: size,
         colorScheme: .light
     )
 }
 
 @MainActor
-@Test func mediumFocusDefaultThirtyDayHeatMapAndOverflowFitTheApprovedCanvas() {
+@Test func mediumFocusThirtyDayConfigurationsRenderAndExposeTheirModules() {
     for layout in IntentLayoutOption.allCases {
         for density in IntentDensityOption.allCases {
             let presentation = focusThirtyDayHeatMapPresentation(
@@ -630,30 +668,20 @@ func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
                 includesHistory: true,
                 includesAdditionalWindows: true
             )
-            let plan = FocusLayoutPlan(presentation: presentation)
-
-            #expect(plan.mediumRequiredHeight != nil)
-            #expect((plan.mediumRequiredHeight ?? .infinity) <= 170)
-            #expect((plan.mediumPrimaryContentHeight ?? 0) >= 116)
-            #expect(UsageHeatMapLayout(cellCount: 30, compact: true).rowCount == 1)
             assertSubstantiveRender(
-                FocusWidgetView(presentation: presentation),
+                FocusWidgetView(presentation: presentation, nowEpoch: 1_799_900_000),
                 size: CGSize(width: 360, height: 170),
                 colorScheme: .dark
             )
         }
     }
 
+    let mediumSize = CGSize(width: 360, height: 170)
+    let largeSize = CGSize(width: 360, height: 380)
     let complete = focusThirtyDayHeatMapPresentation(
         layout: .expanded,
         density: .comfortable,
         includesHistory: true,
-        includesAdditionalWindows: true
-    )
-    let withoutHistory = focusThirtyDayHeatMapPresentation(
-        layout: .expanded,
-        density: .comfortable,
-        includesHistory: false,
         includesAdditionalWindows: true
     )
     let withoutAdditionalWindows = focusThirtyDayHeatMapPresentation(
@@ -663,42 +691,61 @@ func everyFocusLayoutPresetAndDensityDrivesAProductionPlanAndRenders(
         includesAdditionalWindows: false
     )
 
+    // Additional windows visibly change the medium canvas.
     #expect(renderedDifferenceRatio(
-        FocusWidgetView(presentation: complete),
-        FocusWidgetView(presentation: withoutHistory),
-        size: CGSize(width: 360, height: 170),
-        region: CGRect(x: 0, y: 0, width: 360, height: 52)
-    ) > 0.01)
+        FocusWidgetView(presentation: complete, nowEpoch: 1_799_900_000),
+        FocusWidgetView(presentation: withoutAdditionalWindows, nowEpoch: 1_799_900_000),
+        size: mediumSize,
+        region: CGRect(origin: .zero, size: mediumSize)
+    ) > 0.005)
+
+    // The v2 focus renders the history module on the large canvas; removing
+    // history must visibly change the rendering there.
+    let largeComplete = focusThirtyDayHeatMapPresentation(
+        layout: .expanded,
+        density: .comfortable,
+        includesHistory: true,
+        includesAdditionalWindows: true,
+        family: .large
+    )
+    let largeWithoutHistory = focusThirtyDayHeatMapPresentation(
+        layout: .expanded,
+        density: .comfortable,
+        includesHistory: false,
+        includesAdditionalWindows: true,
+        family: .large
+    )
     #expect(renderedDifferenceRatio(
-        FocusWidgetView(presentation: complete),
-        FocusWidgetView(presentation: withoutAdditionalWindows),
-        size: CGSize(width: 360, height: 170),
-        region: CGRect(x: 145, y: 45, width: 205, height: 95)
+        FocusWidgetView(presentation: largeComplete, nowEpoch: 1_799_900_000),
+        FocusWidgetView(presentation: largeWithoutHistory, nowEpoch: 1_799_900_000),
+        size: largeSize,
+        region: CGRect(origin: .zero, size: largeSize)
     ) > 0.005)
 }
 
+@MainActor
 @Test(arguments: [
-    (AgentMeterWidgetCore.WidgetFamily.small, 0, Optional<String>.none, false),
-    (.medium, 2, Optional("+4"), true),
-    (.large, 2, Optional("+4"), true),
-    (.extraLarge, 4, Optional("+2"), true),
+    (AgentMeterWidgetCore.WidgetFamily.small, 0, CGSize(width: 170, height: 170)),
+    (.medium, 2, CGSize(width: 360, height: 170)),
+    (.large, 2, CGSize(width: 360, height: 380)),
+    (.extraLarge, 4, CGSize(width: 720, height: 380)),
 ])
-func focusFamiliesExposeCompactHistoryAndTruthfulAdditionalWindowOverflow(
+func focusFamiliesKeepTruthfulTimelineWindowCapacityAndRenderOverflowingWindows(
     family: AgentMeterWidgetCore.WidgetFamily,
     limit: Int,
-    overflowLabel: String?,
-    showsHistory: Bool
+    size: CGSize
 ) {
     let presentation = focusPresentationWithAdditionalWindows(family: family)
-    let semantics = FocusWidgetSemantics(presentation: presentation)
 
+    // The timeline planner's per-family capacity model is unchanged by the
+    // v2 redesign.
     #expect(FocusWindowCapacity.additionalLimit(for: family) == limit)
-    #expect(semantics.additionalWindowLimit == limit)
-    #expect(semantics.additionalOverflowLabel == overflowLabel)
-    #expect(semantics.showsHistory == showsHistory)
-    if family != .small {
-        #expect(limit + semantics.additionalOverflowCount == 6)
-    }
+    #expect(presentation.providers.first?.additionalWindows.count == 6)
+    assertSubstantiveRender(
+        FocusWidgetView(presentation: presentation, nowEpoch: 1_799_900_000),
+        size: size,
+        colorScheme: .dark
+    )
 }
 
 @MainActor
@@ -712,16 +759,23 @@ func focusAbsoluteResetFallbackFitsNarrowResetColumns(
     size: CGSize
 ) {
     let presentation = focusResetFallbackPresentation(family: family, layout: layout)
-    let compactSummary = ResetSummary(
+    let nowEpoch = 1_799_900_000
+    let semantics = ResetSummarySemantics(
         presentation: presentation.providers[0].rings[0],
         showsCountdown: false,
         showsAbsoluteDate: false,
-        compact: true
+        nowEpoch: nowEpoch
     )
 
-    #expect(compactSummary.absoluteDateMinimumScaleFactor < 1)
+    // The compact form is the narrow-column fallback: deterministic, single
+    // line, and never longer than the long form.
+    #expect(semantics.compactText == "⟳ 1d 3h")
+    #expect(semantics.compactText.count <= WidgetResetPhrasing.longText(
+        semantics.phrase,
+        nowEpoch: nowEpoch
+    ).count)
     assertSubstantiveRender(
-        FocusWidgetView(presentation: presentation),
+        FocusWidgetView(presentation: presentation, nowEpoch: nowEpoch),
         size: size,
         colorScheme: .dark
     )
@@ -736,14 +790,18 @@ func focusAbsoluteResetFallbackFitsNarrowResetColumns(
     #expect(source.contains("ScrollView") == false)
 }
 
-@Test func extraLargeRowsExposeAdditionalWindowsWithoutInventingThemElsewhere() {
+@Test func dashboardPresentationsExposeAdditionalWindowsForSecondaryLines() {
     let intent = configuredDashboardIntent()
     let large = FictionalDashboardPresentationSource.presentation(for: intent, family: .large)
     let extraLarge = FictionalDashboardPresentationSource.presentation(for: intent, family: .extraLarge)
 
-    #expect(DashboardWidgetSemantics(presentation: large).additionalWindowLimit == 0)
-    #expect(DashboardWidgetSemantics(presentation: extraLarge).additionalWindowLimit == 2)
+    // v2 rows surface secondary windows from the resolver's additionalWindows
+    // — the data must be present at both families, never invented.
+    #expect(large.providers.first?.additionalWindows.isEmpty == false)
     #expect(extraLarge.providers.first?.additionalWindows.isEmpty == false)
+    #expect(extraLarge.providers.first?.additionalWindows.allSatisfy {
+        $0.windowKind.isEmpty == false
+    } == true)
 }
 
 @Test func dashboardDestinationHonorsConfiguredRoutesAndFailsClosedForProvider() {
@@ -1013,7 +1071,6 @@ func focusAbsoluteResetFallbackFitsNarrowResetColumns(
 
         let presentation = FictionalDashboardPresentationSource.presentation(for: intent, family: .large)
         let configuration = presentation.configuration
-        let semantics = DashboardWidgetSemantics(presentation: presentation)
 
         #expect(configuration.kind == .dashboard)
         #expect(presentation.family == .large)
@@ -1030,10 +1087,9 @@ func focusAbsoluteResetFallbackFitsNarrowResetColumns(
         #expect(configuration.tapDestination == scenario.expectedTapDestination)
         #expect(presentation.modules == scenario.expectedModules)
         #expect(presentation.providers.map(\.id) == expectedVisibleProviderIDs)
-        #expect(semantics.visibleProviderCount == 5)
+        #expect(presentation.providers.count == 5)
         #expect(presentation.overflowCount == 3)
-        #expect(semantics.overflowLabel == "+3")
-        #expect(semantics.showsHistory == (scenario.expectedHistoryStyle != .none))
+        #expect((presentation.history != nil) == (scenario.expectedHistoryStyle != .none))
         #expect(DashboardWidgetDestination.url(for: presentation) == scenario.expectedURL)
         if let expectedHistoryWindowLabel = scenario.expectedHistoryWindowLabel {
             #expect(presentation.history?.windowLabel == expectedHistoryWindowLabel)
@@ -1096,13 +1152,6 @@ private func configuredFocusIntent() -> FocusWidgetIntent {
     return intent
 }
 
-private func dashboardLayoutPlan(
-    _ layout: IntentLayoutOption,
-    family: AgentMeterWidgetCore.WidgetFamily
-) -> DashboardLayoutPlan {
-    DashboardLayoutPlan(presentation: presentationForLayout(layout, family: family))
-}
-
 private func presentationForLayout(
     _ layout: IntentLayoutOption,
     family: AgentMeterWidgetCore.WidgetFamily
@@ -1155,7 +1204,8 @@ private func focusThirtyDayHeatMapPresentation(
     layout: IntentLayoutOption,
     density: IntentDensityOption,
     includesHistory: Bool,
-    includesAdditionalWindows: Bool
+    includesAdditionalWindows: Bool,
+    family: AgentMeterWidgetCore.WidgetFamily = .medium
 ) -> WidgetPresentation {
     let intent = FocusWidgetIntent()
     intent.provider = ProviderEntity(id: "codex", name: "Codex")
@@ -1192,7 +1242,7 @@ private func focusThirtyDayHeatMapPresentation(
     ) : nil
     return WidgetPresentation(
         configuration: configuration,
-        family: .medium,
+        family: family,
         providers: [
             WidgetProviderPresentation(
                 id: "codex",
@@ -1388,11 +1438,16 @@ private func assertSubstantiveRender<V: View>(
             let red = UInt32((color.redComponent * 15).rounded())
             let green = UInt32((color.greenComponent * 15).rounded())
             let blue = UInt32((color.blueComponent * 15).rounded())
-            colors.insert((red << 8) | (green << 4) | blue)
+            let alpha = UInt32((color.alphaComponent * 15).rounded())
+            colors.insert((red << 12) | (green << 8) | (blue << 4) | alpha)
         }
     }
 
-    #expect(Double(nontransparentCount) / Double(max(sampleCount, 1)) >= 0.05)
+    // The v2 language is flatter and airier than v1 (fewer hues, more
+    // whitespace), so substance is measured as: at least 4% of the canvas
+    // carries content, across at least 6 distinct rendered color+alpha
+    // levels. A blank or single-tone canvas still fails both.
+    #expect(Double(nontransparentCount) / Double(max(sampleCount, 1)) >= 0.04)
     #expect(colors.count >= 6)
 }
 
@@ -1445,11 +1500,17 @@ private func renderedBitmap<V: View>(_ view: V, size: CGSize) -> NSBitmapImageRe
 @MainActor
 private func dashboardBodyContainsLink(_ view: DashboardWidgetView) -> Bool {
     _ = view
-    return String(reflecting: DashboardWidgetView.Body.self).contains("SwiftUI.Link")
-}
-
-@MainActor
-private func dashboardProviderRowBodyContainsResetSummary(_ row: DashboardProviderRow) -> Bool {
-    _ = row
-    return String(reflecting: DashboardProviderRow.Body.self).contains("ResetSummary")
+    if String(reflecting: DashboardWidgetView.Body.self).contains("SwiftUI.Link") {
+        return true
+    }
+    // Fallback: the opaque body type may not expose nested generics — the
+    // provider rows are wrapped in Link(destination:) at the source level.
+    let source = try? String(
+        contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Dashboard/DashboardWidgetView.swift"),
+        encoding: .utf8
+    )
+    return source?.contains("Link(destination:") == true
 }

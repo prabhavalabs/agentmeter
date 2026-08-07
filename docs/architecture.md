@@ -68,7 +68,8 @@ The desktop socket opens no TCP port and accepts only the current macOS user. Lo
 
 The native app separately publishes one bounded widget JSON file to
 `group.com.prabhavalabs.agentmeter.shared`. It allowlists provider IDs and display names, health
-status, used percentages, reset and update epochs, and downsampled daily consumption. It excludes
+status, used percentages, reset and update epochs, downsampled daily consumption, and up to 26
+hourly percentage points per window for the 24-hour trend. It excludes
 account identity, prompts, code, repositories and paths, tokens, cookies, credentials, raw
 responses, local session logs, costs, credits, and billing fields. The WidgetKit extension only
 reads this file; it has no IPC, Bluetooth, SQLite, network, or keychain dependency.
@@ -76,9 +77,10 @@ reads this file; it has no IPC, Bluetooth, SQLite, network, or keychain dependen
 Dashboard and Focus use App Intent configuration, so each installed widget instance retains its
 own provider, window, used-or-remaining, history, density, theme, and deep-link choices. Dashboard
 omits history in small and medium. Focus omits history in small and can render compact history in
-medium. Large and extra-large families can project the fuller daily consumption history as a heat
-map or the latest daily used percentage as a trend. Passed reset timestamps remain **Refresh
-pending** until a fresh snapshot establishes the next provider window.
+medium. Large and extra-large families can project the daily consumption history as a strip or
+grid, an hourly multi-agent trend, or the latest daily used percentage as a Focus trend. Passed
+reset timestamps remain **Refresh pending** until a fresh snapshot establishes the next provider
+window.
 
 ## macOS distribution boundary
 

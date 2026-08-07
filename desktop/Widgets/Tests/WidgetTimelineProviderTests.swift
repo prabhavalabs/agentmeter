@@ -176,8 +176,13 @@ private let fixedCalendar: Calendar = {
     let presentation = timelineProvider.snapshotEntry(for: intent, family: .large).presentation
     let ring = try #require(presentation?.providers.first?.rings.first)
 
-    #expect(DashboardProviderCopy.percentage(ring) == "Not reported")
-    #expect(DashboardProviderCopy.reset(ring) == "Reset time unavailable")
+    #expect(ring.usedPercent == nil)
+    #expect(ring.displayedPercent == nil)
+    #expect(ring.resetState == .unavailable)
+    #expect(WidgetResetPhrasing.longText(
+        WidgetResetPhrasing.phrase(for: ring.resetState, nowEpoch: Int(fixedNow.timeIntervalSince1970)),
+        nowEpoch: Int(fixedNow.timeIntervalSince1970)
+    ) == "Reset unavailable")
     #expect(presentation?.history?.availabilityMessage == "History unavailable for this window")
 }
 

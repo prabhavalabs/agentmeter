@@ -403,6 +403,13 @@ struct FocusWidgetView: View {
                     .font(.system(size: 12.5, weight: .semibold))
                     .lineLimit(1)
                 Spacer(minLength: 4)
+                WidgetHealthBadges(
+                    labels: WidgetHealthSemantics.mandatoryLabels(
+                        provider: provider,
+                        freshness: presentation.freshness
+                    ),
+                    compact: true
+                )
                 StatusDot(health: provider.healthState, worstUsedPercent: nil)
             }
             WidgetStateView(

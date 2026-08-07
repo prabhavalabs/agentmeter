@@ -8,14 +8,20 @@ import Testing
     let widgetDirectory = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
+    // Files whose primary data marks (ring arcs, trend lines, bar fills,
+    // provider marks) must use the contrast-resolved accent at full strength.
+    // Deliberately excluded v2 components with design-sanctioned opacity uses:
+    // ConsumptionStrip (heat-band opacity ramp over the resolved accent),
+    // SingleUsageRing and StatusDot (glow shadows), LivePill (stroke tint),
+    // DashboardProviderRow (decorative icon-chip fill at 10%; its data track
+    // lives in UsageBarRow's UsageTrackCapsule, which is scanned here).
     let sourcePaths = [
-        "Sources/Components/DualUsageRing.swift",
-        "Sources/Components/UsageHeatMap.swift",
         "Sources/Components/UsageTrendChart.swift",
+        "Sources/Components/HourlyTrendChart.swift",
+        "Sources/Components/UsageBarRow.swift",
         "Sources/Components/WidgetProviderMark.swift",
         "Sources/Focus/FocusWidgetView.swift",
         "Sources/Dashboard/DashboardWidgetView.swift",
-        "Sources/Dashboard/DashboardProviderRow.swift",
         "Sources/Dashboard/DashboardHistoryPanel.swift",
     ]
     let opacityPattern = try NSRegularExpression(
