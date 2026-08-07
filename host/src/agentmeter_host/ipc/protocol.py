@@ -19,6 +19,7 @@ COMMAND_TYPES = frozenset(
         "device.forget",
         "device.identify",
         "device.refresh",
+        "device.sync",
         "settings.get",
         "settings.patch",
         "providers.refresh",

@@ -117,6 +117,14 @@ class FakeControlApi:
             return copy.deepcopy(self.state)
         if command == "device.refresh":
             return copy.deepcopy(self.state)
+        if command == "device.sync":
+            enabled = request.payload.get("enabled")
+            if set(request.payload) != {"enabled"} or not isinstance(enabled, bool):
+                raise IpcCommandError("invalidPayload", "Device sync setting is invalid")
+            self.state["bridge"]["deviceSyncEnabled"] = enabled
+            if not enabled:
+                self.state["connection"]["phase"] = "stopped"
+            return copy.deepcopy(self.state)
         if command in {
             "device.identify",
             "providers.refresh",

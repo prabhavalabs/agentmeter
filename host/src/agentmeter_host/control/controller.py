@@ -155,6 +155,7 @@ class BridgeController:
                 version=__version__,
                 configured_provider_ids=self._host_settings.provider_ids,
                 poll_interval_seconds=self._host_settings.poll_interval_seconds,
+                device_sync_enabled=self._host_settings.device_sync_enabled,
             ),
         )
 
@@ -217,6 +218,7 @@ class BridgeController:
         self._commit("connection.changed")
 
     async def scan(self) -> list[dict[str, object]]:
+        self._require_device_sync()
         scanning_while_connected = self.state.connection.phase is ConnectionPhase.CONNECTED
         if not scanning_while_connected:
             self._set_connection(ConnectionPhase.SEARCHING)
@@ -236,6 +238,7 @@ class BridgeController:
         return [item.to_document() for item in peripherals]
 
     async def connect(self, identifier: str | None = None) -> None:
+        self._require_device_sync()
         async with self._connection_lock:
             self._manual_disconnect = False
             self._sleeping = False
@@ -558,14 +561,22 @@ class BridgeController:
         if self._manual_disconnect or self._sleeping or self._closed:
             return
         self._set_connection(ConnectionPhase.RETRYING, error_code=code)
-        if self._host_settings.auto_reconnect and self._host_settings.selected_device_id:
+        if (
+            self._host_settings.device_sync_enabled
+            and self._host_settings.auto_reconnect
+            and self._host_settings.selected_device_id
+        ):
             self._reconnect_needed.set()
 
     async def run(self, stop_event: asyncio.Event) -> None:
         self.state = replace(self.state, bridge=replace(self.state.bridge, running=True))
         self._commit("bridge.changed")
         self._history.prune(now_epoch=int(self._clock()))
-        if self._host_settings.auto_reconnect and self._host_settings.selected_device_id:
+        if (
+            self._host_settings.device_sync_enabled
+            and self._host_settings.auto_reconnect
+            and self._host_settings.selected_device_id
+        ):
             self._reconnect_needed.set()
         tasks = (
             asyncio.create_task(self._provider_loop(stop_event)),
@@ -626,6 +637,7 @@ class BridgeController:
         return bool(
             not self._manual_disconnect
             and not self._sleeping
+            and self._host_settings.device_sync_enabled
             and self._host_settings.auto_reconnect
             and self._host_settings.selected_device_id
             and not self._is_connected()
@@ -641,7 +653,11 @@ class BridgeController:
     async def wake_system(self) -> None:
         self._sleeping = False
         self._manual_disconnect = False
-        if self._host_settings.auto_reconnect and self._host_settings.selected_device_id:
+        if (
+            self._host_settings.device_sync_enabled
+            and self._host_settings.auto_reconnect
+            and self._host_settings.selected_device_id
+        ):
             self._reconnect_needed.set()
 
     async def update_providers(self, payload: dict[str, Any]) -> None:
@@ -672,6 +688,34 @@ class BridgeController:
             ),
         )
         await self.refresh_providers()
+
+    def _require_device_sync(self) -> None:
+        if not self._host_settings.device_sync_enabled:
+            raise IpcCommandError(
+                "deviceSyncDisabled",
+                "Device sync is turned off in application settings",
+            )
+
+    async def set_device_sync(self, enabled: bool) -> None:
+        if enabled == self._host_settings.device_sync_enabled:
+            return
+        self._host_settings = replace(self._host_settings, device_sync_enabled=enabled)
+        self._settings_store.save(self._host_settings)
+        self.state = replace(
+            self.state,
+            bridge=replace(self.state.bridge, device_sync_enabled=enabled),
+        )
+        if enabled:
+            self._commit("bridge.changed")
+            if self._host_settings.auto_reconnect and self._host_settings.selected_device_id:
+                self._reconnect_needed.set()
+            return
+        self._reconnect_needed.clear()
+        self._manual_disconnect = True
+        with suppress(TransportError):
+            await self._transport.disconnect()
+        self._set_connection(ConnectionPhase.STOPPED)
+        self._commit("bridge.changed")
 
     async def handle_ipc(self, request: IpcRequest) -> dict[str, Any]:
         command = request.type
@@ -711,6 +755,13 @@ class BridgeController:
         if command == "device.refresh":
             self._require_empty(request)
             await self.refresh_device()
+            return self.state.to_document()
+        if command == "device.sync":
+            if set(request.payload) != {"enabled"} or not isinstance(
+                request.payload["enabled"], bool
+            ):
+                raise IpcCommandError("invalidPayload", "Device sync setting is invalid")
+            await self.set_device_sync(request.payload["enabled"])
             return self.state.to_document()
         if command == "settings.get":
             self._require_empty(request)

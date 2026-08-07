@@ -778,3 +778,58 @@ async def test_history_hourly_ipc_rejects_invalid_payloads(tmp_path, payload) ->
 
     assert error.value.code == "invalidPayload"
     history.close()
+
+
+@pytest.mark.asyncio
+async def test_device_sync_disable_disconnects_and_blocks_device_commands(tmp_path) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+
+    result = await controller.handle_ipc(
+        IpcRequest(id="sync-off", type="device.sync", payload={"enabled": False})
+    )
+
+    assert result["bridge"]["deviceSyncEnabled"] is False
+    assert controller._should_reconnect() is False
+
+    for command in ("device.scan", "device.connect"):
+        with pytest.raises(IpcCommandError) as error:
+            await controller.handle_ipc(
+                IpcRequest(id=f"{command}-blocked", type=command, payload={})
+            )
+        assert error.value.code == "deviceSyncDisabled"
+
+    history.close()
+
+
+@pytest.mark.asyncio
+async def test_device_sync_setting_survives_restart_and_reenables(tmp_path) -> None:
+    controller, settings_store, history = make_controller(tmp_path)
+    await controller.handle_ipc(
+        IpcRequest(id="sync-off", type="device.sync", payload={"enabled": False})
+    )
+    history.close()
+
+    reloaded, _, second_history = make_controller(tmp_path)
+    assert reloaded.state.bridge.device_sync_enabled is False
+
+    result = await reloaded.handle_ipc(
+        IpcRequest(id="sync-on", type="device.sync", payload={"enabled": True})
+    )
+    assert result["bridge"]["deviceSyncEnabled"] is True
+    second_history.close()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{}, {"enabled": "yes"}, {"enabled": 1}, {"enabled": True, "extra": 1}],
+    ids=["missing", "string", "integer", "extra-key"],
+)
+@pytest.mark.asyncio
+async def test_device_sync_rejects_invalid_payloads(tmp_path, payload) -> None:
+    controller, _settings_store, history = make_controller(tmp_path)
+
+    with pytest.raises(IpcCommandError) as error:
+        await controller.handle_ipc(IpcRequest(id="sync-bad", type="device.sync", payload=payload))
+
+    assert error.value.code == "invalidPayload"
+    history.close()

@@ -30,9 +30,10 @@
           "enum": [
             "hello", "status.get", "events.subscribe", "device.scan",
             "device.connect", "device.disconnect", "device.forget",
-            "device.identify", "device.refresh", "settings.get",
+            "device.identify", "device.refresh", "device.sync", "settings.get",
             "settings.patch", "providers.refresh", "providers.update",
-            "history.query", "history.clear", "diagnostics.get",
+            "history.query", "history.summary", "history.hourly",
+            "history.clear", "diagnostics.get",
             "bridge.restart", "system.sleep", "system.wake"
           ]
         },
