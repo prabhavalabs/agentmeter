@@ -2,13 +2,39 @@ import AgentMeterCore
 import AgentMeterWidgetCore
 import SwiftUI
 
+/// Fixed tokens from the approved "AgentMeter Widgets v2" design language.
+enum WidgetV2Tokens {
+    static let cardTop = Color(red: 0x23 / 255, green: 0x23 / 255, blue: 0x27 / 255)
+    static let cardBottom = Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x1B / 255)
+    static let live = Color(red: 0x3D / 255, green: 0xDC / 255, blue: 0x97 / 255)
+    static let warn = Color(red: 0xFB / 255, green: 0xBF / 255, blue: 0x24 / 255)
+
+    static var cardGradient: LinearGradient {
+        LinearGradient(
+            colors: [cardTop, cardBottom],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 struct WidgetThemePalette {
     let background: Color
     let primaryText: Color
     let secondaryText: Color
+    /// The 45%-strength caption tier from the v2 language.
+    let tertiaryText: Color
     let track: Color
+    /// 1 pt module divider.
+    let rule: Color
+    /// Card outline.
+    let border: Color
+    /// XL mini-card fill and outline.
+    let chipFill: Color
+    let chipBorder: Color
     let dataAccents: WidgetDataAccentPalette
     let preferredColorScheme: ColorScheme?
+    private let usesCardGradient: Bool
 
     init(theme: WidgetTheme, providerID: String, colorScheme: ColorScheme) {
         let providerBaseRGB = WidgetRGB(hex: ProviderVisuals.accentHex(for: providerID))
@@ -24,39 +50,83 @@ struct WidgetThemePalette {
             background = Color.primary.opacity(0.035)
             primaryText = .primary
             secondaryText = .secondary
+            tertiaryText = Color.secondary.opacity(0.75)
             track = Color.secondary.opacity(0.18)
+            rule = Color.secondary.opacity(0.16)
+            border = Color.secondary.opacity(0.14)
+            chipFill = Color.primary.opacity(0.035)
+            chipBorder = Color.primary.opacity(0.05)
             preferredColorScheme = nil
+            usesCardGradient = false
         case .light:
             background = Color(red: 0.965, green: 0.97, blue: 0.98)
             primaryText = Color(red: 0.08, green: 0.09, blue: 0.12)
             secondaryText = Color(red: 0.32, green: 0.34, blue: 0.4)
+            tertiaryText = Color(red: 0.45, green: 0.47, blue: 0.52)
             track = Color.black.opacity(0.12)
+            rule = Color.black.opacity(0.08)
+            border = Color.black.opacity(0.09)
+            chipFill = Color.black.opacity(0.035)
+            chipBorder = Color.black.opacity(0.05)
             preferredColorScheme = .light
+            usesCardGradient = false
         case .dark:
-            background = Color(red: 0.105, green: 0.115, blue: 0.14)
-            primaryText = Color.white.opacity(0.96)
+            background = WidgetV2Tokens.cardBottom
+            primaryText = .white
             secondaryText = Color.white.opacity(0.65)
-            track = Color.white.opacity(0.14)
+            tertiaryText = Color.white.opacity(0.45)
+            track = Color.white.opacity(0.08)
+            rule = Color.white.opacity(0.07)
+            border = Color.white.opacity(0.09)
+            chipFill = Color.white.opacity(0.035)
+            chipBorder = Color.white.opacity(0.05)
             preferredColorScheme = .dark
+            usesCardGradient = true
         case .midnight:
             background = Color(red: 0.025, green: 0.045, blue: 0.09)
             primaryText = Color(red: 0.9, green: 0.95, blue: 1)
             secondaryText = Color(red: 0.62, green: 0.72, blue: 0.84)
+            tertiaryText = Color(red: 0.5, green: 0.6, blue: 0.72)
             track = Color.white.opacity(0.12)
+            rule = Color.white.opacity(0.08)
+            border = Color.white.opacity(0.1)
+            chipFill = Color.white.opacity(0.04)
+            chipBorder = Color.white.opacity(0.06)
             preferredColorScheme = .dark
+            usesCardGradient = false
         case .neutral:
             background = Color.secondary.opacity(0.08)
             primaryText = .primary
             secondaryText = .secondary
+            tertiaryText = Color.secondary.opacity(0.75)
             track = Color.secondary.opacity(0.2)
+            rule = Color.secondary.opacity(0.16)
+            border = Color.secondary.opacity(0.14)
+            chipFill = Color.primary.opacity(0.035)
+            chipBorder = Color.primary.opacity(0.05)
             preferredColorScheme = nil
+            usesCardGradient = false
         case .providerTinted:
             background = providerBaseAccent.opacity(0.105)
             primaryText = .primary
             secondaryText = .secondary
+            tertiaryText = Color.secondary.opacity(0.75)
             track = Color.secondary.opacity(0.2)
+            rule = Color.secondary.opacity(0.16)
+            border = Color.secondary.opacity(0.14)
+            chipFill = Color.primary.opacity(0.035)
+            chipBorder = Color.primary.opacity(0.05)
             preferredColorScheme = nil
+            usesCardGradient = false
         }
+    }
+
+    /// Container fill for the widget card — the v2 gradient on the dark
+    /// theme, a flat colour elsewhere.
+    var cardFill: AnyShapeStyle {
+        usesCardGradient
+            ? AnyShapeStyle(WidgetV2Tokens.cardGradient)
+            : AnyShapeStyle(background)
     }
 
     func dataAccent(_ role: WidgetDataAccentRole) -> Color {

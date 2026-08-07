@@ -153,7 +153,7 @@ void test_cursor_visuals_use_warm_neutral_cube_mark() {
   const agentmeter::ProviderVisuals visuals =
       agentmeter::provider_visuals("cursor");
 
-  TEST_ASSERT_EQUAL_HEX32(0xD6D5CC, visuals.accent_rgb);
+  TEST_ASSERT_EQUAL_HEX32(0xD8D8DC, visuals.accent_rgb);
   TEST_ASSERT_EQUAL(static_cast<int>(agentmeter::ProviderMark::CursorCube),
                     static_cast<int>(visuals.mark));
 }

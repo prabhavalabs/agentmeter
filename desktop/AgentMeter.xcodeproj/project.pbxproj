@@ -42,6 +42,7 @@
 		6204D558B92C094A401A83E4 /* WidgetSnapshotCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFEA3A95DCD61DDB08963A5F /* WidgetSnapshotCoordinatorTests.swift */; };
 		625E8E27279DE8F71E7CC10E /* DashboardWidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5D85D380E7FB0C4FA14A73 /* DashboardWidgetPreviews.swift */; };
 		62754311310BA82DEEB16722 /* FocusWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A46648A8519DC4FEE921AE2 /* FocusWidgetView.swift */; };
+		64B778E677E779D51688E5DB /* SVGPathShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */; };
 		654283763A106AA31A461725 /* WidgetSnapshotLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C668698FC58A8CA3C2019F /* WidgetSnapshotLoader.swift */; };
 		6865E54D0053877B9B8B079D /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = A5CA30D375E2693BCFF620C1 /* Fixtures */; };
 		6B1F713DDCB6A396ADAEF3D8 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F97E03D6B10AA2E41F0AC4F /* WidgetTheme.swift */; };
@@ -66,6 +67,7 @@
 		9D64B111A50ECBA180047340 /* AgentMeterWidgetCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3EC0EAA4977BA09D0D16414B /* AgentMeterWidgetCore */; };
 		A2ED40C9E5BDCCBC78405952 /* UsageHeatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB1017B8B9694012907C61E /* UsageHeatMap.swift */; };
 		A52D22277010B394A3575572 /* WidgetAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917B39DE8880DC9107BAFE0C /* WidgetAccentContrastTests.swift */; };
+		A5FD1A2EED71B330ECA50727 /* SVGPathShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */; };
 		AEA8C3A6B0D4CCD1E1E29A61 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
 		AEF22BCF9DA0F2BA6AD5FE54 /* AgentMeterApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EEB34CD5DF4C166624B6AF /* AgentMeterApplication.swift */; };
 		B59D1DEC169DE8AE13AA2BED /* FictionalFocusPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */; };
@@ -150,6 +152,7 @@
 		3DB7D20A006EE6998D0D6834 /* AgentMeterWidgetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentMeterWidgetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3F9F0FA5846787D50560BBB7 /* BridgeDistributionModeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BridgeDistributionModeTests.swift; sourceTree = "<group>"; };
 		43A2F92987D2D697D954941D /* UnixBridgeClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnixBridgeClientTests.swift; sourceTree = "<group>"; };
+		47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGPathShape.swift; sourceTree = "<group>"; };
 		54E63E3C7DC4F9187A7D37C5 /* WidgetComponentRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetComponentRenderingTests.swift; sourceTree = "<group>"; };
 		5A46648A8519DC4FEE921AE2 /* FocusWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWidgetView.swift; sourceTree = "<group>"; };
 		5D1BD7776514DC1E2C30FFAD /* AgentMeterIPCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentMeterIPCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -424,6 +427,7 @@
 			children = (
 				DAAF3043A988574588FE6408 /* DualUsageRing.swift */,
 				FA003F811271504D138EE2A5 /* ResetSummary.swift */,
+				47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */,
 				EBB1017B8B9694012907C61E /* UsageHeatMap.swift */,
 				211A787513AFE5CA6DBF0545 /* UsageTrendChart.swift */,
 				1B39EE1E507E471060E06263 /* WidgetHealthIndicator.swift */,
@@ -732,6 +736,7 @@
 				62754311310BA82DEEB16722 /* FocusWidgetView.swift in Sources */,
 				9C45F84A292B2D04C55A63A4 /* IntentConfigurationAdapter.swift in Sources */,
 				9BB3EBD1C5BA4F8FE520DBE9 /* ResetSummary.swift in Sources */,
+				A5FD1A2EED71B330ECA50727 /* SVGPathShape.swift in Sources */,
 				FD716A3B45EB0D32CB5F9C3A /* UsageHeatMap.swift in Sources */,
 				758526815CC469A2F5498570 /* UsageTrendChart.swift in Sources */,
 				AEA8C3A6B0D4CCD1E1E29A61 /* WidgetEntities.swift in Sources */,
@@ -808,6 +813,7 @@
 				D73494C15E937C6742A0F0B5 /* FocusWidgetView.swift in Sources */,
 				CD2A26DCC7502BE27A8C8016 /* IntentConfigurationAdapter.swift in Sources */,
 				2BF3A08175781732EFC0EDA3 /* ResetSummary.swift in Sources */,
+				64B778E677E779D51688E5DB /* SVGPathShape.swift in Sources */,
 				A2ED40C9E5BDCCBC78405952 /* UsageHeatMap.swift in Sources */,
 				CACC00922984B90FF66E6EC1 /* UsageTrendChart.swift in Sources */,
 				A52D22277010B394A3575572 /* WidgetAccentContrastTests.swift in Sources */,
