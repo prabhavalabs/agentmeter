@@ -32,6 +32,8 @@ The first hardware version is working end to end with Codex, Claude, Gemini, and
 - Touch-driven provider details, recognizable agent marks, and a physical-button fallback
 - On-device agent visibility, always-on, full-view rotation, and rotation interval settings
 - Configurable brightness, dimming, screen-off, and AMOLED pixel shifting
+- A standalone mode that turns off device sync entirely while the desktop app keeps monitoring
+- An in-app Settings section for device sync, appearance, startup, and notifications
 
 ![AgentMeter macOS companion showing a connected device, local usage history, and provider cards](docs/assets/screenshots/macos-overview-connected.png)
 
@@ -54,17 +56,25 @@ See [Architecture](docs/architecture.md) and [Device protocol](docs/protocol.md)
 ## macOS widgets
 
 The managed macOS build includes independently configurable **AgentMeter Dashboard** and
-**AgentMeter Focus** widgets in small, medium, large, and extra-large families. Dashboard can show
-several providers; Focus selects one provider and its primary and secondary allowance windows.
-Each widget instance keeps its own providers, windows, used-or-remaining percentage, history,
-layout, density, theme, reset display, and tap destination.
+**AgentMeter Focus** widgets in small, medium, large, and extra-large families. Focus follows one
+agent — a hero number at small, a glowing usage ring with labelled progress bars from medium up.
+Dashboard covers every agent: compact rows at small, a ring-per-agent board at medium, provider
+rows with history at large, and a mini-card grid beside a 24-hour analytics rail at extra large.
+Each widget instance keeps its own agents, windows, used-or-remaining percentage, history, layout,
+density, theme, reset display, and tap destination.
 
-Dashboard omits history in small and medium, while Focus omits it only in small and can show a
-compact history in medium. Large and extra-large widgets add a 7- or 30-day consumption strip, a
-24-hour multi-agent trend, or a Focus daily trend. Consumption cells show daily allowance
-percentage points; trends show the latest known used percentage. Missing samples remain gaps.
-After a reported reset time passes, the widget says **Refresh pending** until the app publishes
-fresh provider data rather than pretending usage reset to zero.
+<p align="center">
+  <img src="docs/assets/screenshots/macos-widget-dashboard.png" width="364" alt="AgentMeter Dashboard widget with provider rows and a 30-day consumption strip">
+  <img src="docs/assets/screenshots/macos-widget-focus.png" width="364" alt="AgentMeter Focus widget with a usage ring and window bars">
+</p>
+
+Agents are drawn with their recognizable marks, and reset times read the way people say them —
+**Resets in 2 hr 5 min**, **Resets Mon 6:00 PM**, or the compact **⟳ 8h 15m** in dense layouts.
+Large and extra-large families add a 30-day consumption strip and a 24-hour multi-agent trend
+drawn from the bridge's retained five-minute samples. Consumption cells show daily allowance
+percentage points; trends show the latest known used percentage. Missing samples remain gaps, an
+unknown value renders as **Not reported** rather than a zero, and a passed reset says
+**Refresh pending** until fresh provider data arrives.
 
 Widget data is a bounded local JSON snapshot in the shared App Group container. It contains
 presentation-safe provider labels, status, percentages, reset times, and aggregated history—not
