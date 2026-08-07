@@ -200,20 +200,11 @@ enum FictionalFocusPresentations {
     )
 }
 
-#Preview("Claude Stale History — Large", as: .systemLarge) {
+#Preview("Claude Not Reported — Large", as: .systemLarge) {
     AgentMeterFocusWidget()
 } timeline: {
     FictionalUsageEntry(
         date: Date(timeIntervalSince1970: 1_799_884_800),
         focusPresentation: FictionalFocusPresentations.claude(family: .large)
-    )
-}
-
-#Preview("Claude Stale History — Extra Large", as: .systemExtraLarge) {
-    AgentMeterFocusWidget()
-} timeline: {
-    FictionalUsageEntry(
-        date: Date(timeIntervalSince1970: 1_799_884_800),
-        focusPresentation: FictionalFocusPresentations.claude(family: .extraLarge)
     )
 }

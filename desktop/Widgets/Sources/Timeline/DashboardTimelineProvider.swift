@@ -91,7 +91,10 @@ struct DashboardTimelineEntryView: View {
 
     var body: some View {
         if let presentation = entry.presentation {
-            DashboardWidgetView(presentation: presentation)
+            DashboardWidgetView(
+                presentation: presentation,
+                nowEpoch: Int(entry.date.timeIntervalSince1970)
+            )
         } else if let state = entry.state {
             WidgetTimelineStateView(state: state)
         }

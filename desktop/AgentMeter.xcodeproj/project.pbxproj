@@ -10,13 +10,15 @@
 		00DFF7236F53C66669AED854 /* DashboardWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05658DC367B0D76481945762 /* DashboardWidgetView.swift */; };
 		014918B5180A3AAF4B874F53 /* WidgetProviderMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217F450DE57448F2A4DAE61D /* WidgetProviderMark.swift */; };
 		017620F5899C6622EEE84953 /* FocusTimelineProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BADC5E5C2ECF4F171E2AC38 /* FocusTimelineProvider.swift */; };
+		05E08D2CA9065331A83A4F59 /* UsageBarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57517A9EF637ACCEE499FF88 /* UsageBarRow.swift */; };
 		065A134909B7C5D408E0547B /* WidgetTimelinePlannerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35FA3318F9F210BCD7B23736 /* WidgetTimelinePlannerTests.swift */; };
 		078495905FB8F613E38321FD /* ModelDecodingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFCBB242FB66501228665201 /* ModelDecodingTests.swift */; };
 		0821A7302EDB1F3BFAAB5B5B /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3D495742E594B0FE1AAF610C /* AgentMeterCore */; };
+		08BF08F3922B6DBEE7D1D9CB /* SingleUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6083C31D075193AF26EDDA /* SingleUsageRing.swift */; };
 		0BE7B0EE848ABCCB96125535 /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5863C51B35CD07EB29ACAF19 /* AgentMeterCore */; };
-		0E086006064B8E265394673D /* DualUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAAF3043A988574588FE6408 /* DualUsageRing.swift */; };
 		1585EFB283E9FA601FD9937F /* JsonLineDecoderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3877C43A7260CDD43E8DD2F /* JsonLineDecoderTests.swift */; };
 		186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
+		190ECDF9E1962280C4E43436 /* UsageBarRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57517A9EF637ACCEE499FF88 /* UsageBarRow.swift */; };
 		1C54823D1578345A395D9FCA /* WidgetStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA66ED3180281C864B89381B /* WidgetStateView.swift */; };
 		1D2500E915836C556C2CFA67 /* WidgetLocalDaySchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 364037DD56E88FD8C91939D7 /* WidgetLocalDaySchedulerTests.swift */; };
 		1DC79AA66ABD329092045169 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
@@ -25,6 +27,7 @@
 		23D913CC2BE8636428809CBE /* AgentMeterCore in Frameworks */ = {isa = PBXBuildFile; productRef = D8FE6F5A68451ECC975C4D41 /* AgentMeterCore */; };
 		24BCBCA37AE54F6CC3E70AB6 /* AgentMeterUI in Frameworks */ = {isa = PBXBuildFile; productRef = 8BBD7A0669299213D34C3611 /* AgentMeterUI */; };
 		2732B0B94B5AFA55918DDEC9 /* WidgetWindowSelectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A68835A3BFBCED93CAB2BB /* WidgetWindowSelectorTests.swift */; };
+		27A628251616DA4DDD3BD609 /* HourlyTrendChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6589635B28FD500AE930EA3D /* HourlyTrendChart.swift */; };
 		287A07CE25DA3A16BDC0BDF9 /* AgentMeterWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 69A703B58D88BE53DBA85A51 /* AgentMeterWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2AA967C7EFF08632C467A101 /* AgentMeterUI in Frameworks */ = {isa = PBXBuildFile; productRef = 2282CBA74B02D421333B7F8A /* AgentMeterUI */; };
 		2BF3A08175781732EFC0EDA3 /* ResetSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA003F811271504D138EE2A5 /* ResetSummary.swift */; };
@@ -35,6 +38,7 @@
 		3A51611A341D0CE357F70B77 /* ApplicationPresentationControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 852F8F27784C5F61DC4B1659 /* ApplicationPresentationControllerTests.swift */; };
 		3B01A3F52D9592993AF7390B /* AgentMeterIPC in Frameworks */ = {isa = PBXBuildFile; productRef = 20A743070A7FE719F2D00E07 /* AgentMeterIPC */; };
 		3BEA4AA7D5171BB9F9BF73F6 /* MenuBarPanelViewportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E76F177E3765BC7131F98A53 /* MenuBarPanelViewportTests.swift */; };
+		3C10DD4140EFB3E374DFE16D /* SingleUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6083C31D075193AF26EDDA /* SingleUsageRing.swift */; };
 		45DED249BA987AED6E3B12C4 /* AppPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9758172F3B7C809F3EBF7AB /* AppPreferencesTests.swift */; };
 		46D8BEB854BB8FCCA8B71A9C /* FictionalDashboardPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D5F8E2A76AB75009241ECD /* FictionalDashboardPresentationSource.swift */; };
 		4A67FFB071554B8A7722AC38 /* DashboardProviderRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */; };
@@ -65,9 +69,11 @@
 		9C45F84A292B2D04C55A63A4 /* IntentConfigurationAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C9DBF4D9E7A15199B86AF57 /* IntentConfigurationAdapter.swift */; };
 		9D362C07AF1DECC8EECBCFD5 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8360EBCEF85F400729DB12EE /* AppModelTests.swift */; };
 		9D64B111A50ECBA180047340 /* AgentMeterWidgetCore in Frameworks */ = {isa = PBXBuildFile; productRef = 3EC0EAA4977BA09D0D16414B /* AgentMeterWidgetCore */; };
-		A2ED40C9E5BDCCBC78405952 /* UsageHeatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB1017B8B9694012907C61E /* UsageHeatMap.swift */; };
+		A19AB3DE5F8EC95B5C857F40 /* ConsumptionStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25EF5502AEC45A13C8D468A /* ConsumptionStrip.swift */; };
 		A52D22277010B394A3575572 /* WidgetAccentContrastTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 917B39DE8880DC9107BAFE0C /* WidgetAccentContrastTests.swift */; };
+		A5A28EC5B4152148752E440E /* StatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B859C10C686052BDDF6363 /* StatusDot.swift */; };
 		A5FD1A2EED71B330ECA50727 /* SVGPathShape.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */; };
+		AD3202178E41B6CC5C2FD9DC /* HourlyTrendChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6589635B28FD500AE930EA3D /* HourlyTrendChart.swift */; };
 		AEA8C3A6B0D4CCD1E1E29A61 /* WidgetEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF61228E471856C5301179 /* WidgetEntities.swift */; };
 		AEF22BCF9DA0F2BA6AD5FE54 /* AgentMeterApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67EEB34CD5DF4C166624B6AF /* AgentMeterApplication.swift */; };
 		B59D1DEC169DE8AE13AA2BED /* FictionalFocusPresentationSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */; };
@@ -99,13 +105,15 @@
 		E0D2940E3CF48A09DBBD5035 /* FocusWidgetPreviews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27D23EF3F97D468A45561CC5 /* FocusWidgetPreviews.swift */; };
 		E13AFE006C01FEF22C3EFF57 /* AppIcon-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = B10AEEC4278BA59CFCCC75D3 /* AppIcon-1024.png */; };
 		E3A096550481D2DA737A6D2B /* FormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99F0045ED6F2F4AABEA97B00 /* FormattingTests.swift */; };
+		E5B69C81AEF3A74B1223EC34 /* StatusDot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B859C10C686052BDDF6363 /* StatusDot.swift */; };
 		EBC310F09D028D287911CB09 /* WidgetHealthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B39EE1E507E471060E06263 /* WidgetHealthIndicator.swift */; };
-		F09D327749401CDCA2EA49C6 /* DualUsageRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAAF3043A988574588FE6408 /* DualUsageRing.swift */; };
+		EDD13DD2DDCE89AA2506E796 /* LivePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05537A4E78A391358E3C9265 /* LivePill.swift */; };
 		F52003EF03931C249D5A1CDB /* DashboardHistoryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E543E3001B33FDF33AFB0DA /* DashboardHistoryPanel.swift */; };
 		F8977EAF86A89661A085DCF3 /* WidgetSnapshotLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6C668698FC58A8CA3C2019F /* WidgetSnapshotLoader.swift */; };
+		F8E488C60AE7D4BFCF94B5AA /* ConsumptionStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25EF5502AEC45A13C8D468A /* ConsumptionStrip.swift */; };
 		F984CCCF0E7258BBDDEEE21A /* WidgetIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DCDD224CB044A3B7C37E75B /* WidgetIntents.swift */; };
 		FC078974741D830EDF8F3FEA /* WidgetHealthIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B39EE1E507E471060E06263 /* WidgetHealthIndicator.swift */; };
-		FD716A3B45EB0D32CB5F9C3A /* UsageHeatMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB1017B8B9694012907C61E /* UsageHeatMap.swift */; };
+		FF3276A2BDD8208D83265300 /* LivePill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05537A4E78A391358E3C9265 /* LivePill.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -133,7 +141,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		00B859C10C686052BDDF6363 /* StatusDot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusDot.swift; sourceTree = "<group>"; };
 		0145D621DB3D1817EA966FA8 /* DashboardProviderRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardProviderRow.swift; sourceTree = "<group>"; };
+		05537A4E78A391358E3C9265 /* LivePill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LivePill.swift; sourceTree = "<group>"; };
 		05658DC367B0D76481945762 /* DashboardWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardWidgetView.swift; sourceTree = "<group>"; };
 		09D06F629160E7325C6BA933 /* FictionalFocusPresentationSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FictionalFocusPresentationSource.swift; sourceTree = "<group>"; };
 		09D518E9D78EC1CFD9BAE036 /* ThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeTests.swift; sourceTree = "<group>"; };
@@ -154,12 +164,15 @@
 		43A2F92987D2D697D954941D /* UnixBridgeClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnixBridgeClientTests.swift; sourceTree = "<group>"; };
 		47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGPathShape.swift; sourceTree = "<group>"; };
 		54E63E3C7DC4F9187A7D37C5 /* WidgetComponentRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetComponentRenderingTests.swift; sourceTree = "<group>"; };
+		57517A9EF637ACCEE499FF88 /* UsageBarRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageBarRow.swift; sourceTree = "<group>"; };
 		5A46648A8519DC4FEE921AE2 /* FocusWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusWidgetView.swift; sourceTree = "<group>"; };
 		5D1BD7776514DC1E2C30FFAD /* AgentMeterIPCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentMeterIPCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		64CF61228E471856C5301179 /* WidgetEntities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetEntities.swift; sourceTree = "<group>"; };
+		6589635B28FD500AE930EA3D /* HourlyTrendChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HourlyTrendChart.swift; sourceTree = "<group>"; };
 		67EEB34CD5DF4C166624B6AF /* AgentMeterApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentMeterApplication.swift; sourceTree = "<group>"; };
 		69A703B58D88BE53DBA85A51 /* AgentMeterWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AgentMeterWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C9DBF4D9E7A15199B86AF57 /* IntentConfigurationAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentConfigurationAdapter.swift; sourceTree = "<group>"; };
+		7B6083C31D075193AF26EDDA /* SingleUsageRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleUsageRing.swift; sourceTree = "<group>"; };
 		7F97E03D6B10AA2E41F0AC4F /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTheme.swift; sourceTree = "<group>"; };
 		8360EBCEF85F400729DB12EE /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		852F8F27784C5F61DC4B1659 /* ApplicationPresentationControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationPresentationControllerTests.swift; sourceTree = "<group>"; };
@@ -173,6 +186,7 @@
 		99F0045ED6F2F4AABEA97B00 /* FormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingTests.swift; sourceTree = "<group>"; };
 		9BADC5E5C2ECF4F171E2AC38 /* FocusTimelineProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusTimelineProvider.swift; sourceTree = "<group>"; };
 		A1B425590ADBC293AA842B6E /* DisplaySettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySettingsTests.swift; sourceTree = "<group>"; };
+		A25EF5502AEC45A13C8D468A /* ConsumptionStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsumptionStrip.swift; sourceTree = "<group>"; };
 		A5CA30D375E2693BCFF620C1 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Fixtures; path = Tests/AgentMeterCoreTests/Fixtures; sourceTree = SOURCE_ROOT; };
 		A6755288048AEAE724C5A68D /* UsageHistoryRangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHistoryRangeTests.swift; sourceTree = "<group>"; };
 		AA39D3AEBBB2DBE363A85A55 /* WidgetRenderingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRenderingTests.swift; sourceTree = "<group>"; };
@@ -190,10 +204,8 @@
 		C9B2A30FB33B748D13793CCE /* AgentMeterCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AgentMeterCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA2D407565ED1F8F612E0E14 /* desktop */ = {isa = PBXFileReference; lastKnownFileType = folder; name = desktop; path = .; sourceTree = SOURCE_ROOT; };
 		D2A68835A3BFBCED93CAB2BB /* WidgetWindowSelectorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetWindowSelectorTests.swift; sourceTree = "<group>"; };
-		DAAF3043A988574588FE6408 /* DualUsageRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualUsageRing.swift; sourceTree = "<group>"; };
 		DD1DC3228DEBBA8769092CF0 /* WidgetPresentationResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetPresentationResolverTests.swift; sourceTree = "<group>"; };
 		E76F177E3765BC7131F98A53 /* MenuBarPanelViewportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPanelViewportTests.swift; sourceTree = "<group>"; };
-		EBB1017B8B9694012907C61E /* UsageHeatMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageHeatMap.swift; sourceTree = "<group>"; };
 		ED5E31E9B3E09332E93259A8 /* AgentMeterWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentMeterWidgetBundle.swift; sourceTree = "<group>"; };
 		F3877C43A7260CDD43E8DD2F /* JsonLineDecoderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JsonLineDecoderTests.swift; sourceTree = "<group>"; };
 		F83FBFE1962F9CAAED078DD0 /* MenuProviderDetailsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuProviderDetailsTests.swift; sourceTree = "<group>"; };
@@ -425,10 +437,14 @@
 		BAD05300E067377968E675B9 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				DAAF3043A988574588FE6408 /* DualUsageRing.swift */,
+				A25EF5502AEC45A13C8D468A /* ConsumptionStrip.swift */,
+				6589635B28FD500AE930EA3D /* HourlyTrendChart.swift */,
+				05537A4E78A391358E3C9265 /* LivePill.swift */,
 				FA003F811271504D138EE2A5 /* ResetSummary.swift */,
+				7B6083C31D075193AF26EDDA /* SingleUsageRing.swift */,
+				00B859C10C686052BDDF6363 /* StatusDot.swift */,
 				47EC4CDF47CA2C810A4D1D30 /* SVGPathShape.swift */,
-				EBB1017B8B9694012907C61E /* UsageHeatMap.swift */,
+				57517A9EF637ACCEE499FF88 /* UsageBarRow.swift */,
 				211A787513AFE5CA6DBF0545 /* UsageTrendChart.swift */,
 				1B39EE1E507E471060E06263 /* WidgetHealthIndicator.swift */,
 				BB43D81CBA6586FC4F0F7D76 /* WidgetHistoryAccessibility.swift */,
@@ -723,21 +739,25 @@
 			buildActionMask = 2147483647;
 			files = (
 				7F1665A78DB4B63BF5464AE5 /* AgentMeterWidgetBundle.swift in Sources */,
+				F8E488C60AE7D4BFCF94B5AA /* ConsumptionStrip.swift in Sources */,
 				F52003EF03931C249D5A1CDB /* DashboardHistoryPanel.swift in Sources */,
 				4A67FFB071554B8A7722AC38 /* DashboardProviderRow.swift in Sources */,
 				C26BD91EFDD3257CAB5FE4E6 /* DashboardTimelineProvider.swift in Sources */,
 				625E8E27279DE8F71E7CC10E /* DashboardWidgetPreviews.swift in Sources */,
 				00DFF7236F53C66669AED854 /* DashboardWidgetView.swift in Sources */,
-				0E086006064B8E265394673D /* DualUsageRing.swift in Sources */,
 				46D8BEB854BB8FCCA8B71A9C /* FictionalDashboardPresentationSource.swift in Sources */,
 				776168455B8CF6B7B4273AE2 /* FictionalFocusPresentationSource.swift in Sources */,
 				7BD5A96D12B48A5399D0C895 /* FocusTimelineProvider.swift in Sources */,
 				E0D2940E3CF48A09DBBD5035 /* FocusWidgetPreviews.swift in Sources */,
 				62754311310BA82DEEB16722 /* FocusWidgetView.swift in Sources */,
+				27A628251616DA4DDD3BD609 /* HourlyTrendChart.swift in Sources */,
 				9C45F84A292B2D04C55A63A4 /* IntentConfigurationAdapter.swift in Sources */,
+				FF3276A2BDD8208D83265300 /* LivePill.swift in Sources */,
 				9BB3EBD1C5BA4F8FE520DBE9 /* ResetSummary.swift in Sources */,
 				A5FD1A2EED71B330ECA50727 /* SVGPathShape.swift in Sources */,
-				FD716A3B45EB0D32CB5F9C3A /* UsageHeatMap.swift in Sources */,
+				3C10DD4140EFB3E374DFE16D /* SingleUsageRing.swift in Sources */,
+				A5A28EC5B4152148752E440E /* StatusDot.swift in Sources */,
+				05E08D2CA9065331A83A4F59 /* UsageBarRow.swift in Sources */,
 				758526815CC469A2F5498570 /* UsageTrendChart.swift in Sources */,
 				AEA8C3A6B0D4CCD1E1E29A61 /* WidgetEntities.swift in Sources */,
 				FC078974741D830EDF8F3FEA /* WidgetHealthIndicator.swift in Sources */,
@@ -802,19 +822,23 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A19AB3DE5F8EC95B5C857F40 /* ConsumptionStrip.swift in Sources */,
 				35F1ABB2F2137947391E1436 /* DashboardHistoryPanel.swift in Sources */,
 				186721C0F60DC1DAF634293E /* DashboardProviderRow.swift in Sources */,
 				BF599D7D15D7144863A0A749 /* DashboardTimelineProvider.swift in Sources */,
 				C1950A820CF460095F05FD9E /* DashboardWidgetView.swift in Sources */,
-				F09D327749401CDCA2EA49C6 /* DualUsageRing.swift in Sources */,
 				D7A1F9E1DB470B2D1814B2C4 /* FictionalDashboardPresentationSource.swift in Sources */,
 				B59D1DEC169DE8AE13AA2BED /* FictionalFocusPresentationSource.swift in Sources */,
 				017620F5899C6622EEE84953 /* FocusTimelineProvider.swift in Sources */,
 				D73494C15E937C6742A0F0B5 /* FocusWidgetView.swift in Sources */,
+				AD3202178E41B6CC5C2FD9DC /* HourlyTrendChart.swift in Sources */,
 				CD2A26DCC7502BE27A8C8016 /* IntentConfigurationAdapter.swift in Sources */,
+				EDD13DD2DDCE89AA2506E796 /* LivePill.swift in Sources */,
 				2BF3A08175781732EFC0EDA3 /* ResetSummary.swift in Sources */,
 				64B778E677E779D51688E5DB /* SVGPathShape.swift in Sources */,
-				A2ED40C9E5BDCCBC78405952 /* UsageHeatMap.swift in Sources */,
+				08BF08F3922B6DBEE7D1D9CB /* SingleUsageRing.swift in Sources */,
+				E5B69C81AEF3A74B1223EC34 /* StatusDot.swift in Sources */,
+				190ECDF9E1962280C4E43436 /* UsageBarRow.swift in Sources */,
 				CACC00922984B90FF66E6EC1 /* UsageTrendChart.swift in Sources */,
 				A52D22277010B394A3575572 /* WidgetAccentContrastTests.swift in Sources */,
 				7DCD3F3488F0AFA09768578B /* WidgetComponentRenderingTests.swift in Sources */,

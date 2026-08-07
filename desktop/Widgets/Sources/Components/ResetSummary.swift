@@ -1,68 +1,55 @@
 import AgentMeterWidgetCore
+import Foundation
 import SwiftUI
 
 enum ResetSummaryContent: Equatable {
+    /// Under 24 hours away and countdowns are enabled — the view renders a
+    /// live-updating "Resets in …" line.
+    case liveRelative(Date)
+    /// Deterministic copy from WidgetResetPhrasing.
     case text(String)
-    case timer(Date)
-    case absoluteDate(Date)
 }
 
+/// Deterministic reset copy derived from the v2 distance-classified phrasing.
+/// All static text comes from WidgetResetPhrasing so views, accessibility, and
+/// tests agree on the wording.
 struct ResetSummarySemantics: Equatable {
+    let phrase: WidgetResetPhrase
     let content: [ResetSummaryContent]
+    let nowEpoch: Int
 
     init(
         presentation: WidgetRingPresentation,
         showsCountdown: Bool,
-        showsAbsoluteDate: Bool
+        showsAbsoluteDate: Bool,
+        nowEpoch: Int = Int(Date().timeIntervalSince1970)
     ) {
-        switch presentation.resetState {
-        case .unavailable:
-            content = [.text("Reset time unavailable")]
-        case .pending:
-            content = [.text("Refresh pending")]
-        case let .scheduled(epoch):
-            let resetDate = Date(timeIntervalSince1970: TimeInterval(epoch))
-            var scheduled: [ResetSummaryContent] = []
-            if showsCountdown { scheduled.append(.timer(resetDate)) }
-            if showsAbsoluteDate { scheduled.append(.absoluteDate(resetDate)) }
-            content = scheduled.isEmpty ? [.absoluteDate(resetDate)] : scheduled
+        self.nowEpoch = nowEpoch
+        let phrase = WidgetResetPhrasing.phrase(
+            for: presentation.resetState,
+            nowEpoch: nowEpoch
+        )
+        self.phrase = phrase
+        switch phrase {
+        case let .relative(epoch) where showsCountdown:
+            content = [.liveRelative(Date(timeIntervalSince1970: TimeInterval(epoch)))]
+        case .relative, .weekdayTime, .calendarDate, .pending, .unavailable:
+            content = [.text(WidgetResetPhrasing.longText(phrase, nowEpoch: nowEpoch))]
         }
+        // showsAbsoluteDate is retained for call-site compatibility; the long
+        // forms already include the absolute date beyond 24 hours.
+        _ = showsAbsoluteDate
+    }
+
+    var compactText: String {
+        WidgetResetPhrasing.compactText(phrase, nowEpoch: nowEpoch)
     }
 
     func accessibilityLines(relativeTo referenceDate: Date) -> [String] {
-        content.map { item in
-            switch item {
-            case let .text(copy):
-                copy
-            case let .timer(resetDate):
-                "Reset countdown \(Self.countdown(from: referenceDate, to: resetDate))"
-            case let .absoluteDate(resetDate):
-                "Reset date \(resetDate.formatted(.dateTime.month(.abbreviated).day().hour().minute()))"
-            }
-        }
-    }
-
-    private static func countdown(from referenceDate: Date, to resetDate: Date) -> String {
-        let seconds = Int(resetDate.timeIntervalSince(referenceDate).rounded())
-        let magnitude = abs(seconds)
-        let value: Int
-        let unit: String
-
-        if magnitude >= 86_400 {
-            value = max(1, magnitude / 86_400)
-            unit = value == 1 ? "day" : "days"
-        } else if magnitude >= 3_600 {
-            value = max(1, magnitude / 3_600)
-            unit = value == 1 ? "hour" : "hours"
-        } else if magnitude >= 60 {
-            value = max(1, magnitude / 60)
-            unit = value == 1 ? "minute" : "minutes"
-        } else {
-            value = magnitude
-            unit = value == 1 ? "second" : "seconds"
-        }
-
-        return seconds >= 0 ? "in \(value) \(unit)" : "\(value) \(unit) ago"
+        [WidgetResetPhrasing.longText(
+            phrase,
+            nowEpoch: Int(referenceDate.timeIntervalSince1970)
+        )]
     }
 }
 
@@ -72,22 +59,20 @@ struct ResetSummary: View {
     var showsLabel = true
     var compact = false
 
-    var absoluteDateMinimumScaleFactor: CGFloat {
-        compact ? 0.65 : 0.85
-    }
-
     init(
         presentation: WidgetRingPresentation,
         showsCountdown: Bool,
         showsAbsoluteDate: Bool,
         showsLabel: Bool = true,
-        compact: Bool = false
+        compact: Bool = false,
+        nowEpoch: Int = Int(Date().timeIntervalSince1970)
     ) {
         self.presentation = presentation
         semantics = ResetSummarySemantics(
             presentation: presentation,
             showsCountdown: showsCountdown,
-            showsAbsoluteDate: showsAbsoluteDate
+            showsAbsoluteDate: showsAbsoluteDate,
+            nowEpoch: nowEpoch
         )
         self.showsLabel = showsLabel
         self.compact = compact
@@ -113,40 +98,48 @@ struct ResetSummary: View {
                     .lineLimit(1)
             }
 
-            ForEach(Array(semantics.content.enumerated()), id: \.offset) { _, item in
-                contentView(item)
+            if compact {
+                Text(semantics.compactText)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            } else {
+                ForEach(Array(semantics.content.enumerated()), id: \.offset) { _, item in
+                    contentView(item)
+                }
             }
         }
-        .font(compact ? .caption2 : .caption)
-        .foregroundStyle(.secondary)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilitySummary)
     }
 
     @ViewBuilder
     private func contentView(_ content: ResetSummaryContent) -> some View {
         switch content {
-        case let .text(copy):
-            if compact {
-                Text(copy)
-            } else if case .unavailable = presentation.resetState {
-                Label(copy, systemImage: "questionmark.circle")
-            } else if case .pending = presentation.resetState {
-                Label(copy, systemImage: "arrow.clockwise")
-            } else {
-                Text(copy)
-            }
-        case let .timer(resetDate):
-            HStack(spacing: 3) {
-                Image(systemName: "clock")
-                    .accessibilityHidden(true)
-                Text(resetDate, style: .timer)
-                    .monospacedDigit()
-            }
-        case let .absoluteDate(resetDate):
-            Text(resetDate, format: .dateTime.month(.abbreviated).day().hour().minute())
+        case let .liveRelative(resetDate):
+            Text("Resets in \(Text(resetDate, style: .relative))")
+                .monospacedDigit()
                 .lineLimit(1)
-                .minimumScaleFactor(absoluteDateMinimumScaleFactor)
-                .allowsTightening(compact)
+        case let .text(copy):
+            switch semantics.phrase {
+            case .pending:
+                Label(copy, systemImage: "arrow.clockwise")
+                    .lineLimit(1)
+            case .unavailable:
+                Label(copy, systemImage: "questionmark.circle")
+                    .lineLimit(1)
+            case .relative, .weekdayTime, .calendarDate:
+                Text(copy)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
         }
+    }
+
+    private var accessibilitySummary: String {
+        let lines = semantics.accessibilityLines(
+            relativeTo: Date(timeIntervalSince1970: TimeInterval(semantics.nowEpoch))
+        )
+        guard showsLabel else { return lines.joined(separator: ", ") }
+        return ([presentation.label] + lines).joined(separator: ", ")
     }
 }
