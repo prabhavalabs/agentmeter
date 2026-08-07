@@ -12,12 +12,37 @@ _PROVIDER_NAMES = {
     "gemini": "Gemini",
 }
 
-_WINDOW_LABELS = {
-    "claude": ("Session", "Weekly", "Sonnet"),
-    "codex": ("Session", "Weekly", "Tertiary"),
-    "cursor": ("Total", "Auto", "API"),
-    "gemini": ("Pro", "Flash", "Flash Lite"),
+# CodexBar reports usage as primary/secondary/tertiary slots whose meaning
+# differs per provider; kinds must reflect that meaning, not the slot, so the
+# window selectors downstream never treat Cursor's total or Gemini's daily
+# quota as a session window.
+_WINDOW_SPECS = {
+    "claude": (
+        ("session", "Session"),
+        ("weekly", "Weekly"),
+        ("model_weekly", "Sonnet"),
+    ),
+    "codex": (
+        ("session", "Session"),
+        ("weekly", "Weekly"),
+        ("tertiary", "Tertiary"),
+    ),
+    "cursor": (
+        ("total", "Total"),
+        ("auto", "Auto"),
+        ("api", "API"),
+    ),
+    "gemini": (
+        ("pro_daily", "Pro"),
+        ("flash_daily", "Flash"),
+        ("flash_lite_daily", "Flash Lite"),
+    ),
 }
+_DEFAULT_WINDOW_SPEC = (
+    ("primary", "Primary"),
+    ("secondary", "Secondary"),
+    ("tertiary", "Tertiary"),
+)
 
 
 class NormalizationError(ValueError):
@@ -255,11 +280,10 @@ def _dashboard_provider_from_usage(
         return fallback
 
     try:
-        labels = _WINDOW_LABELS.get(provider_id, ("Primary", "Secondary", "Tertiary"))
+        specs = _WINDOW_SPECS.get(provider_id, _DEFAULT_WINDOW_SPEC)
         windows = [
-            _usage_window(usage.get("primary"), kind="session", label=labels[0]),
-            _usage_window(usage.get("secondary"), kind="weekly", label=labels[1]),
-            _usage_window(usage.get("tertiary"), kind="tertiary", label=labels[2]),
+            _usage_window(usage.get(slot), kind=kind, label=label)
+            for slot, (kind, label) in zip(("primary", "secondary", "tertiary"), specs, strict=True)
         ]
         normalized_windows = [window for window in windows if window is not None]
         for extra in usage.get("extraRateWindows") or []:
