@@ -94,6 +94,7 @@ public struct AppSettingsView: View {
             get: { launchAtLogin.isEnabled },
             set: { enabled in
                 Task {
+                    model.preferences.launchAtLoginConfigured = true
                     let saved = await launchAtLogin.setEnabled(enabled)
                     if saved {
                         model.preferences.launchAtLogin = enabled

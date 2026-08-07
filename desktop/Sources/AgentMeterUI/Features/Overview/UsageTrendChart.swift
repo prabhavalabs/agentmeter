@@ -20,7 +20,10 @@ struct UsageTrendChart: View {
         self.now = now
         self.onSelectRange = onSelectRange
         series = providers.compactMap { provider in
-            let preferredKind = provider.windows.first(where: { $0.kind == "session" })?.kind
+            // Chart the long allowance window: session windows reset every few
+            // hours and draw a sawtooth that reads as erratic usage.
+            let preferredKind = provider.windows.first(where: { $0.kind == "weekly" })?.kind
+                ?? provider.windows.first(where: { $0.kind != "session" })?.kind
                 ?? provider.windows.first?.kind
             guard let preferredKind else { return nil }
             let matching = samples
@@ -124,6 +127,11 @@ struct UsageTrendChart: View {
         }
         .chartXScale(domain: chartDomain)
         .chartYScale(domain: 0 ... 100)
+        // Marks are not clipped to the plot area by default, so a point that
+        // lands on the domain boundary spills over the axis labels.
+        .chartPlotStyle { plotArea in
+            plotArea.clipped()
+        }
         .chartYAxis {
             AxisMarks(position: .leading, values: [0, 25, 50, 75, 100]) { value in
                 AxisGridLine()

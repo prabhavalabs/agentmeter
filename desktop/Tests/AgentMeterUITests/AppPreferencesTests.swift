@@ -35,3 +35,19 @@ import Testing
     #expect(preferences.sidebarVisible)
     #expect(preferences.notificationsEnabled == false)
 }
+
+@MainActor
+@Test func launchAtLoginDefaultRegistrationRunsExactlyOnce() async {
+    let defaults = UserDefaults(suiteName: "launch-at-login-default-\(UUID().uuidString)")!
+    let preferences = AppPreferences(defaults: defaults)
+
+    #expect(preferences.launchAtLoginConfigured == false)
+
+    // First run claims the one-time default registration.
+    preferences.launchAtLoginConfigured = true
+    preferences.launchAtLogin = true
+
+    let reloaded = AppPreferences(defaults: defaults)
+    #expect(reloaded.launchAtLoginConfigured == true)
+    #expect(reloaded.launchAtLogin == true)
+}

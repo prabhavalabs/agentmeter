@@ -28,6 +28,15 @@ struct AgentMeterApplication: App {
                     model.navigate(to: AgentMeterRoute(url: url))
                     ApplicationPresentationController.shared.windowWillOpen()
                 }
+                .task {
+                    // Managed installs start at login out of the box; an
+                    // explicit choice in Settings always wins afterwards.
+                    if bridgeService.isCommunityBuild == false {
+                        await launchAtLogin.enableByDefaultIfUnconfigured(
+                            preferences: model.preferences
+                        )
+                    }
+                }
         }
         .defaultSize(width: 1120, height: 760)
         .windowResizability(.contentMinSize)
