@@ -86,6 +86,11 @@ public struct ApplicationSettingsForm: View {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(AgentMeterTheme.warning)
+                    if error == UserNotificationController.deniedMessage {
+                        Button("Open Notification Settings") {
+                            UserNotificationController.openSystemNotificationSettings()
+                        }
+                    }
                 }
             }
 
